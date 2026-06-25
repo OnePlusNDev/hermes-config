@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 62
+        "completed": 110
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.329908+08:00",
-      "next_run_at": "2026-06-23T20:30:00+08:00",
-      "last_run_at": "2026-06-23T20:03:18.228105+08:00",
+      "next_run_at": "2026-06-24T20:30:00+08:00",
+      "last_run_at": "2026-06-24T20:09:45.293223+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -57,15 +57,15 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 1
+        "completed": 2
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.523474+08:00",
-      "next_run_at": "2026-06-24T20:00:00+08:00",
-      "last_run_at": "2026-06-22T20:20:16.251452+08:00",
+      "next_run_at": "2026-06-25T20:00:00+08:00",
+      "last_run_at": "2026-06-23T20:41:32.808628+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -94,15 +94,15 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 1
+        "completed": 2
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.717053+08:00",
-      "next_run_at": "2026-06-23T21:00:00+08:00",
-      "last_run_at": "2026-06-22T21:05:11.787890+08:00",
+      "next_run_at": "2026-06-24T21:00:00+08:00",
+      "last_run_at": "2026-06-23T21:13:45.674161+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -112,5 +112,5 @@
       "workdir": null
     }
   ],
-  "updated_at": "2026-06-23T20:03:18.229164+08:00"
+  "updated_at": "2026-06-24T20:09:45.293859+08:00"
 }
