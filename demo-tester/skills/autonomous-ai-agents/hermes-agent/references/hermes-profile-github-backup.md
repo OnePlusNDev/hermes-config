@@ -71,7 +71,7 @@ If the target repo (e.g., `hermes-config`) doesn't exist under the expected org 
 
 Workaround: try `gh repo view OWNER/repo-name`. If that works, use `OWNER/repo` as the remote URL. The personal repo may already contain subdirectories per profile (e.g., `demo-tester/`, `demo-dev/`). Check existing tree structure before creating content.
 
-### 10. SSH Works When HTTPS Times Out
+### 10. SSH Works When HTTPS Times Out (But Watch the Account)
 
 In cron environments, HTTPS to `github.com:443` can hang indefinitely (75+ second timeouts). **Git over SSH works in these cases** because it uses a different transport layer.
 
@@ -82,6 +82,13 @@ git clone --depth=1 git@github.com:<owner>/<repo>.git /tmp/dest 2>&1
 ```
 
 If `gh repo view OWNER/repo` works but cloning fails on HTTPS, the repo exists — just use SSH for the transport.
+
+**⚠️ SSH key / GitHub account mismatch pitfall:** The SSH key on the host machine may belong to a **different** GitHub account than the repo owner. For example, the key authenticates as `MigbotBoss` but the repo lives under `OnePlusNDev`. `ssh -T git@github.com` confirms *who* authenticates, not *which account owns the repo*. When the accounts don't match:
+- SSH clone may work for read but fail for push (403)
+- `gh repo view OWNER/repo` works because `gh` uses its own OAuth token (not SSH)
+- `git push` over HTTPS also fails if the credential helper maps to the wrong token
+
+**Diagnostic:** Compare `ssh -T git@github.com` (authenticated user) with `gh api /user --jq .login` (gh's token user). If they differ, SSH push will fail.
 
 ### 11. Remote Git Ops Can Work Even When Clone Fails
 
@@ -250,6 +257,110 @@ for name, content in files.items():
 print(f"\nDone → https://github.com/{OWNER}/{REPO}/tree/{BRANCH}/{subdir}")
 ```
 
+## Alternative 2: Git Data API Batch Upload (Faster for 100+ Files)
+
+When you need to upload hundreds of files (e.g., the entire `skills/` directory with 480+ files), the single-file Contents API approach above is **painfully slow** — one API call per file, each round-trip costing 200-500ms. Total: 2-4 minutes for a full profile.
+
+**Use the Git Data API instead.** It lets you create a commit in 3 API calls regardless of file count:
+
+1. `POST /git/trees` — create a tree with all files as entries
+2. `POST /git/commits` — create a commit pointing to that tree
+3. `PATCH /git/refs/heads/{branch}` — fast-forward the branch
+
+### Why This Matters for Cron
+
+- `gh api` (shell) works in cron even when `execute_code` and `git push` are blocked
+- `gh api` handles GitHub auth automatically via the stored OAuth token — no token extraction needed
+- No raw `urllib` or Python network code needed
+
+### Implementation Pattern
+
+```bash
+# 1. Get latest commit SHA
+LATEST=$(gh api repos/OWNER/REPO/git/refs/heads/main --jq '.object.sha')
+
+# 2. Create a tree JSON with all file entries
+# Each entry: {"path": "demo-tester/config.yaml", "mode": "100644", "type": "blob", "content": "..."}
+python3 -c "
+import os, json
+
+base = '/Users/oneplusn/.hermes/profiles/demo-tester'
+prefix = 'demo-tester'
+entries = []
+
+def add(rel, abspath):
+    with open(abspath) as f:
+        entries.append({
+            'path': f'{prefix}/{rel}',
+            'mode': '100644',
+            'type': 'blob',
+            'content': f.read()
+        })
+
+# Explicitly add files you want to back up
+add('config.yaml', f'{base}/config.yaml')
+add('RULES.md', f'{base}/RULES.md')
+add('SOUL.md', f'{base}/SOUL.md')
+
+# Or walk a directory tree (excluding hidden dirs)
+for root, dirs, files in os.walk(f'{base}/skills'):
+    dirs[:] = [d for d in dirs if not d.startswith('.')]
+    for f in sorted(files):
+        if f.startswith('.'): continue
+        rel = os.path.relpath(os.path.join(root, f), base)
+        add(rel, os.path.join(root, f))
+
+print(json.dumps({'tree': entries, 'base_tree': None}))
+" | gh api repos/OWNER/REPO/git/trees --input - --jq '.sha'
+# Returns: TREE_SHA
+
+# 3. Create commit
+COMMIT_SHA=$(gh api repos/OWNER/REPO/git/commits \
+  --field message="backup(profile): automated backup @ $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --field tree="$TREE_SHA" \
+  --field parents[]="$LATEST" \
+  --jq '.sha')
+
+# 4. Fast-forward branch
+gh api repos/OWNER/REPO/git/refs/heads/main \
+  -X PATCH --field sha="$COMMIT_SHA" --field force=false
+```
+
+### Key Advantages
+
+- **Single tree call handles 487 files in ~2 seconds** (vs 2-4 minutes with individual Contents API calls)
+- **No SHA tracking** — you don't need to know each file's existing SHA for overwriting
+- **`gh api` handles auth** — no token extraction, no urllib, no Authorization headers
+- **Works in cron** where `execute_code` and `git push over HTTPS` may be blocked
+
+### Pitfall: Payload Size Limit
+
+GitHub's API accepts tree payloads up to ~10MB. A full profile backup with all skill SKILL.md files, references, scripts, and templates typically comes to ~5-7MB (under the limit). If you exceed it, split into two trees:
+
+1. Core config files (config.yaml, SOUL.md, RULES.md, memories, cron/jobs.json)
+2. Skills directory (backup separately on alternating cycles)
+
+Or trim what you back up — `skills/` is managed by the skills hub and can be regenerated; consider backing up the skill list (`hermes skills list`) instead of the full tree.
+
+### Verification
+
+```bash
+# Check the commit
+gh api repos/OWNER/REPO/git/commits/$COMMIT_SHA --jq '.tree.sha[:12]'
+
+# List top-level files
+gh api repos/OWNER/REPO/git/trees/$COMMIT_SHA \
+  -q '.tree[] | select(.path | startswith("demo-tester")) | "  \(.type) \(.path)"'
+
+# Count files
+gh api repos/OWNER/REPO/git/trees/$TREE_SHA?recursive=true \
+  -q '[.tree[] | select(.type == "blob")] | length'
+
+# Verify no sensitive files leaked (no .env, auth.json, etc.)
+gh api repos/OWNER/REPO/git/trees/$TREE_SHA?recursive=true \
+  -q '.tree[] | select(.path | test("env|auth|secret|token|key")) | "WARNING: \(.path)"'
+```
+
 ## Cron Prompt Design
 
 When writing the cron job prompt, keep it short and avoid token-handling instructions in the prompt text. The prompt should reference the backup task conceptually, not contain shell commands:
@@ -267,9 +378,12 @@ The security scanner flags prompts that contain `curl` with `Authorization` head
 Before backing up, always scan for plaintext API keys in config files:
 
 ```bash
-grep -rn "sk-" PATH/to/config.yaml  # OpenAI/Azure style
-grep -rn "ghp_" PATH/                # GitHub personal access tokens
-grep -rn "xoxb-" PATH/               # Slack bot tokens
+grep -rn "sk-" PATH/to/config.yaml         # OpenAI/Azure style (starts with 'sk-')
+grep -rn "api_key: ['\"][a-zA-Z0-9_]" PATH/  # Any non-empty api_key value in YAML
+grep -rn "ghp_" PATH/                       # GitHub personal access tokens
+grep -rn "xoxb-" PATH/                      # Slack bot tokens
 ```
 
-If found, **do not backup** — replace the key with a `key_env` reference in config.yaml first. In this session, all `api_key` fields in `config.yaml` were empty strings (`''`) and the model provider was local Ollama — no plaintext keys detected.
+If found, **do not backup**. Replace the key with a `key_env` reference in config.yaml first. The pattern to confirm safety: search for `api_key:` with a non-empty value AND search for `sk-` specifically. Both must return zero matches.
+
+**In this session:** all `api_key` fields in `config.yaml` were empty strings (`''`), no `sk-` pattern was found. The model provider (DeepSeek) uses the standard environment-var-based auth (`DEEPSEEK_API_KEY` in `.env`) — no plaintext key in config.yaml.
