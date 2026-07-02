@@ -155,7 +155,102 @@ export HF_ENDPOINT=https://hf-mirror.com
 Models live at `~/.cache/huggingface/hub/`. If the directory exists with model
 subdirectories, the cache is populated — the daemon just can't verify freshness.
 
-## No Dedicated \"Optimize\" or \"Vacuum\" Command
+## Importing Flat-File Memories Into Hindsight
+
+When the `memory` tool returns `"Memory is not available"` (common when hindsight is configured as provider but the tool dispatch fails), the fallback is to use `hindsight_client` directly against the running daemon:
+
+```python
+from hindsight_client import Hindsight
+
+client = Hindsight(base_url='http://localhost:<port>')
+```
+
+### Read flat files and import
+
+```python
+import asyncio
+
+async def import_flat_memories():
+    client = Hindsight(base_url='http://localhost:<port>')
+
+    # Read the flat-file memories
+    with open('/path/to/profile/memories/MEMORY.md') as f:
+        memory_content = f.read()
+    with open('/path/to/profile/memories/USER.md') as f:
+        user_content = f.read()
+
+    # Import into hindsight's DB
+    r1 = await client.aretain(
+        bank_id='hermes',
+        content=f'=== MEMORY.md ===\n\n{memory_content}',
+        tags=['memory-md', 'imported'],
+        metadata={'source': 'flat-file-memory', 'import_date': 'YYYY-MM-DD'}
+    )
+
+    r2 = await client.aretain(
+        bank_id='hermes',
+        content=f'=== USER.md ===\n\n{user_content}',
+        tags=['user-md', 'imported'],
+        metadata={'source': 'flat-file-user', 'import_date': 'YYYY-MM-DD'}
+    )
+
+    # Verify — hindsight auto-chunks into facts
+    mems = await client.memory.list_memories(bank_id='hermes')
+    print(f'Total hindsight memories: {mems.total}')
+
+asyncio.run(import_flat_memories())
+```
+
+Hindsight auto-chunks the content: the flat files (~3KB + ~1.5KB) typically produce **15–25 individual facts** with extracted entities, categorized by `fact_type` (experience, observation, etc.) and dated with timestamps.
+
+### Verify imported content
+
+```python
+mems = await client.memory.list_memories(bank_id='hermes', limit=100)
+for m in mems.items:
+    print(f'Fact: {m.get(\"text\", \"\")[:80]}')
+    print(f'  Type: {m.get(\"fact_type\")}  Entities: {m.get(\"entities\")}')
+```
+
+Memory items are `dict` objects (not pydantic models) with keys: `id`, `text`, `context`, `date`, `fact_type`, `document_id`, `entities`, `occurred_start`, `occurred_end`.
+
+### Trigger consolidation after import
+
+```python
+op = await client.banks.trigger_consolidation(bank_id='hermes')
+print(f'Consolidation triggered: operation_id={op.operation_id}')
+```
+
+The consolidation deduplicates and creates cross-fact observations. It runs asynchronously in the background — the operation_id can be used to track progress.
+
+### API method naming quirks
+
+The hindsight_client SDK uses OpenAPI-generated classes where method names differ from the `Hindsight` class aliases:
+
+| Want | Method on `client` | Method on namespace |
+|------|-------------------|-------------------|
+| List banks | `client.banks.list_banks()` | — |
+| Bank config | `client.banks.get_bank_config(bank_id=...)` | — |
+| List memories | `client.memory.list_memories(bank_id=...)` | — |
+| List mental models | `client.mental_models.list_mental_models(bank_id=...)` | NOT `list()` |
+| List directives | `client.directives.list_directives(bank_id=...)` | NOT `list()` |
+| Trigger consolidation | `client.banks.trigger_consolidation(bank_id=...)` | — |
+| Bank profile | `client.banks.get_bank_profile(bank_id=...)` | — |
+
+All methods are **async** — must be called with `await`.
+
+### Bash-only fallback (cron mode)
+
+When `execute_code` is blocked in cron jobs, use curl to save results to a temp file, then analyze with `read_file`:
+
+```bash
+curl -s "http://localhost:<port>/v1/default/banks/hermes/stats" -o /tmp/hindsight_stats.json
+curl -s "http://localhost:<port>/v1/default/banks/hermes/graph?limit=200" -o /tmp/graph.json
+```
+
+Then call `read_file(path='/tmp/graph.json')` for inspection. Avoid piping to `python3 -c` — the security scanner blocks it.
+
+## No Dedicated "Optimize" or "Vacuum" Command
 
 Hindsight has **no standalone optimize/vacuum/maintenance CLI command**. The consolidation endpoint IS the optimization mechanism:
 
@@ -163,7 +258,7 @@ Hindsight has **no standalone optimize/vacuum/maintenance CLI command**. The con
 - `hindsight-admin`: `backup`, `restore`, `run-db-migration`, `export-bank`, `import-bank` — no optimize.
 - The HTTP API: `POST /v1/default/banks/<id>/consolidate` triggers memory consolidation (dedup, observation creation).
 
-If a cron job asks to \"optimize memory with hindsight,\" the answer is: trigger consolidation via the HTTP API, then verify with bank stats. There is no SQL-level VACUUM or index rebuild command.
+If a cron job asks to "optimize memory with hindsight," the answer is: trigger consolidation via the HTTP API, then verify with bank stats. There is no SQL-level VACUUM or index rebuild command.
 
 ## `memory.db` Is Always 0 Bytes with Hindsight
 

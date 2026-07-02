@@ -135,6 +135,191 @@ The Hermes profile's `skills/` directory contains dozens of skills (hundreds of 
 
 If the backup target repo already has other profiles' content (e.g., `demo-dev/`), its top-level `.gitignore` may not cover profile-specific files. Create a per-profile `.gitignore` inside each subdirectory to ensure consistent exclusion.
 
+## 16. ⚠️ CRITICAL: `home/` Directory Hazard — Contains GitHub OAuth Tokens
+
+The Hermes profile's `home/` directory mirrors the user's actual `$HOME` inside the sandboxed terminal. It contains:
+
+```
+home/.config/gh/config.yml     # gh CLI config
+home/.config/gh/hosts.yml      # ⚠️ PLAINTEXT GITHUB OAUTH TOKENS
+home/.gitconfig                 # Git identity
+home/.local/state/gh/device-id  # Device registration
+home/demo-workflow/             # Embedded git repo (submodule trap)
+```
+
+If `home/` is accidentally committed to a public GitHub repo, **all OAuth tokens for all associated GitHub accounts are leaked instantly**.
+
+### Prevention
+
+1. **Add `home/` to the root `.gitignore`** of any Hermes-config backup repo immediately:
+   ```gitignore
+   # Secret / sandbox home directory
+   home/
+   ```
+
+2. **When using rsync, explicitly exclude `home/`**:
+   ```bash
+   rsync -av --exclude='home/' \
+     --exclude='.env' --exclude='auth.json' \
+     ~/.hermes/profiles/<name>/ /tmp/dest/
+   ```
+
+3. **If `home/` was already staged**, remove it before committing:
+   ```bash
+   git rm --cached -rf demo-tester/home
+   # Then add home/ to .gitignore
+   ```
+
+4. **Audit the staged tree for any sensitive files** before committing:
+   ```bash
+   git status --short | grep '^A' | grep -E 'env|auth|token|secret|key|hosts|config\.(yml|yaml)$' | grep -v '.gitignore'
+   ```
+   This catches encryption keys (`auth.*`), credential exports (`hosts.yml`), and runtime secrets that rsync may have picked up.
+
+## 17. Post-rsync File Audit Procedure
+
+When using rsync to copy config files into a git repo, unwanted files inevitably sneak through because rsync doesn't respect `.gitignore`. Run this audit loop after every rsync copy:
+
+```bash
+# 1. Stage everything
+git add -A
+
+# 2. Audit for sensitive files
+git status --short | grep '^A' | grep -E '\.bak\.|\.cache|processes\.json|desktop/|workspace/|bin/|home/|logs/|sessions/|sandboxes/|\.hermes_history|fetch_issues\.py'
+
+# 3. Remove any that match
+git rm --cached \
+  demo-tester/.hermes_history \
+  demo-tester/config.yaml.bak.* \
+  demo-tester/context_length_cache.yaml \
+  demo-tester/ollama_cloud_models_cache.json \
+  demo-tester/provider_models_cache.json \
+  demo-tester/processes.json \
+  demo-tester/fetch_issues.py
+
+# 4. Remove entire hazardous subtrees
+git rm --cached -rf \
+  demo-tester/home \
+  demo-tester/bin \
+  demo-tester/desktop \
+  demo-tester/workspace
+
+# 5. Remove skills runtime state (dotfiles)
+git rm --cached -rf \
+  demo-tester/skills/.hub \
+  demo-tester/skills/.curator_backups
+git rm --cached \
+  demo-tester/skills/.bundled_manifest \
+  demo-tester/skills/.curator_state \
+  demo-tester/skills/.usage.json
+```
+
+After this audit, the staged tree should contain **only**:
+- `config.yaml`, `SOUL.md`, `RULES.md`
+- `memories/MEMORY.md`, `memories/USER.md`
+- `skills/` (skill SKILL.md files, references, scripts, templates — NOT dotfile runtime state)
+
+## 18. `.gitignore` Update Checklist
+
+When adding a new profile subdirectory to the backup repo, update the root `.gitignore` with these patterns:
+
+```gitignore
+# Sensitive / secret files
+.env
+.auth*
+*.lock
+*.pid
+gateway_state.json
+channel_directory.json
+
+# Secrets store
+auth.json
+
+# Secret sandbox home (contains GH OAuth tokens!)
+home/
+
+# Runtime / cache artifacts
+.update_check
+.hermes_history
+fetch_issues.py
+*.bak.*
+context_length_cache.yaml
+ollama_cloud_models_cache.json
+provider_models_cache.json
+processes.json
+desktop/
+workspace/
+bin/
+
+# Runtime databases
+*.db
+*.db-shm
+*.db-wal
+state.db*
+
+# Gateway / session state
+gateway.lock
+session_log.txt
+
+# Large snapshot files
+.skills_prompt_snapshot.json
+skills_manifest.json
+
+# Skip runtime subdirs but keep their .gitignore
+skills/.*/
+sessions/
+cron/.*/
+logs/
+plans/
+sandboxes/
+pairing/
+lsp/
+hooks/
+
+# OS / temp files
+.DS_Store
+*.swp
+*.swo
+*~
+```
+
+## 19. Push Failure Handling
+
+When the local commit succeeds but `git push` fails (network issues, SSH vs HTTPS credential mismatch):
+
+### Diagnostic steps
+
+```bash
+# 1. Test HTTPS connectivity
+curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 https://github.com
+# Returns 000 → network block, 200 → OK
+
+# 2. Test SSH connectivity
+git ls-remote origin HEAD
+# Quick check using SSH on port 22 (may work when HTTPS:443 is blocked)
+
+# 3. Test alternative transport
+GIT_SSH_COMMAND="ssh -o ConnectTimeout=10" git push origin main
+```
+
+### Recovery options
+
+| Scenario | Action |
+|----------|--------|
+| HTTPS blocked, SSH works | `git remote set-url origin git@github.com:OWNER/REPO.git && git push` |
+| Both fail | Report local commit SHA so user can push manually later |
+| Credential mismatch (gh token ≠ SSH key) | `git config --local credential.helper '!gh auth git-credential' && git push` |
+
+### Report format for failed push
+
+Include the commit SHA and the repo so the user can push manually later:
+```
+✅ Commit succeeded locally (SHA: abc1234)
+❌ Push failed: GitHub unreachable (HTTPS time out, SSH also unreachable)
+→ Local commit is ready at /tmp/hermes-config/
+→ To push manually: cd /tmp/hermes-config && git push origin main
+```
+
 ## Working Backup Script
 
 Save as `/tmp/backup_profile.py` via `write_file`, then run with `terminal('python3 /tmp/backup_profile.py')`:

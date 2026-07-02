@@ -553,3 +553,28 @@ git push origin main
 ```
 
 The `failed to store: -60008` warning (macOS keychain) is harmless — the push still succeeds.
+
+### HTTPS blocked, use SSH transport
+
+In certain environments (cron jobs, restricted networks, corporate proxies), HTTPS to `github.com:443` may time out while SSH on port 22 works fine.
+
+**Diagnostic:**
+```bash
+# Test HTTPS
+curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 https://github.com
+# Returns 000 → network block
+
+# Test SSH
+ssh -T git@github.com 2>&1 | head -1
+# "Hi USER! You've successfully authenticated" → SSH works
+```
+
+**Fix — switch remote to SSH:**
+```bash
+git remote set-url origin git@github.com:OWNER/REPO.git
+git push origin main
+```
+Or use `GIT_SSH_COMMAND` for a one-off:
+```bash
+GIT_SSH_COMMAND="ssh -o ConnectTimeout=10" git push origin main
+```

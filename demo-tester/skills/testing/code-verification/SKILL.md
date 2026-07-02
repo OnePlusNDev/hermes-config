@@ -225,6 +225,19 @@ gh auth switch --user OnePlusNDev
 
 This is cleaner than the `.env` sourcing approach (no temp script files, no token extraction). See **`references/profile-auth-mismatch.md` Technique D** for full details.
 
+### Git push via OAuth when SSH key belongs to wrong account
+
+When the SSH key authenticates as a different user than the repo owner, `git push` fails with 403. The fix is `gh auth setup-git` + switching the remote to HTTPS:
+
+```bash
+git remote set-url origin https://github.com/OWNER/REPO.git
+gh auth setup-git     # configures git to use gh's OAuth token
+git push origin main
+git remote set-url origin git@github.com:OWNER/REPO.git  # restore SSH
+```
+
+See **`references/profile-auth-mismatch.md` Technique E** for full details and diagnostic commands.
+
 ### Why this matters
 
 - `--assignee "@me"` resolves from `gh`'s auth context, not the profile

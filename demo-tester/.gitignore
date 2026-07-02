@@ -1,0 +1,54 @@
+# ── Secrets & Credentials ────────────────────────────────────
+.env
+auth.json
+auth.lock
+
+# ── Runtime Databases ──────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+
+# ── Compiled / Cached Artifacts ─────────────────────────────
+*_cache.json
+_cache/
+__pycache__/
+*.pyc
+
+# ── Runtime State Files ─────────────────────────────────────
+gateway.*
+processes.json
+*.pid
+*.lock
+
+# ── Backup / Temporary Files ────────────────────────────────
+*.bak
+*.bak.*
+config.yaml.bak*
+
+# ── User Private Data ──────────────────────────────────────
+memories/
+
+# ── Generated / Runtime Artifacts ──────────────────────────
+logs/
+cache/
+audio_cache/
+image_cache/
+sessions/
+home/
+desktop/
+workspace/
+sandboxes/
+pairing/
+plans/
+skins/
+hooks/
+bin/
+cron/output/
+cron/ticker_*
+.skills_prompt_snapshot.json
+.update_check
+skills/.bundled_manifest
+skills/.curator_backups/
+skills/.curator_state
+skills/.hub/
+skills/.usage.json

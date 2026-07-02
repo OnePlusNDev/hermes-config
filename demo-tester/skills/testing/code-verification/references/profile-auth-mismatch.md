@@ -131,6 +131,74 @@ gh auth switch --user OnePlusNDev
 | **`gh auth switch`** | Fresh cron sessions, when both accounts are in keychain | Must `unset GH_TOKEN` first; affects global auth state |
 | **source .env + GH_TOKEN** | Multi-session environments, when keychain mismatch is expected | Needs temp script file; token is per-call, no side effects |
 
+## Technique E: gh auth setup-git — Bridge SSH + OAuth for git push
+
+When the machine's **SSH key authenticates as a different GitHub account** than the repo owner, `git clone` works (read) but `git push` fails with `ERROR: Permission to OWNER/REPO.git denied to SSH_USER`. This is common in multi-profile setups.
+
+### Root cause
+
+- SSH key → authenticates as `MigbotBoss` (or some other user)
+- Repo lives under `OnePlusNDev` — a different account
+- `gh` CLI holds a valid OAuth token for `OnePlusNDev` (via keychain)
+- `gh repo view`, `gh api`, etc. work fine (OAuth)
+- `git push origin main` → SSH URL → SSH key → wrong account → 403
+
+### The fix: `gh auth setup-git`
+
+```bash
+# 1. Check current remote (likely SSH)
+git remote -v
+# → git@github.com:OnePlusNDev/hermes-config.git
+
+# 2. Switch remote to HTTPS
+git remote set-url origin https://github.com/OnePlusNDev/hermes-config.git
+
+# 3. Configure gh's credential helper for git
+gh auth setup-git
+# → Configures git's credential.helper to use gh's OAuth token
+
+# 4. Push — now uses gh's OAuth token via HTTPS
+git push origin main
+# → ✓ success
+
+# 5. IMPORTANT: Restore SSH remote for future sessions
+git remote set-url origin git@github.com:OnePlusNDev/hermes-config.git
+```
+
+### How it works
+
+`gh auth setup-git` configures git to delegate HTTPS authentication to `gh`'s credential helper. When `git push` is called over HTTPS, git asks the credential helper for credentials, and `gh` returns its OAuth token. This token belongs to the correct account, so push succeeds.
+
+### When to use this
+
+| Scenario | Best approach |
+|----------|---------------|
+| Need git clone + push in one session | Use **Technique E** (`gh auth setup-git` + HTTPS remote) |
+| Need only read operations (`gh api`, `gh issue`) | Normal `gh` commands work via OAuth — no change needed |
+| Need to run `gh` commands as a specific profile user | Use **Technique A** (source .env) or **Technique D** (gh auth switch) |
+| Both SSH and OAuth accounts match | Use SSH as normal — no fix needed |
+
+### Pitfalls
+
+- **Restore SSH remote after push** — if you leave the remote as HTTPS, the NEXT session (which may use SSH-only auth) will hit a credential prompt or 403.
+- **`gh auth setup-git` persists** — once run, it modifies git's global config. This is usually fine (it only affects HTTPS URLs), but be aware it's a persisted change.
+- **`gh auth setup-git` needs network** — the credential helper calls `gh auth token` internally, which hits the GitHub API. No network = no push.
+- **Still can't connect to github.com on port 443?** If the network blocks github.com:443 entirely (not just auth-related), even `gh auth setup-git` won't help. In that case, use `gh api ...` to upload content via the API (see `ghapi-clone-fallback.md`).
+
+### Diagnostic: Compare SSH user vs gh token user
+
+```bash
+# Who does SSH think you are?
+ssh -T git@github.com
+# → Hi MigbotBoss! You've successfully authenticated...
+
+# Who does gh think you are?
+gh api user --jq '.login'
+# → OnePlusNDev
+
+# If different → you have this exact problem
+```
+
 ### The `gh auth token -u USER` 401 trap
 
 `gh auth token -u OnePlusNTester` returns a valid-seeming token (`ghp_...`). **Do NOT use it directly**:
