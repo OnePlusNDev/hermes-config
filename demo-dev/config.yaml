@@ -520,6 +520,7 @@ mattermost:
   require_mention: true
   free_response_channels: ''
   allowed_channels: ''
+  channel_prompts: {}
 matrix:
   require_mention: true
   free_response_rooms: ''
