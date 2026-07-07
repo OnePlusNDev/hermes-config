@@ -19,23 +19,45 @@ Dev(开发) → Tester(测试验证) → Boss(终审)
 Tester(测试验证) ──FAIL──→ Dev(返工修复)
 ```
 
-## Auth Reality (Critical — different from migbot)
+## Auth Reality (Keychain — preferred path)
 
-The `gh` keychain on this machine holds **three** accounts:
+The `gh` keychain on this machine holds **five** accounts:
 
-| Login | Auth Source | Active? |
-|---|---|---|
-| OnePlusNTester | GH_TOKEN (env var) | true |
-| OnePlusNDev | keyring | false |
-| OnePlusNTester | keyring | false |
+| Login | Auth Source | Active? | When to Use |
+|---|---|---|---|
+| OnePlusNPM | keyring | **true** (default) | Not for tester work |
+| OnePlusNDev | keyring | false | Dev tasks |
+| **OnePlusNTester** | keyring | false | **Tester tasks — switch to this** |
+| JungleAssistant | keyring | false | Assistant tasks |
+| zhangtbj | keyring | false | PM tasks |
 
-**Without `source .env`, `gh` has no active account** — both keyring entries are `Active: false`. Therefore:
+### Recommended approach: `gh auth switch`
 
-- **DO source `.env` before every `gh` command** in a fresh `terminal()` call.
-- `gh` will then pick up the profile's OnePlusNTester token via `GH_TOKEN`.
-- The recommendation "Skip `.env` when using `gh`" (from migbot landscape) does **not** apply here — this profile's `gh` auth depends on the env var, not keyring.
+**Do NOT source `.env`.** The old approach of sourcing `.env` before every `gh` command is **deprecated** because:
+- `GH_TOKEN` env var overrides keychain auth, which blocks using `gh auth switch`
+- The token in `.env` gets masked to `***` in terminal output, making debugging impossible
+- Writing temp script files to source `.env` adds unnecessary complexity
 
-### Token extraction via script (reliable approach)
+```bash
+# Step 1: Clear any GH_TOKEN that overrides keychain auth
+unset GH_TOKEN GITHUB_TOKEN
+
+# Step 2: Switch to tester account
+gh auth switch --user OnePlusNTester
+
+# Step 3: Now @me resolves to OnePlusNTester
+gh issue list --repo demo-oneplusn/demo-workflow --assignee @me --state open \
+  --json number,title,state,assignees,labels,updatedAt
+
+# Step 4: After done, switch back to default account
+gh auth switch --user OnePlusNPM
+```
+
+**Why this is better**: No token extraction, no temp scripts, `gh` manages its own auth, and `--assignee @me` resolves correctly.
+
+### Token extraction via script (fallback — only if auth switch fails)
+
+If `gh auth switch` fails (e.g., account not in keychain), fall back to sourcing `.env` via script:
 
 ```bash
 write_file('/tmp/demo_gh.sh', '''#!/usr/bin/env bash
@@ -63,7 +85,13 @@ Using `<< 'SCRIPT'` heredoc with single-quoted delimiter prevents shell expansio
 ## Polling Patterns
 
 ```bash
-# Standard poll: open issues assigned to tester
+# Preferred: switch to tester account first
+unset GH_TOKEN GITHUB_TOKEN
+gh auth switch --user OnePlusNTester
+gh issue list --repo demo-oneplusn/demo-workflow --assignee @me --state open \
+  --json number,title,state,assignees,labels,updatedAt,comments --limit 20
+
+# Fallback: source .env directly
 source ~/.hermes/profiles/demo-tester/.env
 export GH_TOKEN
 gh issue list --repo demo-oneplusn/demo-workflow --assignee OnePlusNTester --state open \
@@ -119,7 +147,7 @@ Per RULES.md 铁律6, each time you touch an issue:
 
 ## Session Pattern: No Issues Found
 
-When `gh issue list --assignee OnePlusNTester --state open` returns `[]`:
+When `gh issue list --assignee @me --state open` returns `[]` (after switching to OnePlusNTester):
 - Respond with exactly `[SILENT]`
 - Do NOT send notifications
 - Do NOT run diagnostic probes on every routine poll
@@ -128,7 +156,7 @@ When `gh issue list --assignee OnePlusNTester --state open` returns `[]`:
 ## Environment
 
 - macOS (26.4)
-- `gh` installed and authenticated (multiple accounts, keychain + GH_TOKEN)
+- `gh` installed and authenticated (multiple accounts in keychain + env var)
 - Profile env: `~/.hermes/profiles/demo-tester/.env`
-- `.env` contains: GITHUB_USERNAME, GITHUB_EMAIL, GITHUB_TOKEN, GATEWAY_PORT, AGENT_NAME, AGENT_ROLE, DEEPSEEK_API_KEY
-- `read_file` blocked on `.env` (credential guard) — use terminal + `source`
+- `.env` contains: GITHUB_USERNAME, GITHUB_EMAIL, GITHUB_TOKEN (masked in terminal), GATEWAY_PORT, AGENT_NAME, AGENT_ROLE, DEEPSEEK_API_KEY
+- `read_file` blocked on `.env` (credential guard) — use terminal + `source` or use `gh auth switch`

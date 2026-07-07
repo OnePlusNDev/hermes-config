@@ -1,7 +1,7 @@
 ---
 name: code-verification
 description: "Systematic code verification workflow for testers — clone/fetch latest, run tests, cross-check against Acceptance Criteria (AC), boundary/edge-case check, pass/reject verdict with Chinese-language comment."
-version: 1.0.0
+version: 1.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -30,7 +30,25 @@ gh issue list \
   --json number,title,state,body,createdAt,pullRequests
 ```
 
-If the result is empty — exit silently (cron jobs produce no notification for zero work).
+If the result is empty — **before exiting silently**, do a lightweight situational-awareness check:
+
+```bash
+# List ALL open issues in the repo (not just assigned to you)
+gh issue list --repo OWNER/REPO --state open --json number,title,assignees,labels
+```
+
+This catches:
+- **Impersonation issues**: dev-created issues with fake "verification report" bodies that bypass the tester (see Issue Impersonation Detection section)
+- **Routing errors**: issues that should have been assigned to you but weren't
+- **Stale issues**: completed work waiting on boss review that hasn't moved in days
+
+If the check reveals nothing anomalous → **exit silently** (cron jobs produce no notification for zero work).
+
+If it reveals impersonation or routing issues:
+1. **Check if this issue was already flagged in a prior session**: `gh issue view N --repo OWNER/REPO --json comments --jq '.comments[-1].author.login'`
+   - If the last comment's author is **the tester themselves** → already handled, **skip** (don't re-flag)
+   - If the last comment's author is **someone else** (dev, boss, or none) → flag with a comment
+2. When flagging, do NOT assign the issue to yourself unless explicitly asked
 
 > **Note for repos with mixed issue/PR workflows**: If you suspect work exists but `--assignee` returns empty, see the diagnostic probe section in `issue-handling-workflow` — it covers `--involves`, `--mentions`, and PR body @-mention probing. Do NOT probe on routine polls; only when you have reason to believe assignments were missed.
 
@@ -151,6 +169,40 @@ gh issue edit N --repo OWNER/REPO --remove-assignee TesterHandle
 gh issue edit N --repo OWNER/REPO --add-assignee DevHandle
 gh issue edit N --repo OWNER/REPO --remove-assignee TesterHandle
 ```
+
+### Verify the handoff
+
+```bash
+gh issue view N --repo OWNER/REPO --json assignees --jq '[.assignees[].login]'
+# Must show exactly 1 assignee — the recipient
+```
+
+---
+
+## Phase 5: Session Cleanup (No-Work and Post-Work)
+
+After finishing all work (or determining no work exists), clean up session state:
+
+### Step 5a: Restore gh auth to original account
+
+If you switched `gh auth` during this session (common in multi-profile setups), always switch back to the default/development account to avoid leaking tester auth to the next profile's cron job:
+
+```bash
+unset GH_TOKEN GITHUB_TOKEN
+gh auth switch --user OriginalAccountHandle
+gh auth status  # verify the switch took
+```
+
+### Step 5b: Clean temp files
+
+Remove any files written to `/tmp/` during this session:
+```bash
+rm -f /tmp/gh_*.json /tmp/gh_*.py /tmp/issue-comment*.md /tmp/verify-*.py
+```
+
+### Step 5c: Final check — no work found
+
+If Phase 1 returned empty + situational-awareness check confirmed nothing anomalous, output `[SILENT]` as the final response to suppress cron delivery. Do NOT switch back and then output content — the auth switch is just cleanup, not a result.
 
 ---
 
@@ -279,22 +331,59 @@ gh issue view N --repo OWNER/REPO --json author,assignees --jq '{author: .author
 ```
 
 **Response**: When you detect an impersonation issue:
+
+**Step 0 — Dedup check**: Check if you already flagged this in a prior session:
+```bash
+gh issue view N --repo OWNER/REPO --json comments --jq '.comments[-1].author.login'
+```
+- If the last comment author is **the tester** → issue already flagged, **skip** (don't re-flag)
+- Only proceed with Steps 1–5 if the last comment is from someone else (dev, boss, or no comments exist)
+
+**Steps** (only reach here after Step 0 confirms the issue was NOT already handled):
 1. Do NOT trust or parrot the report's conclusions
 2. Do NOT assign it to yourself (it was never legitimate)
 3. Add a comment flagging the impersonation: "此 Issue 由开发者创建，但内容冒充了测试工程师的验证报告。测试尚未真实执行。请老板/@OnePlusNBoss 判断是否需要正式走验证流程。"
 4. Leave assignee as-is (unassigned or with boss)
-5. If the report's conclusions are actually correct (you independently verify), create a **new** verification comment stating your independent findings — do not validate the impersonated report
+5. If the report's conclusions are actually correct, create a **new** verification comment stating your independent findings — do not validate the impersonated report
 
-**Why this matters**: A dev-created "verification report" issue with no tester involvement bypasses the entire quality gate. It can flow straight to boss acceptance without actual testing. The tester's signature (and its absence) is the audit trail — impersonation breaks that trail.
+### Post-Flag Follow-Up: PM/Manager Endorsed the Fake Report
+
+After you flag an impersonation, a PM or manager may later comment on the same issue and **endorse the fake report** (e.g., triaging it as "验证工作已完成" without addressing the impersonation flag). This is a signal to **re-engage**, not to skip:
+
+**Trigger**: The last comment on the impersonation issue is from someone else (PM, boss, or dev) after your flag, and it treats the fake report as legitimate.
+
+**Response**:
+
+1. ✅ Do NOT accept the endorsement as validation — the fake report is still fake, even if a manager approved it.
+2. ✅ Write a **new follow-up comment** that:
+   - Restates the impersonation concern (reference your earlier flag comment by date)
+   - Points out that the PM/manager endorsement did not address the impersonation
+   - Provides **independent verification** results (fetch code from repo, run tests, report findings)
+   - Asks the boss to adjudicate the two-layer issue (code correctness + process integrity)
+3. ❌ Do NOT assign the issue to yourself — leave it with the boss for final decision.
+4. ❌ Do NOT remove or edit your original flag comment — it is the audit trail.
+
+**Why separate follow-up is needed**: A single flag can be buried under subsequent triage comments. The dedup check (`last comment author is tester → skip`) only prevents re-flagging the same stale position; a PM endorsement is a **new event** that changes the situation and warrants a fresh response.
+
+### Why This Matters
+
+A dev-created "verification report" issue with no tester involvement bypasses the entire quality gate. It can flow straight to boss acceptance without actual testing. The tester's signature (and its absence) is the audit trail — impersonation breaks that trail. When a manager later endorses the fake report without addressing the impersonation, the bypass is compounded: the manager becomes an unwitting accomplice in the broken process.
 
 ## Pitfalls
 
 - **`gh auth token -u USER` returns a token that gives 401**: The token obtained via `gh auth token -u OnePlusNTester` looks valid (starts with `ghp_`) but causes `HTTP 401: Bad credentials` when used as `export GH_TOKEN=...`. The keychain token may lack org repo scopes even though the `gh auth switch` path works fine. **Do NOT use `gh auth token` output as a GH_TOKEN export** — always use `gh auth switch` with `unset GH_TOKEN GITHUB_TOKEN` beforehand, or source the profile `.env` directly via a script file (Technique A in `references/profile-auth-mismatch.md`).
 
+- **`gh auth switch` silently succeeds when env vars are set**: `gh auth switch --user X` returns exit code 0 and prints `"✓ Switched"` **even when `GH_TOKEN` / `GITHUB_TOKEN` env vars override the keychain switch**, keeping the old user active. The `gh api user --jq '.login'` check is the only reliable way to detect this. **Always unset both env vars before `gh auth switch`, then verify with `gh api user`.** Never trust the "switched" message alone — this session's first attempt appeared to work but actually didn't change the active user.
+
+- **Search API 422 for org repos**: The GitHub Search API can return `HTTP 422 "Validation Failed"` with the message `"The listed users and repositories cannot be searched either because the resources do not exist or you do not have permission to view them"` even when `gh repo view OWNER/REPO` works fine. This happens because the Search API's permission model differs from the REST API — some orgs restrict search indexing even when the REST API grants read access. **Do NOT use the Search API as a fallback when `gh issue list` returns empty** for an org repo. The `gh` CLI approach is authoritative; the Search API error is a false negative and wastes time.
+
+- **Forgotten `gh auth switch` teardown** (shared-keychain setups): When your session switches `gh auth` to the tester account, the active account persists until the next cron job or shell session. If your profile shares a keychain with other profiles (dev, pm, etc.), their cron jobs will inherit your tester auth and produce wrong assignee queries. **Always switch back** to the default account in Phase 5 cleanup. Verify with `gh auth status`.
+
 - **Clone fails in cron**: `git clone https://...` almost always fails (no auth token passed through HTTPS). Use `gh api repos/OWNER/REPO/git/trees/main` to list files, then `gh api repos/OWNER/REPO/git/blobs/<sha>` + `base64 -d` to fetch file contents. This is the reliable path for cron and restricted environments. **See reference: `references/ghapi-clone-fallback.md`.**
 - **Clone fails in general**: Even on interactive macOS, HTTPS can fail with "HTTP2 framing layer" or "Failed to connect" errors. The `gh api` tree/blob method always works because it inherits the already-active gh auth token.
 - **Claim vs reality gap**: Developer says "done" but it's not on main. Always verify via repo API, not dev comments. This is the #1 reason to fail: trust the repo, not the comment (Issue #2 in this session was a confirmed case).
 - **Stale cached code**: Never test against code fetched more than a few minutes ago. Fetch fresh every time.
+- **`rm` on /tmp/ blocked by security scanner**: `rm -f /tmp/issue-comment*.md /tmp/verify-*.py` can be rejected by `tirith:mass_file_deletion` or `delete in root path` rules (common in cron contexts). This is harmless — `/tmp/` auto-cleans on reboot. When blocked, leave the files; do NOT retry or escalate. Consider this a benign warning: the security scanner is noise, not an error.
 - **Unicode scanner on CJK in terminal**: `gh issue comment N --body "中文..."` triggers `tirith:confusable_text`. Write to file via write_file() first, then post. Use ASCII-only IDs for safer API payloads; emoji bodies can also trigger variation-selector blocklists.
 - **execute_code blocked in cron**: Use `write_file()` + `terminal('python3 /tmp/script.py')` instead. No `execute_code`.
 - **`bash -c` with `$VARS` blocked in cron**: Commands like `bash -c 'source .env; GH_TOKEN=*** gh ...'` trigger the approval gate (no user present to approve). Write a script file with `write_file()`, then execute it with plain `terminal('bash /tmp/script.sh')`.

@@ -3,36 +3,80 @@
 How to query, archive, consolidate, and recover Hindsight memory via the HTTP API.  
 Use when a cron job asks to "clean up old memories" or "optimize memory."
 
+## System-Level vs Profile-Level Daemon
+
+There are **two tiers** of Hindsight daemon on a multi-profile machine:
+
+| Type | Port | Idle Timeout | Purpose |
+|------|------|-------------|---------|
+| System-level | 8888 | `--idle-timeout 0` | Always-on shared API, hosts all memory banks |
+| Profile-level | 9177–9180 | `--idle-timeout 86400` | Per-profile daemon, shares PG with system daemon |
+
+**The system-level daemon (port 8888) is the authoritative endpoint** for memory operations. It runs continuously (no idle timeout = always on). Profile-level daemons may restart due to idle timeout — when they're down, proxy through port 8888.
+
+The system daemon may show `--idle-timeout 0` but stay running for days. In modern hindsight (≥0.8.x), `0` means **"never idle"** (continuous), not "immediate death." The earlier pitfall about `--idle-timeout 0` causing immediate death applies only to older versions.
+
+## Bank Identification
+
+The hindsight HTTP API uses **path-based routing**, not query parameters:
+
+```bash
+# Correct — path is /v1/default/banks (not /v1/banks)
+curl -s http://127.0.0.1:8888/v1/default/banks
+# Returns: {"banks":[{"bank_id":"hermes","name":"hermes",...}]}
+```
+
+`/v1/banks` (without `/default/`) returns 404. Always use the full path: `/v1/default/banks/<bank_id>/...`
+
 ## Quick Health Check
 
 ```bash
-# Daemon health
-curl -s http://127.0.0.1:<port>/health
+# Daemon health (port 8888 is the system-level daemon)
+curl -s http://127.0.0.1:8888/health
 # {"status":"healthy","database":"connected"}
 
-# Version + feature flags
-curl -s http://127.0.0.1:<port>/version
-
 # Bank list
-curl -s http://127.0.0.1:<port>/v1/default/banks
+curl -s http://127.0.0.1:8888/v1/default/banks
+# Returns: {"banks":[{"bank_id":"hermes","name":"hermes",...}]}
+
+# Version check (useful before using idempotent-timeout-specific features)
+curl -s http://127.0.0.1:8888/version
 ```
 
-## Check for Old Memories (30+ Days)
+## File-Based Memory Age Check (No Hindsight Bank)
+
+**Many Hermes profiles store memories as flat files, NOT in a hindsight bank.** The demo-tester profile is an example — its memories live at `~/memories/MEMORY.md` and `~/memories/USER.md`. When the current profile uses file-based memory (check `config.yaml: memory.provider`), the hindsight bank is irrelevant for that profile.
+
+To check memory ages for a file-based profile:
+
+```bash
+# Check file modification time — this is when the memory was last edited
+ls -la ~/.hermes/profiles/<profile>/memories/MEMORY.md
+ls -la ~/.hermes/profiles/<profile>/memories/USER.md
+
+# Parse inline dates from memory content (entries are delimited by §)
+grep "^## " ~/.hermes/profiles/<profile>/memories/MEMORY.md
+# Shows section headers with embedded dates like "## 对话主模型（2026-06-14）"
+```
+
+If the files are <30 days old and content dates are <30 days, there's nothing to archive. Report explicitly rather than force an action.
+
+## Check for Old Memories in a Hindsight Bank (30+ Days)
 
 Use the timeseries endpoint to see memory distribution over time:
 
 ```bash
-curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/stats/memories-timeseries?period=30d"
+curl -s "http://127.0.0.1:8888/v1/default/banks/<bank_id>/stats/memories-timeseries?period=30d"
 ```
 
 Returns per-day buckets with `world` / `experience` / `observation` counts.  
 Days with all-zeros have no memories. If all days prior to the cutoff are zero, there's nothing to archive.
 
-For deeper inspection, use the graph endpoint with date filtering:
+For deeper inspection, use the graph endpoint:
 
 ```bash
-curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/graph?limit=200" -o /tmp/graph.json
-# Then grep for old dates: grep "2026-04\|2026-05" /tmp/graph.json
+curl -s "http://127.0.0.1:8888/v1/default/banks/<bank_id>/graph?limit=200" -o /tmp/graph.json
+# Then read_file /tmp/graph.json and grep for old dates manually
 ```
 
 ## Consolidation (Optimization)
@@ -71,6 +115,49 @@ Then re-trigger consolidation to process the recovered items.
 ```bash
 curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/operations?limit=5"
 ```
+
+Operations logged automatically include `consolidation`, `graph_maintenance`, etc. Each operation has `task_type`, `status` (`processing`/`completed`/`failed`), and timestamps. Consolidation runs are typically completed in <1 second on a 20-node graph.
+
+## Reflect (Memory Summary / Query)
+
+The `/reflect` endpoint is a conversational query interface that returns a structured memory summary based on an LLM query. It is DIFFERENT from `/consolidate` — reflect answers questions about what's in memory, consolidate deduplicates and create observations.
+
+```bash
+# Use reflect to get a summary of all memories
+curl -s -X POST "http://127.0.0.1:<port>/v1/default/banks/hermes/reflect" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Summarize all available memories and their categories"}'
+
+# Use reflect for optimization/maintenance review
+curl -s -X POST "http://127.0.0.1:<port>/v1/default/banks/hermes/reflect" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Consolidate similar facts, identify stale/outdated observations, merge redundant entries"}'
+
+# Response format:
+# {"text":"...summary...", "based_on":null, "structured_output":null,
+#  "usage":{"input_tokens":N, "output_tokens":N, ...}}
+```
+
+**Pitfall:** The `/reflect` endpoint requires a `query` field in the JSON body. Without it, returns `{"detail":[{"type":"missing","loc":["body","query"]}]}`.
+
+## Mental Models (Higher-Level Insights)
+
+Hindsight can generate mental models — abstract patterns derived from memory clusters:
+
+```bash
+# List existing mental models (empty until explicitly created)
+curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/mental-models"
+# Response: {"items":[]}
+
+# Create a mental model (requires name + source_query)
+curl -s -X POST "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/mental-models" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"communication-patterns","source_query":"team communication and output standards"}'
+# Response: {"detail":[{"loc":["body","name"],"msg":"Field required"}, ...]}
+# Both 'name' and 'source_query' are required.
+```
+
+Mental models are not auto-generated — they must be explicitly created with a targeted query. Skip in automated cron maintenance unless the graph has 100+ facts with clear clusters.
 
 ## Full Bank Stats
 
@@ -281,3 +368,95 @@ When running as a cron job:
 2. **Pipes to python3 are blocked by security scanner.** Don't do `curl ... | python3 -c ...`. Instead: `curl ... -o /tmp/file.json` → `read_file /tmp/file.json`.
 3. **`~` expansion may resolve to profile HOME, not user HOME.** Use absolute paths (`/Users/oneplusn/...`) when the profile has a redirected `HOME`.
 4. **No memories >30 days old is a valid outcome.** If MEMORY.md timestamps are all recent and the timeseries endpoint shows no old buckets, respond with `[SILENT]` — there's genuinely nothing to clean. Don't force an action just because the cron job fired.
+
+## Structured Memory Maintenance Cron Procedure
+
+A self-contained procedure for cron jobs that need to "clean up old memories and optimize with hindsight":
+
+### Step 1 — Determine 30-Day Cutoff
+
+```bash
+# On macOS (BSD date)
+date -u -v-30d +%Y-%m-%d
+# Returns: 2026-06-06 (example)
+
+# On Linux (GNU date)
+date -u -d '30 days ago' +%Y-%m-%d
+```
+
+### Step 2 — Check File-Based Memory Age
+
+```bash
+ls -la ~/.hermes/profiles/<profile>/memories/MEMORY.md
+ls -la ~/.hermes/profiles/<profile>/memories/USER.md
+# Compare mtime against cutoff. If mtime > 30d, check inline dates.
+```
+
+Parse inline dates from MEMORY.md content (entries use `§` as delimiter, dates in section headers like `## Topic (2026-06-14)`). If no entries are older than the cutoff, file-based archiving is a no-op.
+
+### Step 3 — Check Hindsight Bank Health
+
+```bash
+# Daemon health
+curl -s http://127.0.0.1:8888/health > /tmp/hindsight_health.json
+read_file /tmp/hindsight_health.json
+# Expected: {"status":"healthy","database":"connected"}
+
+# Bank stats
+curl -s "http://127.0.0.1:8888/v1/default/banks/hermes/stats" -o /tmp/hindsight_stats.json
+read_file /tmp/hindsight_stats.json
+# Check: pending_operations, failed_operations, pending_consolidation, failed_consolidation
+```
+
+**Key thresholds for a healthy bank (20-node graph):**
+- `pending_operations`: 0 (any >0 means something is stuck)
+- `failed_operations`: 0 (historical — non-zero is OK if old)
+- `pending_consolidation`: 0 (items waiting to be processed)
+- `failed_consolidation`: 0 (actionable — recover if >0)
+
+### Step 4 — List and Age-Check All Memories
+
+```bash
+curl -s "http://127.0.0.1:8888/v1/default/banks/hermes/memories/list?limit=100" -o /tmp/all_memories.json
+read_file /tmp/all_memories.json
+```
+
+Each memory has a `date` field (ISO 8601 timestamp). Compare against cutoff. Also check `state` — should be `valid` for all. `invalid` state means the memory was invalidated and could be purged.
+
+### Step 5 — Trigger Reflect (Optimization)
+
+Only worthwhile if Step 3+4 show at least some memories exist:
+
+```bash
+curl -s -X POST "http://127.0.0.1:8888/v1/default/banks/hermes/reflect" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Perform memory maintenance: consolidate similar facts, merge redundant entries, identify stale content"}'
+```
+
+The reflect endpoint costs ~5000-6000 input tokens on a 20-node bank. Skip if the bank is empty (`total_nodes: 0`) or the cron budget is tight (e.g. user's daily token cap is low).
+
+### Step 6 — Verify Operations Completed
+
+```bash
+curl -s "http://127.0.0.1:8888/v1/default/banks/hermes/operations?limit=3" -o /tmp/last_ops.json
+read_file /tmp/last_ops.json
+# All recent operations should show status: "completed"
+```
+
+### Step 7 — Report
+
+If everything is clear (no old memories, bank healthy, optimization done):
+- Report a concise summary: list mtime dates, hindsight stats, what was done
+- If genuinely nothing to do (no 30+ day memories, bank already optimal): `[SILENT]`
+
+If issues found:
+- Stuck operations → advise recovery with `/consolidation/recover`
+- Failed consolidation → trigger recovery then re-consolidate
+- Daemon down → proxy through sibling daemon (see "Daemon Not Running")
+
+### Pitfalls for This Flow
+
+- **`curl | python3 -c` is blocked in cron mode.** Always curl to file, then read_file.
+- **Two-tier daemon check:** Profile-level daemon (9177-9180) may be idle. System daemon (8888) is always on. Always prefer port 8888 for cron work.
+- **all-20-memories same date.** Hindsight may show all memories with `date: 2026-06-30` (the consolidation timestamp, not source date). Always cross-reference with the flat file modification times and content inline dates when assessing age.
+- **No mental models = not a problem.** Mental models are not auto-created. The graph needs 100+ facts before they become useful; generating them prematurely wastes tokens.
