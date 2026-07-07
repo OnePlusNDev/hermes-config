@@ -66,6 +66,86 @@ hermes sessions prune --older-than 30d --dry-run
 
 Use `hermes memory status` to determine the active provider. If hindsight is NOT the provider, the Hindsight API endpoints below won't apply — the memory lives either in built-in files or a different backend.
 
+## Variable Name Trap: `HINDSIGHT_LLM_API_KEY` vs `HINDSIGHT_API_LLM_API_KEY`
+
+Hermes stores the LLM provider key in its `.env` file as **`HINDSIGHT_LLM_API_KEY`** (no `API_` after `HINDSIGHT_`). The Hindsight daemon expects it as **`HINDSIGHT_API_LLM_API_KEY`** (with `API_` after `HINDSIGHT_`).
+
+These are **different environment variables**. Setting one does NOT set the other. When copying the key from `.env` to `hermes.env`, you must write it under the `HINDSIGHT_API_LLM_API_KEY` name. The daemon's `profile create --env` flag uses the daemon-side name — if you manually patched it, verify the variable name on both ends.
+
+```bash
+# .env (Hermes side) — INPUT source
+HINDSIGHT_LLM_API_KEY=sk-abc123...
+
+# hermes.env (Hindsight daemon side) — OUTPUT target
+HINDSIGHT_API_LLM_API_KEY=sk-abc123...
+```
+
+**Diagnosis**: If you see the daemon starting but reflect/consolidate/retain operations all fail with `AuthenticationError` or "LLM API key is required", check:
+1. That `hermes.env` has the key **under the right variable name**
+2. That the value is not empty (see pitfall below)
+
+## Empty API Key Pitfall
+
+A common failure mode: `HINDSIGHT_API_LLM_API_KEY=` in `hermes.env` with **nothing after the `=`** — the variable exists but is empty. This produces the same error as a missing key:
+
+```
+ValueError: LLM API key is required. Set HINDSIGHT_API_LLM_API_KEY environment variable.
+```
+
+**How to detect it** — read the raw bytes of the env file (terminal masking may hide the empty value):
+```python
+# Python — the '=' may be followed by a bare newline with no value
+with open('/Users/oneplusn/.hindsight/profiles/hermes.env', 'rb') as f:
+    for line in f:
+        if b'HINDSIGHT_API_LLM_API_KEY' in line:
+            print(repr(line))  # Shows: b'HINDSIGHT_API_LLM_API_KEY=\\n'
+```
+
+When using `grep` or `cat`, an empty value looks identical to a visually masked secret via `***`. Always verify with byte inspection or Python `repr()` when the daemon reports a missing key.
+
+**Fix**: Write the actual key value after the `=`:
+```
+HINDSIGHT_API_LLM_API_KEY=<real-key>
+```
+
+Use the `patch` tool (not `terminal` with sed) to avoid `***` masking corrupting the value.
+
+## All Operations Fail with AuthenticationError
+
+If `consolidate`, `recover`, `retain`, and `reflect` all fail, and the operations log shows `AuthenticationError` for every failure:
+
+```json
+{"error_message": "Fact extraction failed: 1/1 chunks failed. First failures: chunk 0: AuthenticationError", "status": "failed"}
+```
+
+**This is an LLM API key problem, not a memory problem.** The steps are:
+
+1. **Test the key directly** against the provider's API:
+   ```bash
+   curl -s -X POST "https://api.deepseek.com/chat/completions" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <the-key>" \
+     -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'
+   ```
+   If you get `Authentication Fails`, the key has been **revoked or expired** since it was stored — it was valid once (memories were successfully retained) but is no longer.
+
+2. **The 121 failed operations are historical** — they accumulated over multiple retry attempts. Recovering consolidation won't fix them until the key is renewed.
+
+3. **What still works without a valid LLM key:**
+   - Local embeddings (recall/semantic search)
+   - Memory listing and stats endpoints
+   - Bank graph queries
+   - Curating individual memories (PATCH /memories/{id})
+   - Backup and export
+
+4. **What requires a valid LLM key:**
+   - Consolidation (creates observations from world/experience facts)
+   - Reflect (LLM-powered semantic analysis)
+   - Retain with fact extraction
+   - Any operation tagged `AuthenticationError`
+
+5. **Renew the key**, update `HINDSIGHT_API_LLM_API_KEY` in `hermes.env`, restart the daemon, then run `consolidation/recover` + `consolidate` to process the backlog.
+
 ## Quick Health Check
 
 ```bash
@@ -337,6 +417,21 @@ curl -s http://127.0.0.1:<running_port>/v1/default/banks
 **Pitfall:** `hindsight-embed profile list` may show a port mapping that doesn't match
 reality. Always cross-check with `ps aux | grep hindsight-api` — the profile list is
 static config, the process list is ground truth.
+
+**Pitfall — Sibling daemon may NOT have this profile registered.** The `hindsight-embed -p <profile>` commands only work when the profile is registered in the config. But reaching the daemon via curl doesn't require the caller's profile to be registered — all daemons on the same pg0 + bank_id serve the same memory. Use direct curl against the sibling daemon's port, even if your profile has no entry in its port registry.
+
+**Pitfall — `hermes memory status` or the `memory` tool may report "Memory is not available"** even though hindsight is configured (`provider: hindsight` in config.yaml). This happens when:
+1. No hindsight daemon is running for the current profile (no local daemon)
+2. The memory tool dispatches through the configured provider and finds nothing running
+3. The built-in MEMORY.md/USER.md files still exist and are writable
+
+The fix: either (a) find a sibling daemon on a different port (`ps aux | grep hindsight-api`) and use curl directly, or (b) fall back to `read_file()` / `write_file()` on the MEMORY.md and USER.md paths. The built-in files are always valid fallback when the hindsight daemon is unreachable.
+
+```bash
+# When memory tool says "not available", fall back to flat files:
+read_file ~/.hermes/profiles/<profile>/memories/MEMORY.md
+read_file ~/.hermes/profiles/<profile>/memories/USER.md
+```
 
 ## Consolidation Pitfalls
 

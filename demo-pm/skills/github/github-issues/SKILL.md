@@ -521,6 +521,12 @@ When a secret is loaded inline, the harness display-masks the assignment line as
 - **`write_file` can eat the newline** after `GITHUB_TOKEN=*** in Python scripts, merging two lines into one. The written file shows `if line.startswith('GITHUB_TOKEN=***            candidate = ...` on a single line instead of two. This produces `SyntaxError: unterminated string literal`.
 - **`HERMES_REDACT_SECRETS` intercepts variable names containing `TOKEN`** — even `TOKEN` (uppercase) in Python assignments may get redacted to `***` in the file on disk. Use lowercase `token = None` instead.
 
+- **Python linter rejects `***` in source code strings after string close**: When `write_file` creates a Python script with a string like `"GITHUB_TOKEN=***`, the Hermes linter parses it as `"GITHUB_TOKEN="` (string) followed by `*** ` (Python operators, invalid syntax), producing `SyntaxError: unterminated string literal`. This affects any Python source where `***` characters appear immediately after a closing string delimiter — the linter's AST processing interprets `***` as code, not string content.
+  **Workarounds:**
+  - Use **negated comparison**: `if "GITHUB_TOKEN" != key:` instead of `if key.startswith("GITHUB_TOKEN=***` or `if key == "GITHUB_TOKEN=***`. This keeps `***` out of source entirely.
+  - Use **regex with raw string**: `m = re.match(r"^GITHUB_TOKEN=*** s)` — the `r"..."` raw string syntax handles `***` inside the regex pattern correctly (the linter sees it as string content, not operators).
+  - For `subprocess.run(["curl", ...])` argument lists, **assign token to a temp variable first**: `t = token; cmd = ["-H", "Authorization: token " + t, ...]` instead of `["-H", "Authorization: token " + token, ...]`. The linter is less strict about code that reads from a variable than code whose AST contains `***` immediately after a string literal.
+
 Robust workaround:
 1. Write the Python script to a temp file (e.g. `/tmp/gh_script.py`).
 2. **Always** `read_file` lines 7-14 to verify the token-extraction block has correct line breaks. Look for the merged-line symptom: `if line.startswith('GITHUB_TOKEN=***            candidate = ...` on one line.

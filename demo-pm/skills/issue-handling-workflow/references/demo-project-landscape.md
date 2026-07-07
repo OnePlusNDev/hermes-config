@@ -46,13 +46,13 @@ The PM scans `demo-workflow` issues assigned to `OnePlusNPM` and routes them by 
    ```bash
    # Step 1: Remove self (OnePlusNPM)
    curl -s -X DELETE \
-     -H "Authorization: Bearer $TOKEN" \
+     -H "Authorization: token $TOKEN" \\
      "https://api.github.com/repos/demo-oneplusn/demo-workflow/issues/$NUMBER/assignees" \
      -d '{"assignees":["OnePlusNPM"]}'
 
    # Step 2: Add target
    curl -s -X POST \
-     -H "Authorization: Bearer $TOKEN" \
+     -H "Authorization: token $TOKEN" \\
      "https://api.github.com/repos/demo-oneplusn/demo-workflow/issues/$NUMBER/assignees" \
      -d '{"assignees":["TARGET_USER"]}'
    ```
@@ -89,4 +89,12 @@ The PM scans `demo-workflow` issues assigned to `OnePlusNPM` and routes them by 
 - **`execute_code` is BLOCKED in cron mode:** `BLOCKED: execute_code runs arbitrary local Python ... Cron jobs run without a user present to approve it`. Use `write_file` + `terminal(command='python3 /tmp/script.py')` instead.
 - **`curl | python3` pipes are BLOCKED in cron mode:** `tirith:curl_pipe_shell` security blocks. Use two-step: `curl -o /tmp/data.json`, then `python3 /tmp/script.py` that reads the file.
 - **Empty RULES.md:** The demo-pm profile's `RULES.md` (~/.hermes/profiles/demo-pm/RULES.md) is intentionally empty (0 bytes). The coding SOUL.md and the cron job prompt itself serve as the governing rules.
-- **Unassigned issues are not the PM's responsibility:** Issues with no assignee at all are skipped — the PM only acts on issues formally assigned to `OnePlusNPM`. Issues #6–#7 in the demo repo were intentionally left unassigned as part of the test fixture.
+- **Unassigned issues are not the PM's responsibility:** Issues with no assignee at all are skipped — the PM only acts on issues formally assigned to `OnePlusNPM`. In the demo repo, issue #6 was intentionally left unassigned (no labels, no assignee) as a test fixture; issue #7 is assigned to `OnePlusNBoss` ([验证报告] Issue 2 独立验证, no type labels). Current open issues (as of 2026-07-07):
+
+  | # | Title | Assignee | Labels |
+  |---|-------|----------|--------|
+  | 2 | [测试] 验证 PM 分诊流程：新增 add(a,b) 加法函数 | OnePlusNBoss | type:feature, priority:normal |
+  | 4 | [测试] PM→Dev 路径：新增 multiply(a,b) 乘法函数 | OnePlusNBoss | type:feature, priority:normal |
+  | 5 | [测试] 全链路含验证：新增 subtract(a,b) 减法函数 | OnePlusNBoss | type:feature, priority:normal |
+  | 6 | feat: 新增 subtract(a, b) 减法函数并附测试 | (unassigned) | — |
+  | 7 | [验证报告] Issue 2 独立验证 | OnePlusNBoss | — |

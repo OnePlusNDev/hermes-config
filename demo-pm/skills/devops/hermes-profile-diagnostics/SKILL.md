@@ -54,6 +54,8 @@ Retain a test memory, then recall it to verify the full pipeline works.
 - **`--idle-timeout 0` causes immediate daemon death.** The parameter means "maximum idle seconds before shutdown." 0 = no idle allowed = daemon exits instantly. Use `86400` (24h) or a large number to prevent auto-shutdown. NEVER use 0.
 - **`memory.db` at `<profile>/memory.db` is always 0 bytes when hindsight is active.** Hindsight uses its own embedded PG (`<profile>/home/.pg0/`), not this SQLite file. An empty memory.db is normal — don't mistake it for an uninitialized system.
 - **Hindsight daemon restart takes 1-3+ minutes** due to embedded PostgreSQL initialization. The API is unreachable during this window (`curl health` returns connection refused). If a cron job needs the daemon and it's down, proxy through a sibling daemon (see `references/memory-maintenance.md`) instead of waiting for restart.
+- **`hindsight-embed daemon start` in foreground mode times out at the default 60s terminal timeout** because PG init takes longer. Use `terminal(background=true, timeout=300)` to let it complete. Even after the command exits with status 0, `daemon status` may still report "Daemon is not running" for another 30-90s while PG initializes. Poll with curl health checks until the daemon responds.
+- **Sibling daemon bypass: when your profile has `provider: hindsight` but no running daemon**, check `ps aux | grep hindsight-api` for running daemons on other ports. If they share the same `bank_id` + pg0 PostgreSQL, they serve the same memory. Use the sibling's port for all API operations — no need to start a local daemon.
 - **HuggingFace SSL timeout blocks daemon start even with cached models.** The daemon verifies embedding model freshness against huggingface.co at startup. If HF is unreachable, it fails with `RuntimeError: Model/connection initialization did not complete within 300s` even though models are cached at `~/.cache/huggingface/hub/`. Fix: set `HF_ENDPOINT=https://hf-mirror.com` before starting the daemon. If the daemon was started via `subprocess.Popen`, include `HF_ENDPOINT` in the `env` dict.
 - **Without `--daemon`, the daemon dies with its parent.** Foreground daemons started from `execute_code` sandboxes survive the script end temporarily but die when the sandbox fully terminates. For daemons started from `terminal(background=true)`, the shell exits on completion and the daemon goes with it. ALWAYS use `--daemon` for persistent daemons — it double-forks, detaching the child from the parent lifecycle.
 - **`hindsight-embed profile delete` with running daemon prompts interactively.** Pipe `echo "y"` to bypass the prompt in non-interactive contexts.
@@ -79,19 +81,36 @@ rev-01       9180     auto      NO
 Each profile needs correct port registration AND metadata in its own home directory:
 
 ```bash
+# List existing profiles (shows port mapping — ground truth)
+hindsight-embed profile list
+
 # Delete stale profiles (may prompt interactively; pipe 'y' if needed)
-echo "y" | HERMES_HOME=~/.hermes hindsight-embed profile delete <name>
+echo "y" | hindsight-embed profile delete <profile_name>
 
 # Recreate with CORRECT port (must match the actual daemon port)
-HERMES_HOME=~/.hermes hindsight-embed profile create <name> --port <actual_port>
-
-# Move metadata to profile's own home (not shared under a sibling profile)
-mkdir -p ~/.hermes/profiles/<name>/home/.hindsight/profiles/
-# Copy .env file from wherever hindsight-embed wrote it to the profile's home
-# Also create metadata.json with only this profile's entry
+# The pip package uses -p <profile>, NOT HERMES_HOME (which was from an older version)
+hindsight-embed -p <profile_name> profile create <profile_name> --port <actual_port> \
+  --env "HINDSIGHT_API_LLM_PROVIDER=openai" \
+  --env "HINDSIGHT_API_LLM_BASE_URL=https://api.deepseek.com/v1" \
+  --env "HINDSIGHT_API_LLM_MODEL=deepseek-v4-flash"
 ```
 
 **After recreation, the .env file is a template — restore the real API key** into `HINDSIGHT_API_LLM_API_KEY` before the profile's Hermes session needs it.
+
+**Bootstrapping from scratch** (no existing `.hindsight/` directory for the profile):
+
+1. Check if a sibling profile's hindsight daemon is running (`ps aux | grep hindsight-api`)
+2. The Hermes profile's `.env` file contains `DEEPSEEK_API_KEY` (or the relevant provider key) — source it:
+   ```bash
+   cd ~/.hermes/profiles/<profile>
+   source .env
+   hindsight-embed -p <profile> profile create <profile> --port <port> \
+     --env "HINDSIGHT_API_LLM_API_KEY=$DEEPSEEK_API_KEY" \
+     --env "HINDSIGHT_API_LLM_PROVIDER=openai" \
+     --env "HINDSIGHT_API_LLM_BASE_URL=https://api.deepseek.com/v1" \
+     --env "HINDSIGHT_API_LLM_MODEL=deepseek-v4-flash"
+   ```
+3. If no API key is available for the daemon, **use a sibling daemon** (see "Daemon Not Running — Use Sibling Daemon" below) instead of starting a new one. Sibling daemons sharing the same pg0 + bank_id serve the same memory data.
 
 ### Step B — Start daemon with persistence
 

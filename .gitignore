@@ -1,0 +1,60 @@
+# Sensitive files — never commit
+**/.env
+**/auth.json
+**/auth.lock
+# Runtime state & caches
+**/state.db*
+**/logs/
+**/cache/
+**/sessions/
+**/desktop/
+**/sandboxes/
+**/*.bak*
+**/.hermes_history
+**/interrupt_debug.log
+**/processes.json
+**/.update_check
+**/.skills_prompt_snapshot.json
+# Gateway runtime
+**/gateway.lock
+**/gateway.pid
+**/gateway_state.json
+**/gateway.*
+# Skill runtime metadata
+**/skills/.usage.json*
+**/skills/.hub/
+**/skills/.curator_backups/
+**/skills/.curator_state
+**/skills/.bundled_manifest
+# Cron artifacts
+**/cron/output/
+**/cron/.jobs.lock
+**/cron/.tick.lock
+**/cron/ticker_heartbeat
+**/cron/ticker_last_success
+# Provider caches
+**/models_dev_cache.json
+**/ollama_cloud_models_cache.json
+**/provider_models_cache.json
+# Home dir state
+**/home/.ssh/
+**/home/.cache/
+**/home/.config/gh/
+**/home/.local/
+**/home/Library/
+**/home/.hermes/
+# Downloaded binaries
+**/bin/tirith
+# Media caches
+**/audio_cache/
+**/image_cache/
+# Hindsight maintenance logs
+**/hindsight-maintenance-logs/
+# Temp/runtime dirs
+**/pairing/
+**/plans/
+**/hooks/
+**/skins/
+**/workspace/
+# Temp scripts
+**/triage_issues.py
