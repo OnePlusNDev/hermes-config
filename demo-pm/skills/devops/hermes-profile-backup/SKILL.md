@@ -159,12 +159,20 @@ Use the GitHub Git Data API to create a single atomic commit with all files via 
 
 **Detailed recipe:** see `references/gh-api-git-data-backup.md`
 
-**Key steps:**
-1. Get the current main branch SHA: `gh api repos/$OWNER/$REPO/git/refs/heads/main --jq '.object.sha'`
-2. Create a blob for each file: `gh api repos/$OWNER/$REPO/git/blobs --field content="$base64" --field encoding="base64" --jq '.sha'`
-3. Build a tree with all blob entries: `gh api repos/$OWNER/$REPO/git/trees --field tree="$TREE_JSON" --jq '.sha'`
-4. Create a commit: `gh api repos/$OWNER/$REPO/git/commits --field message="..." --field tree="$TREE_SHA" --field 'parents[0]'="$MAIN_SHA" --field author="$AUTHOR_JSON" --jq '.sha'`
-5. Update ref: `gh api repos/$OWNER/$REPO/git/refs/heads/main --method PATCH --field sha="$COMMIT_SHA"`
+**Key steps (incremental — upload only changed files):**
+1. Get the current main branch SHA and its recursive tree: `gh api repos/$OWNER/$REPO/git/trees/$TREE_SHA?recursive=1`
+2. Get the local desired state via `git ls-tree -r HEAD` — this gives mode/type/sha/path for every tracked file.
+3. **Compare** the remote tree entries against local `git ls-tree` output. For each file under the profile directory:
+   - Present in both with same SHA → **copy unchanged** entry from remote tree
+   - Present in local but different SHA or absent in remote → **upload as blob** (base64 via gh API)
+   - Present in remote but absent in local → **omit** from new tree (deleted)
+4. Build a tree JSON with all entries (unchanged + new), dedup by path
+5. Create commit: `gh api repos/$OWNER/$REPO/git/commits --input <(echo "$COMMIT_PAYLOAD") --jq '.sha'`
+6. Update ref: `gh api repos/$OWNER/$REPO/git/refs/heads/main --method PATCH --field sha="$COMMIT_SHA"`
+
+**CRITICAL: never use `git status --porcelain` to find changed files when already committed locally.** After `git commit`, the working tree is clean and `git status` returns nothing. Always use `git ls-tree -r HEAD` for the local state and diff it against the remote tree. See `references/gh-api-git-data-backup.md` for the complete Python script template.
+
+**Reusable script:** `references/gh-api-git-data-incremental-push.py` — a standalone Python script that implements the full incremental comparison + push flow.
 
 ## Method C — Python + Content API (fallback when gh CLI unavailable)
 
@@ -282,6 +290,51 @@ gh repo clone <owner>/<repo> /tmp/hermes-$(date +%s)
 ```
 This bypasses tirith's `recursive delete` and `mass_file_deletion` scanners entirely — no cleanup needed because each run gets its own temp directory.
 
+### `git status` is empty when running Method B after a local commit
+
+When switching from Method A (rsync + git push) to Method B (gh API) mid-session — because `git push` failed — the local working tree already has a clean `git commit`. In that state, `git status --porcelain` returns **nothing**, even though the local commit contains changes the remote doesn't have.
+
+**WRONG approach (found nothing):**
+```python
+status_raw = subprocess.run(["git", "status", "--porcelain"]).stdout
+# → "" (empty! The local commit already staged everything)
+```
+
+**CORRECT approach (compare tree contents):**
+```python
+# Local state
+local_tree = subprocess.run(["git", "ls-tree", "-r", "HEAD"]).stdout
+# Parse into {path: {mode, type, sha}}
+
+# Remote state
+remote_tree = gh_api("GET", f"/repos/{OWNER}/{REPO}/git/trees/{sha}?recursive=1")
+remote_entries = {e["path"]: e for e in remote_tree["tree"]}
+
+# Diff
+for path, local in local_entries.items():
+    remote = remote_entries.get(path)
+    if remote and remote["sha"] == local["sha"]:
+        pass  # unchanged — copy from remote tree
+    else:
+        pass  # new or modified — upload as blob
+```
+
+Always use `git ls-tree -r HEAD` (content-addressed snapshot of the committed tree) rather than `git status` (working-tree diff against HEAD).
+
+### Directory entries in remote tree cause false-positive deletions
+
+The remote tree from `?recursive=1` contains both **blob** entries (files) and **tree** entries (directories). When comparing against `git ls-tree -r HEAD` (which only emits blobs), every directory entry in the remote tree appears as "deleted in local".
+
+**Filter by type:** Only compare entries where `e["type"] == "blob"`. Directories are implicit in git — the tree structure is defined by the path prefix. If all files under a prefix are present in the new tree, the directory exists.
+
+```python
+for entry in remote_tree["tree"]:
+    if entry["type"] != "blob":
+        continue  # skip directory entries — git recreates them from file paths
+    if entry["path"] not in local_blobs:
+        deleted_paths.append(entry["path"])
+```
+
 ### Gitignore patterns for nested profile subdirectories
 When backing up a profile into a repo that uses a subdirectory (e.g. `demo-pm/`), root-level `.gitignore` patterns may not match files inside the profile directory. Example:
 ```gitignore
@@ -344,4 +397,6 @@ for f in leaks:
 - `references/tirith-cron-workarounds.md` — Comprehensive tirith security scanner workarounds for cron-mode backups (approved operations table, verified workarounds, detection)
 - `references/demo-pm-backup-workflow-20260702.md` — Annotated real-run transcript of a 486-file rsync backup including gh auth switching, leak detection, and tirith-bypass patterns
 - `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
+- `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
+- `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format

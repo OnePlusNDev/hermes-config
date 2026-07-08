@@ -43,6 +43,7 @@
 **/home/.local/
 **/home/Library/
 **/home/.hermes/
+**/.local/
 # Downloaded binaries
 **/bin/tirith
 # Media caches
