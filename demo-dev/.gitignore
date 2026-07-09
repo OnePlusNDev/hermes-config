@@ -1,15 +1,11 @@
-# Sensitive / secret files
+# demo-dev profile-specific ignores
 .env
 .auth*
 *.lock
 *.pid
 gateway_state.json
 channel_directory.json
-
-# Secrets store
 auth.json
-
-# Runtime / cache artifacts
 *.db
 *.db-shm
 *.db-wal
@@ -19,29 +15,12 @@ models_dev_cache.json
 cache/
 image_cache/
 audio_cache/
-
-# Gateway / session state
 gateway.lock
 session_log.txt
-
-# Large snapshot files
 .skills_prompt_snapshot.json
 skills_manifest.json
 context_length_cache.yaml
 .update_check
-
-# Skip subdirs but keep their .gitignore
-skills/.*/
-sessions/
-cron/.*/
-logs/
-plans/
-sandboxes/
-pairing/
-lsp/
-hooks/
-
-# OS / temp files
 .DS_Store
 *.swp
 *.swo
