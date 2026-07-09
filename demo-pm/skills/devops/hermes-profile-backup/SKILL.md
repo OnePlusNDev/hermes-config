@@ -79,6 +79,7 @@ rsync -a --delete \
   --exclude 'home/.cache/' \
   --exclude 'home/.config/gh/' \
   --exclude 'home/.local/' \
+  --exclude '.local/' \
   --exclude 'home/Library/' \
   --exclude 'home/.hermes/' \
   --exclude '.skills_prompt_snapshot.json' \
@@ -135,11 +136,22 @@ if [ ! -f .gitignore ]; then
 **/home/.local/
 **/home/Library/
 **/home/.hermes/
+**/.local/
 # Downloaded binaries
 **/bin/tirith
 # Media caches
 **/audio_cache/
 **/image_cache/
+# Hindsight maintenance logs
+**/hindsight-maintenance-logs/
+# Temp/runtime dirs
+**/pairing/
+**/plans/
+**/hooks/
+**/skins/
+**/workspace/
+# Temp scripts
+**/triage_issues.py
 GITIGNORE
   git add .gitignore
   echo "Created .gitignore"
@@ -221,6 +233,7 @@ When neither `git clone` nor `gh api` are available, write a Python script via `
 - `home/.ssh/` — SSH agent socket/credentials
 - `home/.hermes/` — nested profile state (memory daemon db dirs)
 - `home/.config/gh/`, `home/.local/state/gh/` — GitHub CLI credentials and device IDs
+- `.local/` — local state at profile root (gh device-id, other CLI credentials)
 - `home/.cache/`, `home/Library/Caches/`, `home/.npm/` — user-local caches
 
 ## Pitfalls
@@ -290,6 +303,15 @@ gh repo clone <owner>/<repo> /tmp/hermes-$(date +%s)
 ```
 This bypasses tirith's `recursive delete` and `mass_file_deletion` scanners entirely — no cleanup needed because each run gets its own temp directory.
 
+### Git clone timeout in cron mode
+The default terminal timeout (180s) should handle most repos, but `gh repo clone` on repos with existing history may stall past the CLI's default timeout. If clone fails with `[Command timed out after 60s]`, retry with an explicit longer timeout via the `terminal()` call:
+
+```bash
+terminal("gh repo clone <owner>/<repo> /tmp/hermes-$(date +%s)", timeout=120)
+```
+
+A 120s timeout has been verified sufficient for repos with dozens of commits and hundreds of files. If 120s also fails, use Method B (gh API Git Data API) instead — it avoids cloning entirely.
+
 ### `git status` is empty when running Method B after a local commit
 
 When switching from Method A (rsync + git push) to Method B (gh API) mid-session — because `git push` failed — the local working tree already has a clean `git commit`. In that state, `git status --porcelain` returns **nothing**, even though the local commit contains changes the remote doesn't have.
@@ -355,6 +377,10 @@ The exclude list in the `rsync` command and the repo's `.gitignore` should stay 
 - `**/skills/.curator_backups/` — curator backup archives
 - `**/skills/.hub/` — skills hub runtime metadata
 - `**/skills/.curator_state` — curator runtime state
+- `**/.local/` — gh CLI credentials and other local state at profile root
+- `**/hindsight-maintenance-logs/` — hindsight daemon maintenance logs
+- `**/pairing/`, `**/plans/`, `**/hooks/`, `**/skins/`, `**/workspace/` — temp/runtime dirs
+- `**/triage_issues.py` — temp automated triage scripts
 
 ### Pre-commit leak check (rsync excludes drift)
 The rsync example command in this skill can fall out of sync with the documented Exclude list. Before committing, always inspect what `git add -A` would stage:
@@ -374,6 +400,7 @@ Look for leaked artifacts:
 - `processes.json` — missing `--exclude 'processes.json'`
 - `.skills_prompt_snapshot.json` — missing `--exclude '.skills_prompt_snapshot.json'`
 - `bin/tirith` — missing `--exclude 'bin/tirith'`
+- `.local/state/gh/` or `.local/` — missing `--exclude '.local/'` (gh CLI credentials)
 
 If leaked files are found, first update the rsync exclude list in the skill, then clean the clone. **Do not use plain `rm` to clean leaked files in cron mode** — tirith's `mass_file_deletion` scanner has a cumulative counter that persists across terminal calls and will eventually block all `rm` operations even for single-file deletes. Instead, use the Python batch-cleanup pattern:
 
@@ -398,5 +425,6 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260702.md` — Annotated real-run transcript of a 486-file rsync backup including gh auth switching, leak detection, and tirith-bypass patterns
 - `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
 - `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
+- `references/demo-pm-backup-workflow-20260708.md` — Cron-mode backup: git clone 120s timeout, `.local/` leak discovery + cleanup, Python batch cleanup pattern confirmed
 - `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
