@@ -39,7 +39,7 @@ gh auth status --show-token 2>&1 | grep OnePlusNPM
 # → Token: ghp_****  （实际值 masked）
 
 gh auth token --hostname github.com --user OnePlusNPM 2>&1
-# → ghp_Z1...ghiu  （输出被 shell 截断/屏蔽）
+# → ghp_***...***  （输出被 shell 截断/屏蔽）
 ```
 
 ### 尝试 4: 管道传递 token — 不可靠

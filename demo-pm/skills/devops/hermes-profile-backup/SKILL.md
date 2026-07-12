@@ -86,6 +86,16 @@ rsync -a --delete \
   --exclude '.update_check' \
   --exclude 'bin/tirith' \
   --exclude 'processes.json' \
+  --exclude 'hindsight-maintenance-logs/' \
+  --exclude 'audio_cache/' \
+  --exclude 'image_cache/' \
+  --exclude 'pairing/' \
+  --exclude 'plans/' \
+  --exclude 'hooks/' \
+  --exclude 'skins/' \
+  --exclude 'workspace/' \
+  --exclude 'triage_issues.py' \
+  --exclude 'cron_triage.py' \
   ~/.hermes/profiles/<profile>/ /tmp/backup/<profile>/
 cd /tmp/backup
 # First-time setup: create repo-level .gitignore with **/ prefix for subdirectory patterns
@@ -152,6 +162,7 @@ if [ ! -f .gitignore ]; then
 **/workspace/
 # Temp scripts
 **/triage_issues.py
+**/cron_triage.py
 GITIGNORE
   git add .gitignore
   echo "Created .gitignore"
@@ -296,6 +307,32 @@ HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" https://github.
 - **Repo doesn't exist yet**: Create via `gh repo create <owner>/<name> --private --description "..."`. If the org doesn't exist, use user-scoped repo.
 - **Security scanner in cron mode**: `execute_code` is blocked in cron. Write scripts to files and run via `terminal("python3 /tmp/script.py")`.
 
+### `gh api` blob upload fails with "Secret detected in content" (HTTP 422)
+
+GitHub's secret scanning push rules scan every blob uploaded via the Git Data API. A file containing hex-encoded credentials (e.g., `xxd` hexdumps of GITHUB_TOKEN, base64-encoded API keys, or any file where a token appears as raw hexadecimal bytes) will be rejected even though the file is a legitimate reference doc, not a live credential.
+
+**Detection:** The gh API returns HTTP 422 with a message like `"Repository rule violations found — Secret detected in content"`. The error fires on the blob POST — you'll see which file was being uploaded when it failed.
+
+**Fix (redact the file and re-push):**
+
+1. **Read the offending file** — identify all locations containing hex-encoded token bytes, partial plaintext token fragments, or any string matching `ghp_`, `sk-`, `github_pat_`, `AKIA` patterns.
+2. **Redact every occurrence** — replace token hex strings with `***`, replace partially-shown token fragments (e.g., `ghp_Z1...ghiu`) with `ghp_***...***`.
+3. **Re-commit locally** — `git add <file> && git commit --amend --no-edit`
+4. **Re-run the gh API push** — the amended commit has different blob SHAs for the redacted file, so it will be re-uploaded cleanly.
+
+**Concrete patterns that trigger this:**
+
+| Pattern in file | Example | How to redact |
+|----------------|---------|---------------|
+| Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `'***'` |
+| Partial shielded token | `ghp_Z1...ghiu` | Replace with `ghp_***...***` |
+| Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
+| Python hex-to-string code | `h = '676870...'` | Replace hex literal with `'***'` |
+
+**If multiple files trigger the rule:** The script stops at the first failure. Fix that one file, re-commit, re-run — repeat until all pass. A single re-commit with all redactions done at once is more efficient than one-per-run.
+
+See also: `references/demo-pm-backup-workflow-20260710.md` for the full session transcript of this pattern in action.
+
 ### Unique temp directory naming to avoid rm -rf blocks
 When cloning the repo for rsync, avoid needing `rm -rf` on a stale temp directory by using a unique name each time:
 ```bash
@@ -381,10 +418,38 @@ The exclude list in the `rsync` command and the repo's `.gitignore` should stay 
 - `**/hindsight-maintenance-logs/` — hindsight daemon maintenance logs
 - `**/pairing/`, `**/plans/`, `**/hooks/`, `**/skins/`, `**/workspace/` — temp/runtime dirs
 - `**/triage_issues.py` — temp automated triage scripts
+- `**/cron_triage.py` — deprecated cron triage script
+
+### Legacy tracked credential files survive .gitignore changes
+
+When a new exclude is added to `.gitignore` or to the rsync `--exclude` list, files that were already committed in a previous backup remain **tracked by git**. `.gitignore` only prevents *new* (untracked) files from being staged — it does not remove files already tracked in the repo. This means sensitive files like `home/.config/gh/hosts.yml`, `bin/tirith`, or `.local/state/gh/credentials.yml` may exist in the git history from before the exclude was added.
+
+**To handle this during a backup:**
+
+1. Detect the legacy files: `git ls-files | grep -E 'hosts\.yml|credentials|\.local/'`
+2. Remove them from tracking (but NOT from disk): `git rm --cached <file>`
+3. The `git commit` that removes them will appear as a deletion in the next backup.
+
+If you don't want to trigger a bogus deletion commit, at minimum check that the rsync exclude prevents the local copy from being re-added:
+```bash
+# Verify rsync didn't touch the legacy tracked file
+git diff --cached -- <legacy-file>  # should show no changes
+```
+
+**Best practice for new repos:** Before the very first commit, set up the full `.gitignore` and rsync exclude list so no credential file ever gets tracked in the first place.
+
+### xxd hexdump output: the ASCII column is a second leak vector
+
+When hexdumps of token files appear in reference docs, the xxd output has **two** content channels that both need redaction:
+
+| Channel | Example | Redaction |
+|---------|---------|-----------|
+| Hex byte column | `5f54 4f4b 454e 3d67 6870 5f5a...` | Replace hex bytes with `2a2a 2a2a...` (asterisk ASCII) |
+| ASCII representation column | `_TOKEN=ghp_Z1Syf...` | Replace visible chars with `***********...` |
+
+Redacting only the hex column leaves the ASCII column as a readable plaintext token. Both must be replaced. After redaction, grep the file again to confirm no `ghp_` or `sk-` patterns remain.
 
 ### Pre-commit leak check (rsync excludes drift)
-The rsync example command in this skill can fall out of sync with the documented Exclude list. Before committing, always inspect what `git add -A` would stage:
-
 ```bash
 cd /tmp/backup
 git add -A
@@ -421,8 +486,9 @@ for f in leaks:
 ## Reference Files
 
 - `references/gh-api-git-data-backup.md` — Detailed recipe for Method B (Git Data API)
-- `references/tirith-cron-workarounds.md` — Comprehensive tirith security scanner workarounds for cron-mode backups (approved operations table, verified workarounds, detection)
-- `references/demo-pm-backup-workflow-20260702.md` — Annotated real-run transcript of a 486-file rsync backup including gh auth switching, leak detection, and tirith-bypass patterns
+- `references/demo-pm-backup-workflow-20260710.md` — Annotated real-run transcript
+- `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction, gh API push fallback, .gitignore expansion
+- `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction (xxd hex+ASCII column both redacted), successful gh API fallback when git push failed on port 443 timeout, `.gitignore` expansion to 40+ patterns
 - `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
 - `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
 - `references/demo-pm-backup-workflow-20260708.md` — Cron-mode backup: git clone 120s timeout, `.local/` leak discovery + cleanup, Python batch cleanup pattern confirmed

@@ -146,7 +146,7 @@ for _ in range(15):
 
 For routine memory cleanup (archiving old memories, triggering consolidation, recovering failed operations), see the detailed API workflow in:
 
-→ `references/memory-maintenance.md` — Hindsight HTTP API endpoints for consolidation, recovery, timeseries queries, bank stats, daemon-fallback (proxy through sibling daemon when target is down), HuggingFace model download timeout fix, and cron-mode workarounds.
+→ `references/memory-maintenance.md` — Hindsight HTTP API endpoints for consolidation, recovery, timeseries queries, bank stats, daemon-fallback (proxy through sibling daemon OR global :8888 API), and two flat-file optimization workflows (A: embedded reflect query, B: temp bank + retain).
 
 ## Reference
 - `references/memory-maintenance.md` — Memory cleanup/optimization via Hindsight HTTP API.
