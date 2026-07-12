@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 824
+        "completed": 920
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T16:19:27.305084+08:00",
-      "next_run_at": "2026-07-10T20:30:00+08:00",
-      "last_run_at": "2026-07-10T20:08:56.021050+08:00",
+      "next_run_at": "2026-07-12T20:30:00+08:00",
+      "last_run_at": "2026-07-12T20:09:14.677491+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -58,15 +58,15 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 19
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T16:19:27.493669+08:00",
-      "next_run_at": "2026-07-11T20:00:00+08:00",
-      "last_run_at": "2026-07-09T20:20:41.704244+08:00",
+      "next_run_at": "2026-07-13T20:00:00+08:00",
+      "last_run_at": "2026-07-11T20:17:15.610232+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -96,15 +96,15 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 17
+        "completed": 19
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-23T16:19:27.683379+08:00",
-      "next_run_at": "2026-07-10T21:00:00+08:00",
-      "last_run_at": "2026-07-09T21:10:15.909237+08:00",
+      "next_run_at": "2026-07-12T21:00:00+08:00",
+      "last_run_at": "2026-07-11T21:08:40.159466+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -115,5 +115,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-07-10T20:08:56.021824+08:00"
+  "updated_at": "2026-07-12T20:09:14.678907+08:00"
 }
