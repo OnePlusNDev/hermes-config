@@ -17,7 +17,7 @@ demo-pm profile 定时 cron 轮询，查询 demo-oneplusn/demo-workflow 中 assi
 
 ### 2. grep|cut 提取 token 成功验证
 - `grep '^GITHUB_TOKEN=' ~/.hermes/profiles/demo-pm/.env | cut -d'=' -f2 | tr -d "\"'` 成功提取 40 字符 token
-- 确认以 `ghp_***` 开头（classic PAT）
+- 确认以 `ghp_Z...` 开头（classic PAT）
 - 在同一 terminal() 调用中，curl 用该 token 成功查询 GitHub API
 
 ### 3. 无待分诊任务

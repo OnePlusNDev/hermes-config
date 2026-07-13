@@ -272,19 +272,27 @@ terminal("bash /tmp/clean_backup.sh")
 - `gh repo view oneplusn/hermes-config` may fail with "Could not resolve to a Repository" even though `OnePlusNDev/hermes-config` works.
 - Always resolve the exact username first: `gh api user --jq '.login'` → use that value in repo references.
 - If `gh repo create <owner>/<repo>` fails with "cannot create a repository for <owner>", switch to the correct active user with `gh auth switch --user <username>` and retry with the repo name only.
-
 ### gh auth account mismatch (push denied with 403)
-When the repo owner differs from the active gh account, `git push` fails with "Permission denied" (HTTP 403). This is common on machines with multiple gh accounts (`gh auth status` lists several, only one is active). Before pushing:
+
+`git push` can fail with "Permission denied" (HTTP 403) even when `gh api user --jq '.login'` reports the *correct* active user. This happens on machines with multiple gh accounts where git's credential helper has cached credentials from a *different* account than the one gh considers active. In our session, `gh api user --jq '.login'` returned `OnePlusNDev` (correct), but the push was denied to `OnePlusNTester`.
+
+**Detection:** Read the 403 error message — it names the denied account:
+```
+remote: Permission to OnePlusNDev/hermes-config.git denied to OnePlusNTester.
+```
+The account after `denied to` is the culprit. Check whether this differs from `gh api user --jq '.login'`.
+
+**Fix:** Run `gh auth setup-git` before each backup session to force the git credential helper to use the active gh account's credentials, or simply always switch to the repo-owner account before cloning:
 
 ```bash
-ACTIVE_USER=$(gh api user --jq '.login')
-REPO_OWNER="OnePlusNDev"  # from the repo URL
-if [ "$ACTIVE_USER" != "$REPO_OWNER" ]; then
-  gh auth switch --user "$REPO_OWNER"
-fi
+REPO_OWNER="OnePlusNDev"         # from the repo URL
+gh auth setup-git                 # ensure git credential helper points to active gh account
+gh auth switch --user "$REPO_OWNER"  # ensure the correct account is active
 ```
 
-Switch back after the push if the cron job needs the original account for later work:
+This is safer than the conditional check because `gh auth switch` also re-configures git's credential helper. Even when the active user already matches the repo owner, the switch forces any stale credential cache to be replaced.
+
+**Switch back** after the push if the cron job needs the original account for later work:
 ```bash
 gh auth switch --user "$ORIGINAL_USER"
 ```
@@ -489,6 +497,7 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260710.md` — Annotated real-run transcript
 - `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction, gh API push fallback, .gitignore expansion
 - `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction (xxd hex+ASCII column both redacted), successful gh API fallback when git push failed on port 443 timeout, `.gitignore` expansion to 40+ patterns
+- `references/demo-pm-backup-workflow-20260712.md` — git credential helper 403 despite matching active gh user (detection + fix); broader file-scan discovery when GitHub push protection fires on an amended commit; rebase + regular push after divergence
 - `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
 - `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
 - `references/demo-pm-backup-workflow-20260708.md` — Cron-mode backup: git clone 120s timeout, `.local/` leak discovery + cleanup, Python batch cleanup pattern confirmed

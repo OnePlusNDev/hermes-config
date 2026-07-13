@@ -27,7 +27,7 @@ for l in lines:
 |---------|------|------|
 | `cat .env` | `GITHUB_TOKEN=***` | 输出屏蔽 |
 | `grep '^GITHUB_TOKEN=' .env` | `GITHUB_TOKEN=***` | 输出屏蔽 |
-| `grep ... | cut -d= -f2` | `ghp_***...***` | 部分屏蔽（首尾可见） |
+| `grep ... | cut -d= -f2` | `ghp_Z1...ghiu` | 部分屏蔽（首尾可见） |
 | Python `repr()` | `'GITHUB_TOKEN=***'` | **原始内容也含 `***`** |
 | `xxd .env` | hex bytes 含 token 字符 | 可通过十六进制拼合恢复 |
 

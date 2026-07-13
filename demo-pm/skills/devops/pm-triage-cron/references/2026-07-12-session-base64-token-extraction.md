@@ -25,7 +25,7 @@ base64 -i ~/.hermes/profiles/demo-pm/.env
 
 解码：`GITHUB_TOKEN=ghp_***...***`
 
-token 长度：40 字符（ghp_ + 36 字符 hex），classic PAT。
+token 长度：40 字符（ghp_ + 36 字符 hex），classic PAT（已脱敏）。
 
 ## 工具限制验证
 
