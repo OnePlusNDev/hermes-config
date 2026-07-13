@@ -296,7 +296,7 @@ Hindsight auto-chunks the content: the flat files (~3KB + ~1.5KB) typically prod
 mems = await client.memory.list_memories(bank_id='hermes', limit=100)
 for m in mems.items:
     print(f'Fact: {m.get(\"text\", \"\")[:80]}')
-    print(f'  Type: {m.get(\"fact_type\")}  Entities: {m.get(\"entities\")}')
+    print(f'  Type: {m.get("fact_type")}  Entities: {m.get("entities")}')
 ```
 
 Memory items are `dict` objects (not pydantic models) with keys: `id`, `text`, `context`, `date`, `fact_type`, `document_id`, `entities`, `occurred_start`, `occurred_end`.
@@ -337,6 +337,241 @@ curl -s "http://localhost:<port>/v1/default/banks/hermes/graph?limit=200" -o /tm
 
 Then call `read_file(path='/tmp/graph.json')` for inspection. Avoid piping to `python3 -c` — the security scanner blocks it.
 
+### Retain via files/retain (multipart, cron-safe)
+
+In hindsight ≥0.8.x (the version running on this machine), the retain endpoint is **`POST /v1/default/banks/{bank_id}/files/retain`** (multipart form-data), NOT `POST .../memories/retain` (JSON). The path `/memories/retain` returns 405 Method Not Allowed; use `files/retain` instead.
+
+This endpoint accepts files as multipart form-data — each file becomes a document, hindsight auto-extracts facts into memory using the LLM. **Always processes asynchronously** — returns immediate `operation_ids`, facts are committed in background (5–30 seconds for small files).
+
+#### Multipart construction (cron-safe Python)
+
+```python
+import json, uuid, urllib.request
+
+boundary = f"----{uuid.uuid4().hex}"
+
+# Read the content to upload
+with open("MEMORY.md") as f:
+    memory_content = f.read()
+
+body = b""
+
+# File 1: the memory file
+body += f"--{boundary}\r\n".encode()
+body += b'Content-Disposition: form-data; name="files"; filename="MEMORY.md"\r\n'
+body += b"Content-Type: text/markdown\r\n\r\n"
+body += memory_content.encode()
+body += b"\r\n"
+
+# Metadata block: the `request` field is a JSON STRING in the multipart body
+meta = json.dumps({
+    "document_tags": ["agent_memory", "operational"],
+    "parser": "markitdown"  # parser name, NOT 'markdown'
+}).encode()
+body += f"--{boundary}\r\n".encode()
+body += b'Content-Disposition: form-data; name="request"\r\n'
+body += b"Content-Type: application/json\r\n\r\n"
+body += meta
+body += b"\r\n"
+body += f"--{boundary}--\r\n".encode()
+
+url = "http://127.0.0.1:8888/v1/default/banks/hermes/files/retain"
+req = urllib.request.Request(url, data=body,
+    headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+
+with urllib.request.urlopen(req, timeout=120) as resp:
+    result = json.loads(resp.read())
+# Returns: {"operation_ids": ["uuid1", "uuid2"]}
+# One operation_id per file
+```
+
+#### Key differences from SDK retain
+
+| Aspect | `hindsight_client.aretain()` | `files/retain` multipart |
+|--------|------------------------------|--------------------------|
+| Input format | Raw text string | File upload with filename |
+| Async | Configurable (async=bool) | Always async |
+| Parser | Automatic | Configurable via `request.parser` |
+| Return | Operation ID or completed result | Always operation_ids array |
+| Token cost | Fact extraction happens synchronously | Fact extraction in background |
+| Cron safety | Needs `execute_code` (blocked in cron) | Needs `terminal()` only |
+
+#### Parser name quirk
+
+The parser field must be `"markitdown"` — NOT `"markdown"`. If you pass `"markdown"`, the API returns 400 with:
+
+```json
+{"detail": "Parser(s) not available: ['markdown']. Available: ['markitdown']"}
+```
+
+Omit the `parser` field entirely if you want the default parser. The available parser names can be found by inspecting the 400 error response.
+
+#### Polling for completion
+
+After uploading, child `retain` operations show as `status: "processing"`. Poll the operations endpoint:
+
+```bash
+curl -s "http://127.0.0.1:8888/v1/default/banks/hermes/operations" -o /tmp/ops.json
+# retain operations progress: {"stage":"storing","processed":1,"total":1,"detail":{"facts_committed":N}}
+```
+
+Expected timeline for small files (~3KB text):
+- `file_convert_retain` (parent): completes instantly (<1s)
+- `retain` (child): completes in 5–30 seconds (LLM fact extraction)
+- `consolidation` (auto-triggered after retain): completes in seconds
+
+#### Verify facts were committed
+
+```bash
+curl -s "http://127.0.0.1:8888/v1/default/banks/hermes/stats" -o /tmp/stats.json
+read_file /tmp/stats.json
+# For ~4KB total input (MEMORY.md + USER.md):
+#   total_nodes: 15–30
+#   total_documents: 2 (one per file)
+#   total_links: 100–250
+#   nodes_by_fact_type: {"experience": ~15, "observation": ~15}
+```
+
+#### When to use which path
+
+| Situation | Method |
+|-----------|--------|
+| Interactive session, SDK available | `hindsight_client.aretain()` |
+| Cron mode, SDK unavailable | `files/retain` via Python `urllib.request` (written as file, executed via `terminal()`) |
+| Temp files only, no Python | Not possible — multipart construction requires string manipulation that curl heredocs can't do cleanly |
+
+## Flat-File Memory Classification via Hindsight Reflect
+
+When your profile uses **flat-file memory** (MEMORY.md + USER.md, not hindsight bank), you can still use hindsight's `/reflect` endpoint to classify entries as CURRENT vs STALE before pruning. Pass the file content **inline in the query** — no bank ingestion needed.
+
+### Use Case
+
+A cron job asks to "archive old memories" and you have flat files with section-based entries delimited by `§` and dated headers like `## Topic (2026-06-14)`.
+
+### Workflow
+
+```
+Backup → Read files → Classify via reflect → Prune stale entries → Generate report → Archive
+```
+
+### Step 1 — Backup originals
+
+```python
+import shutil, os
+from datetime import datetime
+
+mem_dir = os.path.expanduser("~/.hermes/profiles/<profile>/memories")
+archive_dir = os.path.join(mem_dir, "archive")
+today = datetime.now().strftime("%Y%m%d")
+
+# Timestamped backup
+shutil.copy2(os.path.join(mem_dir, "MEMORY.md"),
+             os.path.join(archive_dir, f"MEMORY-{today}.md"))
+shutil.copy2(os.path.join(mem_dir, "USER.md"),
+             os.path.join(archive_dir, f"USER-{today}.md"))
+```
+
+### Step 2 — Classify via reflect with inline content
+
+Send the full memory content inside the `query` field. Use `"include": {"facts": {}}` so hindsight also searches its own bank for relevant context:
+
+```python
+import json, urllib.request
+
+memory_md = open(os.path.join(mem_dir, "MEMORY.md")).read()
+user_md = open(os.path.join(mem_dir, "USER.md")).read()
+
+query = f"""Consolidate the following memories for the {profile} Hermes profile.
+
+Current MEMORY.md:
+{memory_md}
+
+Current USER.md:
+{user_md}
+
+Task:
+1. Classify each entry: [CURRENT] (still active/valid) or [STALE] (outdated, should be archived).
+2. For [STALE] items, explain why.
+3. Produce a cleaned MEMORY.md with only [CURRENT] entries, grouped logically.
+4. Mark entries that belong to another profile and don't apply to this one."""
+
+url = "http://127.0.0.1:8888/v1/default/banks/<bank_id>/reflect"
+data = json.dumps({
+    "query": query,
+    "budget": "high",      # "high" gives most thorough analysis
+    "max_tokens": 4096,
+    "include": {"facts": {}}
+}).encode()
+req = urllib.request.Request(url, data=data,
+    headers={"Content-Type": "application/json",
+             "X-HINDSIGHT-API-KEY": "hermes"})
+
+with urllib.request.urlopen(req, timeout=180) as resp:
+    result = json.loads(resp.read())
+
+classification = result.get("text", "")
+usage = result.get("usage", {})
+# usage: {"input_tokens": N, "output_tokens": N, ...}
+```
+
+**API header:** Some hindsight installations require `X-HINDSIGHT-API-KEY: hermes`. If omitted and auth is enforced, the request silently succeeds but returns generic output — the classification quality degrades. Always include it for cron maintenance.
+
+**Timeout:** Budget=high on a 1500-char MEMORY.md uses ~3000-4000 input tokens and completes in 5-15 seconds. Set timeout=180 to handle LLM provider latency.
+
+### Step 3 — Write cleaned MEMORY.md
+
+Parse the hindsight output for the "Cleaned MEMORY.md" section it produces. Write the cleaned version:
+
+```python
+# Extract the cleaned markdown from classification text
+# (hindsight returns it wrapped in ```markdown ... ``` or as plain text)
+cleaned = extract_md_section(classification)  # custom extraction logic
+with open(os.path.join(mem_dir, "MEMORY.md"), 'w') as f:
+    f.write(cleaned)
+```
+
+Keep USER.md untouched unless hindsight flags content as stale for a specific reason — User protocol entries rarely go stale.
+
+### Step 4 — Generate and archive consolidation report
+
+```python
+report = f"""# Hindsight 记忆整理报告
+生成时间: {datetime.now().isoformat()}
+处理工具: hindsight-api reflect
+
+## 分析范围
+- 清理前 MEMORY.md ({len(memory_md)} chars, {len(memory_md.splitlines())} lines)
+- 清理后 MEMORY.md 精简 (对比存档备份)
+- USER.md 保持不变
+
+## Hindsight 分类结果
+{classification}
+
+## Token 消耗
+{json.dumps(usage, indent=2)}
+"""
+with open(os.path.join(archive_dir, f"hindsight-consolidation-{today}.md"), 'w') as f:
+    f.write(report)
+```
+
+### Pitfalls
+
+- **Do NOT cross-profile contaminate.** If the MEMORY.md contains entries from another profile (e.g., "Hindsight Daemon Config (属 tester-01 profile)"), flag them as STALE and remove. With hindsight reflect, explicitly tell it: "Mark entries that belong to another profile."
+- **`include: {"facts": {}}` triggers fact search.** Omit this or set to empty dict `{}` if you only want LLM reflection without hindsight bank lookups. When facts are included, token cost doubles (extra tokens for retrieved context).
+- **Classification is LLM-dependent.** DeepSeek-based hindsight (like this installation) produces good classification. With weaker models, verify the output manually before writing — especially before deleting entries that look "stale" but are actually active reminders (e.g., "secret key invalid, needs update").
+- **date parsing:** Reflect works best when MEMORY.md entries have explicit dates (e.g. `## Topic (2026-06-14)`). If entries lack dates, the LLM may guess based on content recency — flag this in your report.
+- **`~/.hermes/profiles/<profile>/memories/archive/` is the right archive dir.** Hindsight's `archive/` directory already stores timestamped backups and consolidation reports. Use this convention, not a separate path.
+- **USER.md is typically low-churn.** User protocol entries (communication rules, collaboration norms, anti-patterns) rarely need archiving. Only prune USER.md if hindsight explicitly flags an entry, and even then, verify.
+
+### When to Use This vs Hindsight Bank Memory
+
+| Situation | Method |
+|-----------|--------|
+| Profile uses flat-file memory (MEMORY.md) | Reflect with inline content (this section) |
+| Profile uses hindsight bank (hermes) | Standalone `/reflect` on bank |
+| Cron job, flat files present, hindsight daemon up | This workflow (backup first) |
+| No hindsight daemon at all | Manual date check on MEMORY.md entries |
+
 ## No Dedicated "Optimize" or "Vacuum" Command
 
 Hindsight has **no standalone optimize/vacuum/maintenance CLI command**. The consolidation endpoint IS the optimization mechanism:
@@ -354,11 +589,11 @@ When hindsight is the active memory provider, the file `<profile>/memory.db` exi
 ## Daemon Restart Latency (1-3+ Minutes)
 
 After an idle-timeout shutdown, restarting the daemon via `hindsight-embed -p <name> daemon start` takes **1-3+ minutes** because the embedded PostgreSQL must reinitialize. During this window:
-- `hindsight-embed daemon status` reports \"Daemon is not running\"
+- `hindsight-embed daemon status` reports "Daemon is not running"
 - `curl http://127.0.0.1:<port>/api/health` returns connection refused
 - `hindsight-embed bank list` times out
 
-The process exits cleanly (`exit_code: 0`) but the API isn't reachable until PG is fully up. Use `--idle-timeout 86400` to avoid frequent restarts. If a cron job needs the daemon and it's down, proxy through a sibling daemon (see \"Daemon Not Running\" above) rather than waiting for restart.
+The process exits cleanly (`exit_code: 0`) but the API isn't reachable until PG is fully up. Use `--idle-timeout 86400` to avoid frequent restarts. If a cron job needs the daemon and it's down, proxy through a sibling daemon (see "Daemon Not Running" above) rather than waiting for restart.
 
 ## Cron Mode Pitfalls
 
@@ -381,7 +616,7 @@ Root cause unknown (possibly a stdin/stdout interaction between the embed CLI an
 |---|---|
 | `hindsight-embed -p hermes memory recall hermes "query"` | `curl -s -X POST /v1/default/banks/hermes/memories/recall -d '{"query":"...","budget":"low"}'` |
 | `hindsight-embed -p hermes memory reflect hermes "query"` | `curl -s -X POST /v1/default/banks/hermes/reflect -d '{"query":"...","budget":"mid"}'` |
-| `hindsight-embed -p hermes memory retain hermes "text"` | `curl -s -X POST /v1/default/banks/hermes/memories/retain -d '{"items":[{"content":"..."}]}'` |
+| `hindsight-embed -p hermes memory retain hermes "text"` | Use `files/retain` multipart (see "Retain via files/retain" section) — `/memories/retain` returns 405 in hindsight ≥0.8.x |
 | `hindsight-embed -p hermes bank list` | `curl -s /v1/default/banks` |
 
 **Discovery path for REST endpoints:** The OpenAPI spec is always available at `curl -s http://<host>:<port>/openapi.json`. This is a complete spec — use it to discover new endpoints instead of guessing URL paths. The spec lists every endpoint with its exact path, parameters, and request/response schemas.

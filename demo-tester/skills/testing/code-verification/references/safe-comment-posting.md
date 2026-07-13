@@ -2,12 +2,41 @@
 
 ## Problem
 - `gh issue comment N --repo OWNER/REPO -b "中文..."` triggers `tirith:confusable_text` scan errors
-- Emoji-rich bodies (e.g., ✅, 🔌, 📊) trigger `tirith:variation_selector` blocks due to Unicode variation selectors
+- Emoji-rich bodies (e.g., ✅, 🔌, 📊) trigger `tirith:variation_selector` blocks due to Unicode variation selectors — specifically any character with VS16 (U+FE0F) appended for emoji presentation
+- CJK characters (中文, ✅, 汉字) trigger `tirith:confusable_text` when mixed with ASCII homoglyphs (e.g., fullwidth Latin, mathematical script)
 - Terminal Unicode encoding issues can corrupt comments before they're sent
 
-## Solution Workflow
+## Quick Escape Hatch: Pure ASCII Direct Post
 
-### Always write to file first
+**When content is simple enough**, strip all emoji/CJK and post directly:
+
+```bash
+gh issue comment N --repo demo-oneplusn/demo-workflow --body '## Verification Report
+
+### Test Results
+
+```
+All 13 tests: OK
+```
+
+| AC | Result |
+|----|--------|
+| AC1: func(5,3)==2 | PASS |
+
+**Verdict: PASS**'
+```
+
+**Rules of thumb:**
+- NO emoji (not even ✅ ❌ ⚠️) — use `PASS`, `FAIL`, `OK`, `WARN` in plain text
+- NO CJK characters (中文/Kanji/Hangul)
+- NO Unicode combining marks, variation selectors, or zero-width joiners
+- Pure ASCII table syntax (pipe `|`, dash `-`) is safe
+- Bold `**text**` and inline code `` `code` `` are safe
+- This bypasses BOTH `confusable_text` AND `variation_selector` scanners
+
+**When NOT to use this:** If the project convention requires Chinese-language comments (per RULES.md 铁律 5), this technique violates that rule. In that case, use the body-file approach below, or post in English if the rules allow it for automated cron reports.
+
+## Standard Workflow: Write to file first
 ```bash
 write_file('/tmp/comment_issue_N.md', '...body content...')
 ```

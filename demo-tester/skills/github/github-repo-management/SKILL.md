@@ -579,6 +579,95 @@ Or use `GIT_SSH_COMMAND` for a one-off:
 GIT_SSH_COMMAND="ssh -o ConnectTimeout=10" git push origin main
 ```
 
+### Remote URL points to wrong account when using existing clone
+
+When reusing an existing cloned repo directory (e.g. `/tmp/hermes-config` that was cloned by a different process or profile), the remote URL may point to a **different GitHub account** than the one you're authenticated as:
+
+```bash
+# What you think: cloned from OnePlusNPM/hermes-config
+# What you get:
+$ git remote -v
+origin	https://github.com/OnePlusNDev/hermes-config.git (fetch)  # ← wrong owner!
+origin	https://github.com/OnePlusNDev/hermes-config.git (push)
+```
+
+This happens when the directory already existed from a previous session under a different profile. **Always verify the remote URL before pushing:**
+
+```bash
+# Check before push
+git remote -v
+
+# Fix: set to the correct owner/repo
+git remote set-url origin https://github.com/CORRECT_OWNER/REPO.git
+
+# Then verify push access
+gh api repos/CORRECT_OWNER/REPO --jq '.permissions.push'
+```
+
+### `.gitignore` stale after stash/rebase — transient files leak into commits
+
+When your workflow involves `git stash`, `git rebase`, or conflict resolution, the `.gitignore` in effect during `git add` may be **an older version** than expected. If a stash contained `.gitignore` updates:
+
+1. `git stash pop` conflicts may leave the old `.gitignore` in the index
+2. `git checkout --ours .gitignore` restores the pre-stash version (missing recent patterns)
+3. `git add -A` then captures files the updated `.gitignore` would have excluded — cron output files, binary build artifacts, model caches, etc.
+
+**Prevention — verify .gitignore before `git add`:**
+
+```bash
+# Before adding files, confirm .gitignore is current
+git show HEAD:.gitignore | head -20         # what's committed
+cat .gitignore | head -20                   # what's on disk
+diff <(git show HEAD:.gitignore 2>/dev/null) .gitignore  # any difference?
+
+# If .gitignore was updated in a stash/islands, ensure it's the right version
+git checkout <correct-branch> -- .gitignore   # restore from the right source
+```
+
+**Fix after the fact — untrack unwanted files from the commit:**
+
+```bash
+# If bad files are already committed, remove them from tracking
+git rm --cached 'path/to/transient/files/*'
+git commit --amend --no-edit
+
+# Add them to .gitignore for future
+echo "**/cron/output/" >> .gitignore
+git add .gitignore && git commit --amend --no-edit
+```
+
+### `git stash pop` conflicts — stash is NOT dropped
+
+When `git stash pop` encounters merge conflicts, the stash **remains on the stack** even though changes were partially applied. This is a common git gotcha:
+
+```bash
+# Conflicted stash pop — stash is still on the stack
+git stash list
+# stash@{0}: On main: my-work
+
+# After resolving conflicts and git adding, the stash is still there
+# You MUST drop it manually when the pop is done:
+git stash drop
+```
+
+**Pattern to remember:** `git stash pop` = `git stash apply` + `git stash drop`. The drop only happens if apply succeeds without conflicts. With conflicts, the stash persists — and if you don't drop it, it'll re-surface on the next `git stash pop` or be accidentally applied later.
+
+### Non-interactive `git rebase --continue` in cron jobs
+
+In cron jobs (no TTY, no editor available), `git rebase --continue` will fail because it tries to open an editor for the commit message:
+
+```
+error: There was a problem with the editor 'vi'.
+```
+
+**Fix — set GIT_EDITOR to a no-op:**
+
+```bash
+GIT_EDITOR=true git rebase --continue
+```
+
+`true` exits successfully with status 0 without producing output, which git interprets as "editor accepted the message as-is." This preserves the original commit message without modification.
+
 ### `git push` fails with HTTP/2 framing error (macOS)
 
 On macOS, git defaults to the HTTP/2 transport. Some networks, proxies, or VPNs handle HTTP/2 poorly — you'll see an error like:

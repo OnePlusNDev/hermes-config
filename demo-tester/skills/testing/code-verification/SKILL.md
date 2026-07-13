@@ -1,7 +1,7 @@
 ---
 name: code-verification
 description: "Systematic code verification workflow for testers — clone/fetch latest, run tests, cross-check against Acceptance Criteria (AC), boundary/edge-case check, pass/reject verdict with Chinese-language comment."
-version: 1.2.0
+version: 1.4.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -20,6 +20,25 @@ Systematic approach for verifying developer-submitted code against acceptance cr
 
 ## Phase 1: Discovery
 
+### Step 0: Repo Discovery (when repo owner is unknown)
+
+You may know the repo name (e.g. `demo-workflow`) but not which user or org owns it. Do NOT assume it lives under a user account — it may be under an **org**.
+
+```bash
+# 1. Check which orgs your active user belongs to
+gh api user/orgs --jq '.[].login'
+
+# 2. Search each org for the target repo
+gh repo list demo-oneplusn --limit 30
+
+# 3. If still not found, also check user accounts
+gh repo list OWN_USERNAME --limit 30
+```
+
+**Do NOT use `gh search repos` for org repos** — the Search API returns `422 Validation Failed` for org repos even when `gh repo view` works fine. The `gh api user/orgs` + `gh repo list <org>` approach is authoritative.
+
+If the repo is found under an org, use `-R ORG_NAME/REPO_NAME` for all subsequent `gh` commands (not `OWNER_USERNAME/REPO_NAME`).
+
 ### Step 1a: Get all open issues assigned to tester
 
 ```bash
@@ -28,6 +47,16 @@ gh issue list \
   --state open \
   --assignee YOUR_USERNAME \
   --json number,title,state,body,createdAt,pullRequests
+```
+
+**Important: `--assignee USERNAME` vs `--assignee @me`.** The `@me` shorthand resolves from gh's active auth context — if the active user is `OnePlusNDev`, then `--assignee @me` searches for issues assigned to `OnePlusNDev`, not the tester. **However, `--assignee OnePlusNTester` (explicit username) works regardless of the active gh user**, as long as the active user has read access to the repo. The filter operates on the repo-side assignee field, not on auth identity. So in a multi-profile setup, use the explicit username form and skip auth switching entirely, unless you also need to post comments (which require the correct token for authorship).
+
+**Only use the API alternative below when the active gh user cannot even access the repo** (e.g., a private repo restricted to specific accounts):
+
+```bash
+gh api repos/OWNER/REPO/issues --state open --jq \
+  '.[] | select(.assignee != null) | select(.assignee.login == "OnePlusNTester") |
+   {number: .number, title: .title, state: .state, assignee: .assignee.login}'
 ```
 
 If the result is empty — **before exiting silently**, do a lightweight situational-awareness check:
@@ -202,7 +231,13 @@ rm -f /tmp/gh_*.json /tmp/gh_*.py /tmp/issue-comment*.md /tmp/verify-*.py
 
 ### Step 5c: Final check — no work found
 
-If Phase 1 returned empty + situational-awareness check confirmed nothing anomalous, output `[SILENT]` as the final response to suppress cron delivery. Do NOT switch back and then output content — the auth switch is just cleanup, not a result.
+If Phase 1 returned empty + situational-awareness check confirmed nothing anomalous:
+
+1. **Switch gh auth back** (Step 5a) — the auth switch is cleanup, not a result
+2. **Clean temp files** (Step 5b)
+3. **Output `[SILENT]`** as the final response to suppress cron delivery
+
+**Do NOT skip auth cleanup on the no-work path** — the active gh auth state persists across cron jobs. A one-line `gh auth switch` at the end prevents the next profile's cron job from inheriting the wrong account.
 
 ---
 
@@ -377,9 +412,18 @@ A dev-created "verification report" issue with no tester involvement bypasses th
 
 - **Search API 422 for org repos**: The GitHub Search API can return `HTTP 422 "Validation Failed"` with the message `"The listed users and repositories cannot be searched either because the resources do not exist or you do not have permission to view them"` even when `gh repo view OWNER/REPO` works fine. This happens because the Search API's permission model differs from the REST API — some orgs restrict search indexing even when the REST API grants read access. **Do NOT use the Search API as a fallback when `gh issue list` returns empty** for an org repo. The `gh` CLI approach is authoritative; the Search API error is a false negative and wastes time.
 
+- **`gh issue list` without `-R` fails when not in a git repo**: Running `gh issue list --assignee @me` from `/tmp/` or any non-repo directory produces `"failed to run git: fatal: not a git repository"`. The `gh` CLI infers the repo from the current directory's `.git` config. If you're not in a git checkout, you MUST pass `-R OWNER/REPO` explicitly. This is not a transient error — the command will always fail without `-R` outside a git repo.
+
 - **Forgotten `gh auth switch` teardown** (shared-keychain setups): When your session switches `gh auth` to the tester account, the active account persists until the next cron job or shell session. If your profile shares a keychain with other profiles (dev, pm, etc.), their cron jobs will inherit your tester auth and produce wrong assignee queries. **Always switch back** to the default account in Phase 5 cleanup. Verify with `gh auth status`.
 
 - **Clone fails in cron**: `git clone https://...` almost always fails (no auth token passed through HTTPS). Use `gh api repos/OWNER/REPO/git/trees/main` to list files, then `gh api repos/OWNER/REPO/git/blobs/<sha>` + `base64 -d` to fetch file contents. This is the reliable path for cron and restricted environments. **See reference: `references/ghapi-clone-fallback.md`.**
+- **Clone alternative when `rm -rf` blocked**: If `rm -rf /tmp/repo` triggers the `tirith:recursive_delete` security scanner, use `git init + git fetch + git checkout` instead of `git clone` (no prior deletion needed):
+  ```bash
+  mkdir -p /tmp/repo && cd /tmp/repo
+  git init && git remote add origin https://github.com/OWNER/REPO.git
+  git fetch origin main && git checkout -b main origin/main
+  ```
+  This creates a fresh clone without needing to delete anything first. Works identically to `git clone` for test execution.
 - **Clone fails in general**: Even on interactive macOS, HTTPS can fail with "HTTP2 framing layer" or "Failed to connect" errors. The `gh api` tree/blob method always works because it inherits the already-active gh auth token.
 - **Claim vs reality gap**: Developer says "done" but it's not on main. Always verify via repo API, not dev comments. This is the #1 reason to fail: trust the repo, not the comment (Issue #2 in this session was a confirmed case).
 - **Stale cached code**: Never test against code fetched more than a few minutes ago. Fetch fresh every time.
