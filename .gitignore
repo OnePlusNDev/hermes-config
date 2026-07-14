@@ -1,88 +1,78 @@
-# Sensitive files — never commit
-**/.env
-**/.env.*
-**/auth.json
-**/auth.lock
+# Sensitive / secret files
+.env
+.auth*
+*.lock
+*.pid
+gateway_state.json
+channel_directory.json
 
-# Runtime state & caches
-**/state.db*
-**/sessions.db*
-**/logs/
-**/cache/
-**/sessions/
-**/desktop/
-**/sandboxes/
-**/*.bak*
-**/.hermes_history
-**/interrupt_debug.log
-**/processes.json
-**/.update_check
-**/.skills_prompt_snapshot.json
+# Secrets store
+auth.json
 
-# Gateway runtime
-**/gateway.lock
-**/gateway.pid
-**/gateway_state.json
-**/gateway.*
-
-# Skill runtime metadata
-**/skills/.usage.json*
-**/skills/.hub/
-**/skills/.curator_backups/
-**/skills/.curator_state
-**/skills/.bundled_manifest
-
-# Cron artifacts
-**/cron/output/
-**/cron/.jobs.lock
-**/cron/.tick.lock
-**/cron/ticker_heartbeat
-**/cron/ticker_last_success
-
-# Provider caches
-**/models_dev_cache.json
-**/ollama_cloud_models_cache.json
-**/provider_models_cache.json
-
-# Home dir state
-**/home/.ssh/
-**/home/.cache/
-**/home/.config/gh/
-**/home/.local/
-**/home/Library/
-**/home/.gitconfig
-**/home/.hermes/
-**/.local/
-
-# Downloaded binaries
-**/bin/tirith
-
-# Media caches
-**/audio_cache/
-**/image_cache/
-
-# Hindsight maintenance logs
-**/hindsight-maintenance-logs/
-
-# Temp/runtime files
-**/channel_directory.json
-**/context_length_cache.yaml
-**/pairing/
-**/plans/
-**/hooks/
-**/skins/
-**/workspace/
-
-# External submodule (demo-workflow is a separate repo)
-**/home/demo-workflow/
-
-# Temp scripts
-**/triage_issues.py
-**/cron_triage.py
-**/fetch_issues.py
-
-# Binary/large cache files
-*.pem
-*.key
+# Runtime / cache artifacts
+*.db
+*.db-shm
+*.db-wal
+state.db*
+models_dev_cache.json
 *.cache
-*curator_backups/**/*.tar.gz
+cache/
+image_cache/
+audio_cache/
+
+# Gateway / session state
+gateway.lock
+session_log.txt
+
+# Large snapshot files
+.skills_prompt_snapshot.json
+skills_manifest.json
+context_length_cache.yaml
+.update_check
+
+# Skip subdirs but keep their .gitignore
+skills/.*/
+sessions/
+cron/.*/
+logs/
+plans/
+sandboxes/
+pairing/
+lsp/
+hooks/
+
+# OS / temp files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# ===== demo-pm profile exclusions =====
+
+# Binary / compiled artifacts
+bin/
+
+# Runtime caches
+*.bak
+config.yaml.bak*
+processes.json
+interrupt_debug.log
+*.log
+ollama_cloud_models_cache.json
+provider_models_cache.json
+models_dev_cache.json
+
+# Home directory (contains .ssh, gh auth tokens, caches)
+home/
+
+# Local state (gh auth device IDs, etc.)
+.local/
+.desktop/
+desktop/
+
+# Session & history
+.hermes_history
+hindsight-maintenance-logs/
+
+# Workspace scripts (development artifacts, not config)
+triage_issues.py

@@ -315,27 +315,72 @@ HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" https://github.
 - **Repo doesn't exist yet**: Create via `gh repo create <owner>/<name> --private --description "..."`. If the org doesn't exist, use user-scoped repo.
 - **Security scanner in cron mode**: `execute_code` is blocked in cron. Write scripts to files and run via `terminal("python3 /tmp/script.py")`.
 
-### `gh api` blob upload fails with "Secret detected in content" (HTTP 422)
+### Method A `git push` blocked by GitHub push protection (GH013)
 
-GitHub's secret scanning push rules scan every blob uploaded via the Git Data API. A file containing hex-encoded credentials (e.g., `xxd` hexdumps of GITHUB_TOKEN, base64-encoded API keys, or any file where a token appears as raw hexadecimal bytes) will be rejected even though the file is a legitimate reference doc, not a live credential.
+A regular `git push` (Method A) can be rejected with `GH013: Repository rule violations found` — push protection fires on content even in reference docs. This typically hits when transcripts contain hex-encoded tokens (xxd output of .env), base64-encoded token strings, or partially-shielded token references.
 
-**Detection:** The gh API returns HTTP 422 with a message like `"Repository rule violations found — Secret detected in content"`. The error fires on the blob POST — you'll see which file was being uploaded when it failed.
+**Detection:** The error message names the commit SHA, file paths, and line numbers:
+```
+remote: - GITHUB PUSH PROTECTION
+remote:       —— GitHub Personal Access Token ——————————————————————
+remote:        locations:
+remote:          - commit: 27eea24...
+remote:            path: demo-pm/skills/.../reference.md:45
+```
 
-**Fix (redact the file and re-push):**
+**Fix (redact, amend, rebase, push):**
 
-1. **Read the offending file** — identify all locations containing hex-encoded token bytes, partial plaintext token fragments, or any string matching `ghp_`, `sk-`, `github_pat_`, `AKIA` patterns.
-2. **Redact every occurrence** — replace token hex strings with `***`, replace partially-shown token fragments (e.g., `ghp_Z1...ghiu`) with `ghp_***...***`.
-3. **Re-commit locally** — `git add <file> && git commit --amend --no-edit`
-4. **Re-run the gh API push** — the amended commit has different blob SHAs for the redacted file, so it will be re-uploaded cleanly.
+1. **Scan all flagged files** for these patterns and redact every occurrence:
+
+   | Pattern in file | Example | Redact to |
+   |----------------|---------|-----------|
+   | Hex bytes encoding token | `6768705f5a315379665a...` (decodes to `ghp_...`) | `***` |
+   | Base64 encoding token | `R0lUSFVCX1RPS0VOPWdocF9a...` (decodes to `GITHUB_TOKEN=...`) | `***` |
+   | Partial shielded token | `ghp_Z1...ghiu` | `ghp_***...***` |
+   | xxd hexdump lines (both columns!) | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex with `2a2a...`, ASCII with `***` |
+   | Python hex-to-string code | `h = '6768705f...'` | `h = '***'` |
+
+2. **Pre-commit content scan**: Before re-committing, confirm all patterns are gone:
+   ```bash
+   grep -n 'ghp_[A-Za-z0-9]\|6768705f\|R0lUSFVC' file1.md file2.md
+   ```
+
+3. **Re-commit and push**: The fix changes blob SHAs, so `--amend` produces a different commit. If the previous push attempt failed and the remote received the old commit, the remote has diverged:
+   ```bash
+   git add -A
+   git commit --amend --no-edit
+   git pull --rebase   # required if remote diverged (push rejected with "fetch first")
+   git push
+   ```
+   `git pull --rebase` replays the amended commit on the latest remote HEAD.
 
 **Concrete patterns that trigger this:**
 
 | Pattern in file | Example | How to redact |
 |----------------|---------|---------------|
-| Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `'***'` |
+| Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `***` |
 | Partial shielded token | `ghp_Z1...ghiu` | Replace with `ghp_***...***` |
 | Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
-| Python hex-to-string code | `h = '676870...'` | Replace hex literal with `'***'` |
+| Python hex-to-string code | `h = '676870...'` | Replace hex literal with `***` |
+
+**If multiple files trigger the rule:** The error lists all of them. Redact all files in one pass before amending — a single `--amend` with all fixes is more efficient than iterating one-per-run.
+
+### `gh api` blob upload fails with "Secret detected in content" (HTTP 422)
+
+GitHub's secret scanning push rules scan every blob uploaded via the Git Data API. Same root cause as Method A push protection — hex-encoded or base64-encoded tokens in reference docs — but the error surfaces on the blob POST instead of `git push`.
+
+**Detection:** The gh API returns HTTP 422 with `Repository rule violations found — Secret detected in content`. The error fires on the individual blob upload — you'll see which file was being uploaded when it failed.
+
+**Fix:** Same redaction patterns and amend workflow as Method A above. After amending, re-run the gh API push — the amended commit has different blob SHAs for the redacted files.
+
+**Concrete patterns that trigger this:**
+
+| Pattern in file | Example | How to redact |
+|----------------|---------|---------------|
+| Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `***` |
+| Partial shielded token | `ghp_Z1...ghiu` | Replace with `ghp_***...***` |
+| Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
+| Python hex-to-string code | `h = '676870...'` | Replace hex literal with `***` |
 
 **If multiple files trigger the rule:** The script stops at the first failure. Fix that one file, re-commit, re-run — repeat until all pass. A single re-commit with all redactions done at once is more efficient than one-per-run.
 

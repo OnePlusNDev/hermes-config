@@ -29,6 +29,8 @@ color: blue
 
 ### 第一步（优先度排序）：选择认证方案
 
+> **2026-07-13 更新：** 本会话中 Python `open()` + `urllib.request` 成功工作（AUTH_OK: OnePlusNPM，查询返回 []）。之前的 SSL/超时/`.env` placeholder 失败报告均为间歇性——并非每次都会触发。优先使用 `gh` CLI，次选 Python `/tmp/` 脚本，最后才用 base64/xxd/bash heredoc 等复杂方案。
+
 在开始分诊前，先选一个方案。从上到下按**优先度**选择：
 
 **方案 A（最简洁）→ 直接 gh（首选，推荐）**
@@ -70,16 +72,35 @@ subprocess.run(['/Users/oneplusn/.local/bin/gh', ...], env={'GH_TOKEN': token})
 cat ~/.hermes/profiles/demo-pm/RULES.md
 ```
 
-### ⚠️ 陷阱：`gh auth switch` 偶发未生效（keyring 多账号竞态）
+### ⚠️ 陷阱：`gh auth switch` **可能**偶发未生效（keyring 多账号竞态，间歇性）
 
-**关键问题（2026-07-09 发现）：** 当 keyring 中存在 4+ 个 GitHub 账号时，`gh auth switch` 可能报告成功但实际活跃账号并未切换。
+**关键问题（2026-07-09 发现，2026-07-13 更新）：** 当 keyring 中存在 4+ 个 GitHub 账号时，`gh auth switch` **偶尔**可能报告成功但实际活跃账号并未切换。**注意：此行为是间歇性的**——并非每次都会触发。
 
 ```bash
-# ❌ 假阳性：gh 说切换了，但实际没生效
+# ❌ 可能的假阳性（不保证每次出现）
 gh auth switch --user OnePlusNPM
 # → ✓ Switched active account for github.com to OnePlusNPM
 gh auth status --hostname github.com --active
-# → ✓ Logged in to github.com account JungleAssistant  ← 没变！
+# → ✓ Logged in to github.com account JungleAssistant  ← 可能没变！
+```
+
+**2026-07-13 实测：** 本会话中 `gh auth switch --user OnePlusNPM` 首次尝试即成功，`gh auth status` 确认已正确切换。无需「二次切换回弹」工作区。
+
+**规避策略——切换后立即强制验证，按需使用「二次切换回弹」：**
+
+```bash
+# 第一步：切换到目标账号
+gh auth switch --user OnePlusNPM 2>&1
+
+# 第二步：**必须验证**（不显示目标账号才执行回弹）
+gh auth status --hostname github.com --active 2>&1 | head -3
+# → 如果已显示 OnePlusNPM，继续第三步
+# → 如果显示其他账号，执行回弹：
+
+# 第三步（仅当验证失败时执行）：
+gh auth switch --hostname github.com --user OnePlusNTester 2>&1
+gh auth switch --hostname github.com --user OnePlusNPM 2>&1
+gh auth status --hostname github.com --active 2>&1 | head -3  # 再次验证
 ```
 
 **原因：** keyring 中多账号（OnePlusNPM、OnePlusNDev、OnePlusNTester、JungleAssistant…）时，gh 的凭证刷新可能存在内部竞态条件——`switch` 命令在凭证写入完成前返回成功信号。
@@ -765,10 +786,52 @@ result = subprocess.run(
 
 **注意点：** gh 的全路径 /Users/oneplusn/.local/bin/gh 必须显式指定；别用 \\+ 或 C 风格转义——直接用 \\n 构建多行 comment。
 
+### 第四.五步：还原 gh 活跃账号
+
+**⚠️ 重要（2026-07-14 新增）：** 分诊完成后，必须将 gh CLI 的活跃账号还原为任务开始前的原始账号，避免影响后续 cron 或手动会话。
+
+```bash
+# 记录原始账号（在分诊开始时执行）
+ORIG_GH_USER=$(gh auth status --hostname github.com --active 2>&1 | grep 'Logged in' | sed 's/.*account //')
+
+# ... 分诊逻辑 ...
+
+# 分诊完成后还原
+CURRENT_GH_USER=$(gh auth status --hostname github.com --active 2>&1 | grep 'Logged in' | sed 's/.*account //')
+if [ "$CURRENT_GH_USER" != "$ORIG_GH_USER" ]; then
+  gh auth switch --hostname github.com --user "$ORIG_GH_USER" 2>&1
+  echo "还原 gh 活跃账号: $ORIG_GH_USER"
+fi
+```
+
+**原因：** 本环境 keyring 中有 5 个 GitHub 账号。`gh auth switch` 会改变全局活跃账号，影响同一 shell 中后续运行的进程。
+
+**不还原的后果：** 后续 cron 或用户操作可能因活跃账号不匹配而遇到权限问题。
+
 ### 第五步：静默退出策略
 
 - **有待分诊任务** → 输出完整报告
 - **无待分诊任务** → 输出 `[SILENT]` 抑制通知发送
+
+**在执行静默退出前，推荐执行全量仓库健康检查（确认 repo 状态和 unassigned issue 情况）：**
+详见 `references/2026-07-13-session-full-repo-healthcheck-pattern.md`。
+
+```bash
+gh issue list --repo demo-oneplusn/demo-workflow --state open --json number,title,labels,assignees --limit 20 | python3 -c "
+import json, sys
+issues = json.load(sys.stdin)
+for i in issues:
+    assignees = [a['login'] for a in i.get('assignees',[])]
+    labels = [l['name'] for l in i.get('labels',[])]
+    print(f'  #{i[\"number\"]}: {i[\"title\"][:60]}')
+    print(f'    Labels: {labels}')
+    print(f'    Assignees: {assignees or [\"(none)\"]}')
+"
+```
+
+如全量查询发现：
+- 所有 issue 已 assign（非 PM）→ 真无任务 → `[SILENT]`
+- 存在 unassigned issue → 补 assign PM 后再分诊
 
 ## 备用方案：Python subprocess 读取 .env + GH_TOKEN 传递
 
@@ -858,6 +921,24 @@ gh issue edit 6 --repo demo-oneplusn/demo-workflow --add-assignee OnePlusNDev
 
 **注意点：** 写操作（edit/comment）需要目标账号有 write 权限。如果当前 gh 活跃账号不是 PM 账号，使用 Python subprocess + `GH_TOKEN` 从 `.env` 读取的方法（见「备用方案」）。
 
+### ⚠️ 陷阱：`gh issue list --user` 是无效参数（2026-07-13 新增）
+
+**关键问题：** `gh issue list` 没有 `--user` 标志。在尝试指定 gh 账号时不要使用 `--user`：
+
+```bash
+# ❌ 错误：unknown flag: --user
+gh issue list --repo demo-oneplusn/demo-workflow --assignee OnePlusNPM --user OnePlusNPM
+
+# ✅ 正确：使用 --assignee 指定要查询的 assignee，无需指定用户账号
+gh issue list --repo demo-oneplusn/demo-workflow --assignee OnePlusNPM --state open
+```
+
+**原理：** GitHub API 的 assignee 过滤器独立于发起查询的活跃账号身份，只要当前 token 有 `repo` scope 即可。详见上方「第三步」关于 `@me` vs 显式用户名的说明。
+
+**如果需要以特定账号身份执行查询：**
+- 使用 `gh auth switch --user <TARGET_USER>` 切换活跃账号（2026-07-13 实测第一次尝试即成功，竞态条件为间歇性）
+- 或使用 `gh auth token -u <TARGET_USER>` 提取 token 后通过 `GH_TOKEN` 环境变量传递给子进程
+
 ### 鉴别「真无任务」vs「假阴性」
 
 当 `gh issue list --assignee OnePlusNPM --state open` 返回 `[]` 时，需要区分是**确实无待分诊任务**还是**查询条件导致空结果**。
@@ -878,9 +959,32 @@ gh issue edit 6 --repo demo-oneplusn/demo-workflow --add-assignee OnePlusNDev
    - 返回空列表 `[]` → 仓库完全无 open issue，静默退出
    - 返回有条目 → 检查各条目的 assignee
 
-3. **判断策略：**
-   - **所有 issue 都有 assignee 且非你** → 真无任务，静默退出
-   - **存在无 assignee 的 issue** → 说明有未分诊的新 Issue 漏了 PM assign，需按协作协议补 assign 给自己后再分诊
+3. **输出全量结果摘要（2026-07-13 新增）：**
+   当 `--assignee OnePlusNPM` 返回空但全量查询返回时，输出简洁摘要帮助诊断：
+   ```bash
+   gh issue list --repo demo-oneplusn/demo-workflow --state open --json number,title,labels,assignees --limit 20 | python3 -c "
+   import json, sys
+   issues = json.load(sys.stdin)
+   for i in issues:
+       assignees = [a['login'] for a in i.get('assignees',[])]
+       labels = [l['name'] for l in i.get('labels',[])]
+       print(f'  #{i[\"number\"]}: {i[\"title\"][:60]}')
+       print(f'    Labels: {labels}')
+       print(f'    Assignees: {assignees or [\"(none)\"]}')
+   "
+   ```
+
+4. **判断策略：**
+   - **所有 issue 都有 assignee 且非你（OnePlusNPM）** → 真无任务，静默退出
+   - **存在无 assignee 的 issue** → 说明有未分诊的新 Issue 漏了 PM assign，需按协作协议先补 assign 给自己再分诊
+   - **存在 assign 给你的 issue 但 `--assignee` 查询未返回** → API 查询 bug，应直接用 full list 数据自行筛选
+
+**2026-07-13 crontab 实测案例：**
+```python
+# gh issue list --assignee OnePlusNPM → []（无 PM 任务）
+# 全量查询：4 个 issue（#2, #4, #5, #7），全部 assign 给 OnePlusNBoss
+# 结论：真无任务 → [SILENT]
+```
 
 **关键推论：** `gh issue list --assignee @me` 返回 `[]` 时，即使当前活跃账号非 OnePlusNPM，**也不一定是假阴性**。GitHub API 的 `--assignee` 过滤器独立于活跃账号——只要 token 有 `repo` scope，OnePlusNDev 的 token 也能正确查询 OnePlusNPM 的 assignee。真正的假阴性只会出现在：token 缺少 `repo` scope 时返回空，或仓库为 private 且 token 无权限。
 
