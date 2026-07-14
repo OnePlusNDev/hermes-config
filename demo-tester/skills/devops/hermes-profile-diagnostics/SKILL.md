@@ -1,6 +1,6 @@
 ---
 name: hermes-profile-diagnostics
-description: Verify Hindsight memory daemon ownership, multi-profile PostgreSQL isolation, and daemon health for a Hermes agent profile. Use when configuring or troubleshooting memory — not for everyday recall.
+description: Verify Hindsight memory daemon ownership AND perform routine memory maintenance (age-based archiving, consolidation, reflect optimization, cron cleanup). Use when configuring, troubleshooting, or MAINTAINING memory.
 ---
 
 # Hermes Profile Diagnostics
@@ -12,6 +12,8 @@ Verify that a Hermes profile's Hindsight memory daemon is correctly configured, 
 - "Check Hindsight daemon status"
 - After profile migration or model change
 - When unsure if daemon/PostgreSQL belong to the right profile
+- Cron job: "clean up old memories" / "archive 30-day-old memories" / "optimize with hindsight"
+- "Run memory maintenance" / "memory consolidation / reflect / cleanup"
 
 ## Step 1 — Check config.json
 
@@ -124,6 +126,15 @@ for _ in range(15):
 **LLM key consistency**: All daemons on this machine use the same z.ai GLM key with base URL `https://api.z.ai/api/paas/v4`. Read the key from any profile's `.hindsight/profiles/<name>.env` file, or from the profile's `.env` file (look for `HINDSIGHT_API_LLM_API_KEY` or `HINDSIGHT_LLM_API_KEY`).
 
 ## Memory Maintenance & Cleanup
+
+**Tool limitation — memory is write-only.** The `memory` tool only supports `add`, `replace`, and `remove` actions — there is no `list` or `read` action. To inspect current memory content, read the flat files directly:
+
+```bash
+cat ~/.hermes/profiles/<profile>/memories/MEMORY.md
+cat ~/.hermes/profiles/<profile>/memories/USER.md
+```
+
+Facts stored via hindsight in the bank are NOT visible through the `memory` tool either. Use hindsight's HTTP API (`/v1/default/banks/<bank_id>/memories/list`) or the `reflect` endpoint to query bank-stored memories.
 
 For routine memory cleanup (archiving old memories, triggering consolidation+reflect optimization, recovering failed operations), see the detailed API workflow in:
 

@@ -90,6 +90,24 @@ If `gh repo view OWNER/repo` works but cloning fails on HTTPS, the repo exists �
 
 **Diagnostic:** Compare `ssh -T git@github.com` (authenticated user) with `gh api /user --jq .login` (gh's token user). If they differ, SSH push will fail.
 
+**⚠️ Multi-account nuance:** `gh auth status` may show 5+ logged-in accounts, but only one is **active** (`✓ Active account: true`). The active account determines which token `gh auth git-credential` returns to git. To verify push access:
+
+```bash
+# Check if the active gh account can push to this repo
+gh api repos/OWNER/REPO --jq '.permissions.push'
+# Returns true/false — if false, the active gh account is wrong
+
+# List all gh accounts to find the right one
+gh auth status 2>&1 | grep -E 'Logged in|Active account'
+```
+
+When the active gh account doesn't own the repo, switch accounts or use a token directly:
+```bash
+gh auth switch --user CORRECT_OWNER
+# or
+git push https://CORRECT_OWNER:${TOKEN}@github.com/OWNER/REPO.git main
+```
+
 ### 11. Remote Git Ops Can Work Even When Clone Fails
 
 Commands like `git ls-remote <remote> HEAD` use the remote's native protocol (SSH via ~/.ssh/config), not your general HTTPS proxy or network rules. In cron, HTTPS to github.com may time out completely, but `ls-remote` can succeed within a second because it uses SSH on port 22 instead of HTTP on port 443.
@@ -98,14 +116,21 @@ Commands like `git ls-remote <remote> HEAD` use the remote's native protocol (SS
 
 ### 12. Use `gh repo view OWNER/repo` Not Just `OWNER/org_repo_name`
 
-The target repo was `OnePlusNDev/hermes-config` (personal account), not `hermes-config/demo-tester` (org-style). Use `-f "Repo exists"` check pattern — if org doesn't exist, fall back to personal:
+The target repo was `OnePlusNDev/hermes-config` (personal account), not `hermes-config/demo-tester` (org-style). Use repo-exists check pattern — if org doesn't exist, fall back to personal:
 
 ```bash
 if gh org view hermes-config >/dev/null 2>&1; then
     OWNER=hermes-config
 else
-    OWNER=$(gh api /user | jq -r '.login')
+    OWNER=$(gh api /user --jq '.login')
 fi
+```
+
+Watch out for `gh repo create` failing with `GraphQL: User cannot create a repository for <target>` — this means the active gh account (`gh api /user --jq '.login'`) doesn't match the org/user you're creating the repo under. Verify push access before attempting to create:
+
+```bash
+gh api repos/OWNER/REPO --jq '.permissions.push'
+# true → can push; false → wrong active account; 404 → repo needs creation
 ```
 
 ### 13. `rm -rf` Blocked in Cron/Denied Sessions (tirith mass-deletion guard)
@@ -312,15 +337,27 @@ hint: Updates were rejected because the remote contains work that you do not
 hint: have locally.
 ```
 
-**Fix:** `git pull --rebase` before pushing:
+**Fix — soft-reset approach (when histories don't share a common ancestor):**
+
+When `git pull --rebase` creates merge conflicts (because the remote was pushed by a different fork or has a completely different tree), use the soft-reset approach instead:
 
 ```bash
-cd /tmp/hermes-config
-git pull --rebase origin main   # replay your commits on top of remote
-git push origin main            # now succeeds (fast-forward)
+# 1. Fetch the remote's current state
+git fetch origin main
+
+# 2. Move HEAD to the remote's state (keep ALL local file changes staged)
+git reset --soft origin/main
+
+# 3. Stage only YOUR profile's files (discard other profiles' changes)
+git reset HEAD .gitignore           # don't touch other profiles' .gitignore
+git add -A -- demo-tester/          # stage only your profile dir
+
+# 4. Commit and push
+git commit -m "backup: <profile> config update (<timestamp>)"
+git push origin main
 ```
 
-`--rebase` keeps the commit history linear — no merge commits from a cron job. If conflicts arise (unlikely — different profiles edit disjoint subdirectories), resolve them normally: edit conflicted files, `git add`, `git rebase --continue`.
+This is safe when different profiles edit disjoint subdirectories — your commit only touches `demo-tester/`, never `demo-pm/` or other profiles' files. The soft reset discards only the *commit history* while preserving all file content as unstaged changes.
 
 ### Diagnostic steps
 

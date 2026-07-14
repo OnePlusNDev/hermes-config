@@ -501,6 +501,12 @@ for g in json.load(sys.stdin):
     print(f\"  {g['id']}  {g['description'] or '(no desc)':40}  {files}\")"
 ```
 
+## Multi-Profile / Automated Backup
+
+For repos written by multiple Hermes cron profiles (config backups), see
+[`references/multi-profile-backup-conflicts.md`](references/multi-profile-backup-conflicts.md)
+for automated rebase conflict resolution, `--theirs` strategy, and multi-account repo discovery.
+
 ## Quick Reference Table
 
 | Action | gh | git + curl |
@@ -553,6 +559,48 @@ git push origin main
 ```
 
 The `failed to store: -60008` warning (macOS keychain) is harmless — the push still succeeds.
+
+### Multi-account credential mismatch (gh has the wrong active account)
+
+When `gh auth status` shows multiple logged-in accounts, only one is **active** (marked `✓ Active account: true`). The active account's token is what `gh` uses for API calls AND what `gh auth git-credential` returns to git. If the repo you're pushing to belongs to a **different** GitHub account than the active one, you'll get:
+
+```
+GraphQL: User cannot create a repository for Owner. (createRepository)
+remote: Permission to Owner/Repo.git denied to ActiveUser.
+```
+
+**Diagnostic — compare gh auth user vs SSH user vs repo owner:**
+
+```bash
+# Which account does gh use?
+gh api /user --jq '.login'
+
+# Which account does SSH use?
+ssh -T git@github.com 2>&1 | head -1
+
+# Does the active account have push access? (returns true/false)
+gh api repos/OWNER/REPO --jq '.permissions.push'
+
+# List ALL logged-in gh accounts
+gh auth status 2>&1 | grep -E 'Logged in|Active account'
+```
+
+The three values can diverge — gh token user ≠ SSH key user ≠ repo owner. This is common in multi-profile Hermes setups where different cron jobs log in as different GitHub accounts.
+
+**Fix options, in order of preference:**
+
+| Option | Command | When to use |
+|--------|---------|-------------|
+| Switch active gh account | `gh auth switch --user OTHER_USER` | When OTHER_USER has push access to the target repo |
+| Push with the right token directly | `git push https://OTHER_USER:${TOKEN}@github.com/OWNER/REPO.git main` | When you know OTHER_USER's token |
+| Switch remote to SSH with the right key | `git remote set-url origin git@github.com:OWNER/REPO.git` | When SSH key maps to OWNER's account |
+| Re-login as the correct user | `gh auth login --hostname github.com` then `gh auth setup-git` | Cleanest when you need to switch accounts permanently |
+
+**To check which user owns the SSH key:**
+```bash
+ssh -T git@github.com 2>&1
+# "Hi USERNAME! You've successfully authenticated" → USERNAME
+```
 
 ### HTTPS blocked, use SSH transport
 
