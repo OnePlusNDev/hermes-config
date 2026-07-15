@@ -76,3 +76,18 @@ hindsight-maintenance-logs/
 
 # Workspace scripts (development artifacts, not config)
 triage_issues.py
+
+# ===== demo-tester profile exclusions =====
+
+# Curator runtime metadata (auto-generated, not config)
+demo-tester/skills/.bundled_manifest
+demo-tester/skills/.curator_state
+demo-tester/skills/.usage.json
+demo-tester/skills/.usage.json.lock
+demo-tester/skills/.hub/
+demo-tester/skills/.curator_backups/
+
+# Cron ticker files (runtime state, updated every tick)
+demo-tester/cron/ticker_heartbeat
+demo-tester/cron/ticker_last_success
+demo-tester/cron/output/
