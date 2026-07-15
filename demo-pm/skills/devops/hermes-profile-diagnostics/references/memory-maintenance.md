@@ -393,6 +393,27 @@ memories/
 ## 保留策略
 
 - 下次清理: YYYY-MM-DD
+
+## 运行日志模式
+
+在标准模板之上，添加一个 `## 清理日志` 表格来维护连续记录，以便跟踪随时间推移的清理操作：
+
+```markdown
+## 清理日志
+
+| 日期 | 操作 | 结果 |
+|------|------|------|
+| 2026-07-12 | 初始归档 + Hindsight consolidation/dedup | MEMORY.md -51% (3,241→1,578), USER.md -13% (1,398→1,215) |
+| 2026-07-13 | 例行检查 | ✅ 无 30+天数据；当前记忆最后更新为 07-12，状态新鲜 |
+| 2026-07-13 | Hindsight 尝试 | ⚠️ <profile> hindsight daemon 未运行（API key 为占位符）；全局 :8888 daemon 健康但属于<其他 profile> |
+```
+
+**规则:**
+- 每次 cron 执行追加一行（无论是否采取了行动）
+- 操作列描述具体做了什么（"归档"/"压缩"/"检查"/"Hindsight 调用"）
+- 结果列填充 ✅ 成功、⚠️ 部分成功、❌ 失败以及关键指标（文件大小减少百分比、归档计数）
+- 不要删除旧行 — 运行日志是浏览式审计日志
+- 如果文件变长，在顶部保留最新的 20 行并裁剪旧条目
 ```
 
 **Rules:**
@@ -459,6 +480,39 @@ SELECT COUNT(*) FROM sessions WHERE archived = 1;
 ```
 
 The CLI wrapper `hermes sessions prune --older-than 30d` is preferred over raw SQL for cleanup, but raw SQL is useful for inspection and dry-run reports.
+
+## Daemon Not Running — API Key Placeholder (`***`)
+
+A common chronic condition: the `hindsight-embed profile create` command generates the `.env` file with `HINDSIGHT_API_LLM_API_KEY=***` as a literal placeholder. If the real key was never written into this file, **the daemon can never start** — not just for this session, but permanently. The env file exists, the profile is registered, but `hindsight-embed daemon start` always fails with "LLM API key is required."
+
+**Detection:**
+```bash
+# Read the env file and check if the value is a placeholder or empty
+cat ~/.hindsight/profiles/<profile_name>.env | grep HINDSIGHT_API_LLM_API_KEY
+# If it shows `=***`, it's a placeholder — no real key was ever set.
+```
+
+**Impact:**
+- The profile's hindsight daemon is permanently dead until the key is filled in
+- The `memory()` tool returns "Memory is not available" (routes through the active provider, finds nothing)
+- However, **the flat memory files still work** — MEMORY.md and USER.md can be read/written directly
+- If another profile on the same machine has a running hindsight daemon with the same `bank_id` and shared pg0, that sibling daemon can serve this profile's data (see "Daemon Not Running — Use Sibling Daemon")
+
+**Fix:**
+Write the actual API key into the env file:
+```bash
+# Use patch to avoid *** masking
+HINDSIGHT_API_LLM_API_KEY=<real-key>
+Then start the daemon. The daemon will initialize PostgreSQL and become available after 1-3 minutes.
+
+**Pitfall — cron jobs cannot fix this on their own.**
+Then start the daemon. The daemon will initialize PostgreSQL and become available after 1-3 minutes.
+
+**Pitfall — cron jobs cannot fix this on their own.** A cron job running memory cleanup cannot write API keys (no user present to supply the secret). If the key is a placeholder, the cron job should:
+1. Detect the placeholder state
+2. Attempt sibling daemon fallback
+3. If no sibling available, fall back to flat-file memory operations
+4. Log the state to ARCHIVE.md with a ⚠️ marker for the user to see when they review cron output
 
 ## Daemon Not Running — Use Sibling Daemon
 

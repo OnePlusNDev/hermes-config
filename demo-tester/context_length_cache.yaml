@@ -1,3 +1,0 @@
-context_lengths:
-  qwen3.5:latest@http://127.0.0.1:11434/v1: 262144
-  qwen3.6:latest@http://127.0.0.1:11434/v1: 262144

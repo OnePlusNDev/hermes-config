@@ -282,20 +282,44 @@ remote: Permission to OnePlusNDev/hermes-config.git denied to OnePlusNTester.
 ```
 The account after `denied to` is the culprit. Check whether this differs from `gh api user --jq '.login'`.
 
-**Fix:** Run `gh auth setup-git` before each backup session to force the git credential helper to use the active gh account's credentials, or simply always switch to the repo-owner account before cloning:
+**Fix (two approaches):**
 
+**Approach A — global credential helper (recommended for dedicated machines):**
 ```bash
 REPO_OWNER="OnePlusNDev"         # from the repo URL
 gh auth setup-git                 # ensure git credential helper points to active gh account
 gh auth switch --user "$REPO_OWNER"  # ensure the correct account is active
 ```
-
 This is safer than the conditional check because `gh auth switch` also re-configures git's credential helper. Even when the active user already matches the repo owner, the switch forces any stale credential cache to be replaced.
 
 **Switch back** after the push if the cron job needs the original account for later work:
 ```bash
 gh auth switch --user "$ORIGINAL_USER"
 ```
+
+**Approach B — repo-scoped credential helper (safer for shared environments):**
+Use `git config --local` instead of `gh auth setup-git` to scope the credential helper to the backup repo only. This avoids touching the global git config.
+```bash
+# Inside the backup repo directory
+git config --local credential.helper '!gh auth git-credential'
+git remote set-url origin https://github.com/OWNER/REPO.git  # plain HTTPS, no embedded token
+git pull --rebase origin main
+git push origin main
+```
+The `--local` flag ensures the credential helper is only active for this repo, not all repos on the system. This is also useful when `gh auth switch` doesn't fully clear stale credential caches — the local config bypasses the cached global one entirely.
+
+**Detection for gh auth token URL fallback:**
+When both SSH and standard HTTPS push fail (timeout or 403), attempt push with the gh token embedded in the URL as a diagnostic:
+```bash
+TOKEN=$(gh auth token)
+if [ -n "$TOKEN" ]; then
+  git remote set-url origin "https://OWNER:$TOKEN@github.com/OWNER/REPO.git"
+  timeout 60 git push origin main 2>&1
+  # Clean up — remove token from URL afterward
+  git remote set-url origin https://github.com/OWNER/REPO.git
+fi
+```
+This is useful as a one-shot diagnostic to confirm the gh token has push access, even when curl can't reach GitHub (see Network connectivity pitfall). **Do not leave the token-embedded URL as the permanent remote** — switch back to plain HTTPS after the push.
 
 Always verify the active user before cloning or pushing, not just when a 403 fires.
 
@@ -359,9 +383,11 @@ remote:            path: demo-pm/skills/.../reference.md:45
 | Pattern in file | Example | How to redact |
 |----------------|---------|---------------|
 | Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `***` |
+| Base64-encoded token line | `R0lUSFVCX1RPS0VOPWdocF9a...` (decodes to `GITHUB_TOKEN=ghp_...`) | Replace with shorter redacted base64 (e.g. `R0lUSFVCX1RPS0VOPWdocF8qCg==` which decodes to `GITHUB_TOKEN=***`) |
 | Partial shielded token | `ghp_Z1...ghiu` | Replace with `ghp_***...***` |
 | Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
 | Python hex-to-string code | `h = '676870...'` | Replace hex literal with `***` |
+| Decoded assignment line | `GITHUB_TOKEN=ghp_Z1SyfZDw...` | Replace token value with `[REDACTED]` |
 
 **If multiple files trigger the rule:** The error lists all of them. Redact all files in one pass before amending — a single `--amend` with all fixes is more efficient than iterating one-per-run.
 
@@ -545,6 +571,7 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260712.md` — git credential helper 403 despite matching active gh user (detection + fix); broader file-scan discovery when GitHub push protection fires on an amended commit; rebase + regular push after divergence
 - `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
 - `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
-- `references/demo-pm-backup-workflow-20260708.md` — Cron-mode backup: git clone 120s timeout, `.local/` leak discovery + cleanup, Python batch cleanup pattern confirmed
+- `references/demo-pm-backup-workflow-20260713.md` — Rebase conflict resolution (theirs/.gitignore, ours/content), multi-file push protection redaction
+- `references/demo-pm-backup-workflow-20260714.md` — `gh auth token` URL fallback, `git config --local credential.helper`, base64 push protection redaction on both channels, pull-rebase divergence after amend
 - `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
