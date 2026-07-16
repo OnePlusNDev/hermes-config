@@ -195,7 +195,9 @@ Use the GitHub Git Data API to create a single atomic commit with all files via 
 
 **CRITICAL: never use `git status --porcelain` to find changed files when already committed locally.** After `git commit`, the working tree is clean and `git status` returns nothing. Always use `git ls-tree -r HEAD` for the local state and diff it against the remote tree. See `references/gh-api-git-data-backup.md` for the complete Python script template.
 
-**Reusable script:** `references/gh-api-git-data-incremental-push.py` — a standalone Python script that implements the full incremental comparison + push flow.
+**Reusable script:** `references/gh-api-git-data-incremental-push.py` — a Python script for incremental push when a local git clone exists (uses `git ls-tree -r HEAD`).
+
+**Standalone script (no git clone needed):** `scripts/gh-api-standalone-backup.py` — use this when `gh repo clone` fails (port 443 timeout) but `gh api` works. This script computes blob SHAs directly from the filesystem via `hashlib.sha1(f"blob {size}\\0{content}")` — no local git repo required. It walks the profile directory, collects files with proper excludes, diffs against the remote tree, and pushes only changed blobs.
 
 ## Method C — Python + Content API (fallback when gh CLI unavailable)
 
@@ -391,7 +393,31 @@ remote:            path: demo-pm/skills/.../reference.md:45
 
 **If multiple files trigger the rule:** The error lists all of them. Redact all files in one pass before amending — a single `--amend` with all fixes is more efficient than iterating one-per-run.
 
-### `gh api` blob upload fails with "Secret detected in content" (HTTP 422)
+### Graceful fallback on blob upload push protection (gh API)
+
+When using Method B (gh API Git Data API), a single blob upload can fail with `HTTP 422 — Secret detected in content`. This typically happens when reference docs in sibling skills (e.g. `pm-triage-cron/references/`) contain hex-encoded or base64-encoded token strings from past session transcripts.
+
+**Instead of aborting the entire push, use this graceful fallback pattern:**
+
+```python
+result, err = gh_api("POST", f"/repos/{OWNER}/{REPO}/git/blobs", ...)
+if err and "Secret detected in content" in err:
+    # File can't be uploaded — keep the remote version in the tree
+    remote = remote_blob_map.get(repo_path)
+    if remote:
+        add_entry(repo_path, remote["mode"], remote["type"], remote["sha"])
+        skipped_files.append(repo_path)
+    continue  # don't fail the whole push
+```
+
+This keeps the remote version of blocked files unchanged, allowing the backup to proceed for all other files. The commit message should list the skipped files so they're not invisible.
+
+**Proactive prevention:** Before uploading, scan the reference file paths for known push-protection triggers:
+- Filenames containing `hexdump`, `base64-token`, `token-extraction`
+- Filenames starting with `demo-pm-backup-workflow-` (these are session transcripts)
+- Files under a sibling skill's `references/` directory
+
+The standalone script (`scripts/gh-api-standalone-backup.py`) already implements this fallback + exclusion logic.
 
 GitHub's secret scanning push rules scan every blob uploaded via the Git Data API. Same root cause as Method A push protection — hex-encoded or base64-encoded tokens in reference docs — but the error surfaces on the blob POST instead of `git push`.
 
@@ -427,6 +453,31 @@ terminal("gh repo clone <owner>/<repo> /tmp/hermes-$(date +%s)", timeout=120)
 ```
 
 A 120s timeout has been verified sufficient for repos with dozens of commits and hundreds of files. If 120s also fails, use Method B (gh API Git Data API) instead — it avoids cloning entirely.
+
+### No local git clone: computing blob SHAs without `git ls-tree -r HEAD`
+
+When `gh repo clone` times out (port 443 unreachable) but `gh api` works, the existing Method B reference script (`references/gh-api-git-data-incremental-push.py`) cannot run — it assumes a local cloned repo with `git ls-tree -r HEAD` for the local tree state.
+
+**Workaround:** Compute git blob SHAs directly from file contents using pure Python:
+
+```python
+import hashlib
+def git_blob_hash(filepath):
+    with open(filepath, "rb") as f:
+        data = f.read()
+    blob = f"blob {len(data)}\\0".encode() + data
+    return hashlib.sha1(blob).hexdigest()
+```
+
+Then walk the profile directory to collect all backup-eligible files, compute their SHAs, diff against the remote tree from the gh API, and upload/merge/deleted accordingly.
+
+**Reusable script:** `scripts/gh-api-standalone-backup.py` implements this end-to-end:
+1. Walks the profile dir with proper rsync-style excludes
+2. Fetches the remote tree via `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`
+3. Computes local blob SHAs via pure Python SHA1
+4. Diffs to find modified/new/deleted files
+5. Uploads only changed blobs, falls back gracefully on push protection
+6. Creates tree + commit + updates ref via gh API
 
 ### `git status` is empty when running Method B after a local commit
 
@@ -493,6 +544,7 @@ The exclude list in the `rsync` command and the repo's `.gitignore` should stay 
 - `**/skills/.curator_backups/` — curator backup archives
 - `**/skills/.hub/` — skills hub runtime metadata
 - `**/skills/.curator_state` — curator runtime state
+- `**/skills/.bundled_manifest` — bundled skill manifest
 - `**/.local/` — gh CLI credentials and other local state at profile root
 - `**/hindsight-maintenance-logs/` — hindsight daemon maintenance logs
 - `**/pairing/`, `**/plans/`, `**/hooks/`, `**/skins/`, `**/workspace/` — temp/runtime dirs
@@ -545,6 +597,14 @@ Look for leaked artifacts:
 - `.skills_prompt_snapshot.json` — missing `--exclude '.skills_prompt_snapshot.json'`
 - `bin/tirith` — missing `--exclude 'bin/tirith'`
 - `.local/state/gh/` or `.local/` — missing `--exclude '.local/'` (gh CLI credentials)
+- `skills/.bundled_manifest` — missing `--exclude 'skills/.bundled_manifest'`
+- `skills/.curator_state` — missing `--exclude 'skills/.curator_state'`
+
+**Watch for push-protection triggers in sibling skill references:**
+Reference docs under other skills' `references/` dir (e.g. `pm-triage-cron/references/`) may contain hex-encoded tokens. These files should be excluded preemptively:
+- Filenames containing `hexdump`, `base64-token`, `token-extraction`
+- Filenames starting with `demo-pm-backup-workflow-` (session transcripts)
+Add these to your exclude list before the first upload to avoid push protection failures.
 
 If leaked files are found, first update the rsync exclude list in the skill, then clean the clone. **Do not use plain `rm` to clean leaked files in cron mode** — tirith's `mass_file_deletion` scanner has a cumulative counter that persists across terminal calls and will eventually block all `rm` operations even for single-file deletes. Instead, use the Python batch-cleanup pattern:
 
@@ -574,4 +634,5 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260713.md` — Rebase conflict resolution (theirs/.gitignore, ours/content), multi-file push protection redaction
 - `references/demo-pm-backup-workflow-20260714.md` — `gh auth token` URL fallback, `git config --local credential.helper`, base64 push protection redaction on both channels, pull-rebase divergence after amend
 - `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
+- `scripts/gh-api-standalone-backup.py` — Standalone Python script for gh API push when no local git clone is available (computes blob SHAs via pure Python, walks profile dir, handles push protection fallback)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format

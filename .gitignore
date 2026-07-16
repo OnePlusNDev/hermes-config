@@ -77,6 +77,20 @@ hindsight-maintenance-logs/
 # Workspace scripts (development artifacts, not config)
 triage_issues.py
 
+# ===== demo-pm profile exclusions =====
+
+# Curator runtime metadata (auto-generated, not config)
+demo-pm/skills/.bundled_manifest
+demo-pm/skills/.curator_state
+demo-pm/skills/.usage.json
+demo-pm/skills/.usage.json.lock
+demo-pm/skills/.hub/
+demo-pm/skills/.curator_backups/
+
+# Reference docs with hex-encoded tokens (trigger GitHub push protection)
+demo-pm/skills/devops/pm-triage-cron/references/
+demo-pm/skills/devops/hermes-profile-backup/references/
+
 # ===== demo-tester profile exclusions =====
 
 # Curator runtime metadata (auto-generated, not config)
