@@ -142,7 +142,16 @@ For routine memory cleanup (archiving old memories, triggering consolidation+ref
 
 → `references/memory-maintenance.md` — Hindsight HTTP API endpoints for consolidation, reflect query, mental models, recovery, timeseries queries, bank stats, daemon-fallback (proxy through sibling daemon when target is down), HuggingFace model download timeout fix, cron-mode workarounds, and a step-by-step structured cron maintenance procedure.
 
+→ `scripts/memory-maintenance.py` — Self-contained cron-safe script that runs the full workflow (backup → reflect-classify → flat-file consolidation → bank consolidation → report) with a single `python3 scripts/memory-maintenance.py` call. Edit the CONFIG dict at the top for profile-specific paths. Works in cron mode (uses `terminal()` + curl-to-file, no `execute_code` or pipe-to-python dependencies).
+
+## Profile Config Backup to GitHub
+
+Back up the entire profile (config.yaml, skills, cron, memories, workspace) to the `hermes-config` GitHub repo.
+
+→ `references/profile-github-backup.md` — Complete workflow: pre-backup API key security scan (grep for `sk-` plaintext → replace with `key_env`), rsync with exclusion patterns for runtime/transient files, commit, push, and network-failure workarounds for cron environments where `github.com:443` is blocked but `api.github.com` works.
+
 ## Reference
 - `references/memory-maintenance.md` — Memory cleanup/optimization via Hindsight HTTP API.
+- `references/profile-github-backup.md` — Profile config backup to GitHub.
 - `references/multi-daemon-setup-recipe.md` — Full architecture, incident log, and health verification commands from multi-profile Hindsight setup.
 - `references/multi-profile-daemon-verification.md` — Full command transcript from a real multi-profile diagnosis session.
