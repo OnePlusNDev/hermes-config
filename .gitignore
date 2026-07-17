@@ -27,8 +27,6 @@ session_log.txt
 # Large snapshot files
 .skills_prompt_snapshot.json
 skills_manifest.json
-context_length_cache.yaml
-.update_check
 
 # Skip subdirs but keep their .gitignore
 skills/.*/
@@ -46,62 +44,3 @@ hooks/
 *.swp
 *.swo
 *~
-
-# ===== demo-pm profile exclusions =====
-
-# Binary / compiled artifacts
-bin/
-
-# Runtime caches
-*.bak
-config.yaml.bak*
-processes.json
-interrupt_debug.log
-*.log
-ollama_cloud_models_cache.json
-provider_models_cache.json
-models_dev_cache.json
-
-# Home directory (contains .ssh, gh auth tokens, caches)
-home/
-
-# Local state (gh auth device IDs, etc.)
-.local/
-.desktop/
-desktop/
-
-# Session & history
-.hermes_history
-hindsight-maintenance-logs/
-
-# Workspace scripts (development artifacts, not config)
-triage_issues.py
-
-# ===== demo-pm profile exclusions =====
-
-# Curator runtime metadata (auto-generated, not config)
-demo-pm/skills/.bundled_manifest
-demo-pm/skills/.curator_state
-demo-pm/skills/.usage.json
-demo-pm/skills/.usage.json.lock
-demo-pm/skills/.hub/
-demo-pm/skills/.curator_backups/
-
-# Reference docs with hex-encoded tokens (trigger GitHub push protection)
-demo-pm/skills/devops/pm-triage-cron/references/
-demo-pm/skills/devops/hermes-profile-backup/references/
-
-# ===== demo-tester profile exclusions =====
-
-# Curator runtime metadata (auto-generated, not config)
-demo-tester/skills/.bundled_manifest
-demo-tester/skills/.curator_state
-demo-tester/skills/.usage.json
-demo-tester/skills/.usage.json.lock
-demo-tester/skills/.hub/
-demo-tester/skills/.curator_backups/
-
-# Cron ticker files (runtime state, updated every tick)
-demo-tester/cron/ticker_heartbeat
-demo-tester/cron/ticker_last_success
-demo-tester/cron/output/
