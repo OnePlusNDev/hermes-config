@@ -50,6 +50,17 @@ Retain a test memory, then recall it to verify the full pipeline works.
 - **`ps aux | grep hindsight-api` alone is misleading.** The binary path (`hermes-agent/venv/bin/`) is shared across all profiles. Only the `--profile` argument or the database path reveals which profile a daemon serves.
 - **A running daemon does NOT mean the RIGHT daemon is running.** A profile may have config.json set up and PostgreSQL running, but no daemon process (or connected to the wrong one). Always run Step 2 + 3 before declaring "configured."
 - **`config.json` LLM settings may differ from `hermes.env`.** `hindsight-embed` reads from `<profile_home>/.hindsight/profiles/<name>.env` at daemon startup. If the config.json and the env diverge, the env wins for the running daemon. Check both when LLM behavior doesn't match expectations.
+
+- **`bank_id` mismatch between profile config and running daemon.** The profile's `hindsight/config.json` says `bank_id: X` but the running daemon serves `bank_id: Y`. This happens when:
+  - The daemon was started from another profile or the central Hermes installation (e.g., `hermes-agent/venv/bin/hindsight-api`)
+  - Multiple profiles share one daemon process
+  - The daemon's own config (`~/.hindsight/config.json`) is authoritative — not the profile's
+  
+  **Detection:** Compare `hindsight/config.json`'s `bank_id` against `curl -s http://<daemon_url>/v1/default/banks`. If they differ, the profile's memories land in the daemon's bank, not the configured one.
+  
+  **Impact:** Reflect/consolidate calls using the profile's configured `bank_id` return 404. The profile's flat-file memories (MEMORY.md/USER.md) remain authoritative for that profile; the bank stores a separate namespace that may or may not overlap.
+  
+  **Fix:** Either update the profile's config to match the daemon's actual bank, or start a dedicated daemon on a separate port with a matching config.
 - **NEVER set `HINDSIGHT_API_DATABASE_URL` for any daemon.** The daemon auto-manages its own PostgreSQL via pg0 — it handles initdb, createdb, pgvector extension install, and schema migrations automatically. If you set DATABASE_URL pointing to a manually-created or pre-existing database, startup fails with `RuntimeError: Database migration failed` because the database lacks the required schema. This applies to ALL databases — empty ones (no schema), freshly initdb'd ones (no pgvector extension), AND pre-existing ones from older daemon versions (incompatible schema version). There is no reliable way to pre-create a compatible database. **The only supported path is: no DATABASE_URL, let the daemon do everything.**
 - **Terminal tool `***` masking corrupts credentials.** When passing API keys or passwords through `terminal()` commands, `***` is literally substituted into the shell command — the daemon receives the literal string `***` instead of the real value. Use `execute_code` to read keys from files and pass them through `subprocess.Popen` env, bypassing the masking.
 - **`execute_code` credential masking can break Python syntax.** When `***` appears inside a string literal in execute_code, it can corrupt the code (e.g., `line.startswith("HINDSIGHT_API_LLM_API_KEY=***` breaks the closing quote). Use generic parsing: `"LLM_API_KEY" in line` + `line.split("=", 1)` instead of exact prefix matching when reading from env files.

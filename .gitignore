@@ -19,6 +19,7 @@ models_dev_cache.json
 cache/
 image_cache/
 audio_cache/
+context_length_cache.yaml
 
 # Gateway / session state
 gateway.lock
@@ -28,10 +29,20 @@ session_log.txt
 .skills_prompt_snapshot.json
 skills_manifest.json
 
+# Cron runtime artifacts (output, tickers)
+**/cron/output/
+**/cron/ticker_*
+**/cron/.gitignore
+
+# Skills internal state (curator, hub, usage)
+**/skills/.curator_*
+**/skills/.hub/
+**/skills/.usage.json
+**/skills/.bundled_manifest
+
 # Skip subdirs but keep their .gitignore
 skills/.*/
 sessions/
-cron/.*/
 logs/
 plans/
 sandboxes/

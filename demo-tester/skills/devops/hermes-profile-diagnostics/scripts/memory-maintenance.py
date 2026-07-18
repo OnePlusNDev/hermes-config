@@ -11,7 +11,7 @@ Configuration: edit CONFIG dict at the top.
 """
 
 import json, os, shutil, time, urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ════════════════════════════════════════════════════════════
 # CONFIG — adjust per profile
@@ -35,7 +35,7 @@ ARC_DIR = os.path.join(MEM_DIR, "archive")
 H_URL  = CONFIG["hindsight_url"]
 BANK   = CONFIG["bank_id"]
 CUTOFF = CONFIG["thirty_day_cutoff_iso"] or (
-    datetime.now().replace(day=datetime.now().day-30).strftime("%Y-%m-%d"))
+    (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"))
 TODAY_STR = datetime.now().strftime("%Y%m%d")
 TODAY_ISO = datetime.now().strftime("%Y-%m-%d")
 
@@ -64,7 +64,7 @@ def main():
     ok = True
     os.makedirs(ARC_DIR, exist_ok=True)
 
-    # ── Step 0: Health check ────────────────────────────
+    # ── Step 0: Health check + bank probe ─────────────
     print("=" * 60)
     print(f"Memory Maintenance — {PRO} / {TODAY_ISO}")
     print("=" * 60)
@@ -75,6 +75,27 @@ def main():
     except Exception as e:
         print(f"  FATAL: Hindsight daemon unreachable: {e}")
         return False
+
+    # Probe actual banks — the configured bank_id may not exist
+    try:
+        banks_resp = api("GET", "/v1/default/banks", timeout=5)
+        available_banks = [b["bank_id"] for b in banks_resp.get("banks", [])]
+        fmt(f"Available banks: {available_banks}")
+
+        if BANK not in available_banks:
+            print(f"  ⚠️  Configured bank_id \"{BANK}\" not found on this daemon.")
+            if available_banks:
+                fallback = available_banks[0]
+                print(f"  Using first available bank \"{fallback}\" as fallback.")
+                BANK_ACTUAL = fallback
+            else:
+                print("  No banks available at all — skipping bank operations.")
+                BANK_ACTUAL = None
+        else:
+            BANK_ACTUAL = BANK
+    except Exception as e:
+        print(f"  Bank probe failed (non-fatal): {e}, using configured bank_id={BANK}")
+        BANK_ACTUAL = BANK
 
     # ── Read flat files ─────────────────────────────────
     memory_path = os.path.join(MEM_DIR, "MEMORY.md")
@@ -123,7 +144,7 @@ def main():
             f"4. Produce a cleaned MEMORY.md with STALE items moved under ## Archived."
         )
         try:
-            r = api("POST", f"/v1/default/banks/{BANK}/reflect",
+            r = api("POST", f"/v1/default/banks/{BANK_ACTUAL}/reflect",
                     {"query": query, "budget": CONFIG["reflect_budget"],
                      "max_tokens": 4096, "include": {"facts": {}}},
                     timeout=CONFIG["reflect_timeout"])
@@ -149,26 +170,29 @@ def main():
     print("Step 3 — Bank consolidation")
     print("─" * 50)
     try:
-        st = api("GET", f"/v1/default/banks/{BANK}/stats", timeout=10)
+        st = api("GET", f"/v1/default/banks/{BANK_ACTUAL}/stats", timeout=10)
         fmt(f"Before: {st['total_nodes']} nodes, {st['total_links']} links, "
             f"pending={st.get('pending_consolidation',0)}, "
             f"failed={st.get('failed_consolidation',0)}")
 
-        # Recover stalled items if any
-        if st.get("failed_consolidation", 0) > 0:
-            api("POST", f"/v1/default/banks/{BANK}/consolidation/recover", {}, timeout=30)
+        # Recover stalled items if any (only if bank available)
+        if BANK_ACTUAL and st.get("failed_consolidation", 0) > 0:
+            api("POST", f"/v1/default/banks/{BANK_ACTUAL}/consolidation/recover", {}, timeout=30)
             fmt("Recovered failed consolidation items.")
 
-        # Trigger
-        co = api("POST", f"/v1/default/banks/{BANK}/consolidate", {}, timeout=60)
-        op_id = co.get("operation_id", "?")
-        fmt(f"Triggered: operation_id={op_id}, deduplicated={co.get('deduplicated',False)}")
+        # Trigger (only if bank available)
+        if BANK_ACTUAL:
+            co = api("POST", f"/v1/default/banks/{BANK_ACTUAL}/consolidate", {}, timeout=60)
+            op_id = co.get("operation_id", "?")
+            fmt(f"Triggered: operation_id={op_id}, deduplicated={co.get('deduplicated',False)}")
 
-        time.sleep(3)
-        st2 = api("GET", f"/v1/default/banks/{BANK}/stats", timeout=10)
-        fmt(f"After:  {st2['total_nodes']} nodes, {st2['total_links']} links, "
-            f"pending={st2.get('pending_consolidation',0)}, "
-            f"failed={st2.get('failed_consolidation',0)}")
+            time.sleep(3)
+            st2 = api("GET", f"/v1/default/banks/{BANK_ACTUAL}/stats", timeout=10)
+            fmt(f"After:  {st2['total_nodes']} nodes, {st2['total_links']} links, "
+                f"pending={st2.get('pending_consolidation',0)}, "
+                f"failed={st2.get('failed_consolidation',0)}")
+        else:
+            fmt("No bank available — skipped consolidation.")
     except Exception as e:
         fmt(f"Consolidation error: {e}")
         ok = False
