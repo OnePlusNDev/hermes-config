@@ -3,7 +3,7 @@
     {
       "id": "9fc452560566",
       "name": "demo-dev-task-polling",
-      "prompt": "\u4f60\u662f\u5f00\u53d1\u5de5\u7a0b\u5e08\uff08demo-dev\uff0cGitHub \u7528\u6237\u540d OnePlusNDev\uff09\u3002\u6bcf\u6b21\u8f6e\u8be2\u5fc5\u987b\uff1a\n(1) \u5148\u8bfb\u53d6\u5f53\u524d profile \u7684 RULES.md\uff08~/.hermes/profiles/demo-dev/RULES.md\uff09\u5e76\u4e25\u683c\u9075\u5b88\u534f\u4f5c\u94c1\u5f8b\uff1b\n(2) \u8bfb\u53d6\u540c\u76ee\u5f55 .env \u63d0\u53d6 GITHUB_TOKEN\uff1b\n(3) \u7528 token \u67e5\u8be2\u4ed3\u5e93 demo-oneplusn/demo-workflow \u4e2d assignee \u4e3a\u81ea\u5df1\uff08OnePlusNDev\uff09\u7684 open issue\uff0c\u5bf9\u6709\u65b0\u53cd\u9988\u7684\u9010\u4e2a\u5904\u7406\uff1b\n(4) \u5904\u7406\u6d41\u7a0b\uff1a\u514b\u9686\u4ed3\u5e93 \u2192 \u5b9e\u73b0\u529f\u80fd \u2192 \u5199\u6d4b\u8bd5\u5e76\u8fd0\u884c \u2192 git commit \u5e76 push \u2192 \u5199\u4e00\u6761\u4e2d\u6587 comment\uff08\u505a\u4e86\u4ec0\u4e48 / \u6d4b\u8bd5\u7ed3\u679c / git diff --stat / \u4e0b\u4e00\u6b65\uff09\uff1b\n(5) \u5b8c\u6210\u540e\u6309\u94c1\u5f8b\u4e24\u6b65\u628a assignee \u4ea4\u7ed9\u6d4b\u8bd5\u5de5\u7a0b\u5e08 OnePlusNTester \u505a\u9a8c\u8bc1\uff08\u88ab\u6253\u56de\u65f6\u4e5f\u7531\u4f60\u4fee\u590d\u540e\u518d\u6b21\u4ea4\u7ed9 OnePlusNTester\uff09\u3002\n\u26a0\ufe0f \u5f00\u53d1\u5de5\u7a0b\u5e08\u7981\u6b62\u81ea\u5df1\u5173\u95ed Issue\uff08\u94c1\u5f8b 4\uff09\u3002\n\u26a0\ufe0f \u6240\u6709 Issue Comment \u5fc5\u987b\u7528\u4e2d\u6587\uff08\u4ee3\u7801\u5757\u548c\u6280\u672f\u6807\u8bc6\u7b26\u9664\u5916\uff09\u3002\n\u6ca1\u6709\u4efb\u52a1\u5219\u9759\u9ed8\u9000\u51fa\uff0c\u4e0d\u53d1\u9001\u4efb\u4f55\u901a\u77e5\u3002",
+      "prompt": "你是开发工程师（demo-dev，GitHub 用户名 OnePlusNDev）。每次轮询必须：\n(1) 先读取当前 profile 的 RULES.md（~/.hermes/profiles/demo-dev/RULES.md）并严格遵守协作铁律；\n(2) 读取同目录 .env 提取 GITHUB_TOKEN；\n(3) 用 token 查询仓库 demo-oneplusn/demo-workflow 中 assignee 为自己（OnePlusNDev）的 open issue，对有新反馈的逐个处理；\n(4) 处理流程：克隆仓库 → 实现功能 → 写测试并运行 → git commit 并 push → 写一条中文 comment（做了什么 / 测试结果 / git diff --stat / 下一步）；\n(5) 完成后按铁律两步把 assignee 交给测试工程师 OnePlusNTester 做验证（被打回时也由你修复后再次交给 OnePlusNTester）。\n⚠️ 开发工程师禁止自己关闭 Issue（铁律 4）。\n⚠️ 所有 Issue Comment 必须用中文（代码块和技术标识符除外）。\n没有任务则静默退出，不发送任何通知。",
       "skills": [],
       "skill": null,
       "model": null,
@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 1213
+        "completed": 1260
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.329908+08:00",
-      "next_run_at": "2026-07-17T20:30:00+08:00",
-      "last_run_at": "2026-07-17T20:07:39.149508+08:00",
+      "next_run_at": "2026-07-18T20:30:00+08:00",
+      "last_run_at": "2026-07-18T19:31:46.439646+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -41,7 +41,7 @@
     {
       "id": "5622569f5f48",
       "name": "demo-dev-config-backup",
-      "prompt": "\u5907\u4efd Hermes \u914d\u7f6e\u5230 GitHub \u4ed3\u5e93 hermes-config/demo-dev/\uff0c\u6392\u9664 .env \u7b49\u654f\u611f\u6587\u4ef6\u3002\u26a0\ufe0f\u5907\u4efd\u524d\u5fc5\u987b\u68c0\u67e5 config.yaml \u4e2d\u662f\u5426\u5b58\u5728\u660e\u6587 api_key\uff08\u542b 'sk-' \u524d\u7f00\uff09\uff0c\u5982\u679c\u53d1\u73b0\u660e\u6587 key \u5fc5\u987b\u5148\u66ff\u6362\u4e3a key_env \u5f15\u7528\u518d\u5907\u4efd\u3002\u5b8c\u6210\u540e commit \u5e76 push\u3002\u56de\u590d\u5907\u4efd\u7ed3\u679c\uff08\u6210\u529f/\u5931\u8d25 + \u5907\u4efd\u4e86\u54ea\u4e9b\u6587\u4ef6 + \u662f\u5426\u53d1\u73b0\u660e\u6587 key\uff09\u3002",
+      "prompt": "备份 Hermes 配置到 GitHub 仓库 hermes-config/demo-dev/，排除 .env 等敏感文件。⚠️备份前必须检查 config.yaml 中是否存在明文 api_key（含 'sk-' 前缀），如果发现明文 key 必须先替换为 key_env 引用再备份。完成后 commit 并 push。回复备份结果（成功/失败 + 备份了哪些文件 + 是否发现明文 key）。",
       "skills": [],
       "skill": null,
       "model": null,
@@ -58,15 +58,15 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 25
+        "completed": 26
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.523474+08:00",
-      "next_run_at": "2026-07-18T20:00:00+08:00",
-      "last_run_at": "2026-07-16T20:13:26.104487+08:00",
+      "next_run_at": "2026-07-19T20:00:00+08:00",
+      "last_run_at": "2026-07-17T20:12:55.732390+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -79,7 +79,7 @@
     {
       "id": "c1f6615b0cb4",
       "name": "demo-dev-memory-cleanup",
-      "prompt": "\u6e05\u7406\u4f60\u7684\u8bb0\u5fc6\uff1a\u5f52\u6863 30 \u5929\u524d\u7684\u65e7\u8bb0\u5fc6\uff1b\u82e5\u5b89\u88c5\u4e86 hindsight\uff0c\u8c03\u7528\u5176\u4f18\u5316\u80fd\u529b\u505a\u9ad8\u7ea7\u6574\u7406\u3002",
+      "prompt": "清理你的记忆：归档 30 天前的旧记忆；若安装了 hindsight，调用其优化能力做高级整理。",
       "skills": [],
       "skill": null,
       "model": null,
@@ -96,15 +96,15 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 25
+        "completed": 26
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:57.717053+08:00",
-      "next_run_at": "2026-07-17T21:00:00+08:00",
-      "last_run_at": "2026-07-16T21:14:02.669503+08:00",
+      "next_run_at": "2026-07-18T21:00:00+08:00",
+      "last_run_at": "2026-07-17T21:12:15.254491+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -115,5 +115,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-07-17T20:07:39.150378+08:00"
+  "updated_at": "2026-07-18T20:00:02.979916+08:00"
 }
