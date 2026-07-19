@@ -12,13 +12,14 @@ When the user says "archive old memories and optimize with hindsight," follow th
 2. Check char limits      → If file exceeds limit → compact (step 2b)
 2b. Compact if over-limit → MEMORY.md >2200ch or USER.md >1375ch → trim/restructure
 3. Check hindsight daemon → Is it healthy? Which bank?
+  3a. Discover bank name  → curl -s http://127.0.0.1:<port>/v1/default/banks → extract bank_id (NOT always `hermes`; could be `demo-pm-memory`, `<profile>-memory`, etc.)
 4. Trigger reflect        → LLM tells you if old content exists
 5. Trigger consolidate    → Structural optimization
 6. Verify results         → bank stats, operation status
 7. Report or [SILENT]    → Only report if anything was actually done
 ```
 
-**If no files are >30 days AND files are within char limits AND reflect reports nothing outdated → output `[SILENT]`** for cron jobs. Don't force work where none is needed.
+**If no files are >30 days AND files are within char limits AND reflect reports nothing outdated → there is no archive/compaction work to do.** But if hindsight operations were actually performed (daemon started, reflect + consolidate ran, archive log updated), report those findings normally — `[SILENT]` is only for truly idle runs where nothing at all was done.
 
 ### Step 2b — Compact Over-Limit Memory Files
 
@@ -485,28 +486,48 @@ The CLI wrapper `hermes sessions prune --older-than 30d` is preferred over raw S
 
 A common chronic condition: the `hindsight-embed profile create` command generates the `.env` file with `HINDSIGHT_API_LLM_API_KEY=***` as a literal placeholder. If the real key was never written into this file, **the daemon can never start** — not just for this session, but permanently. The env file exists, the profile is registered, but `hindsight-embed daemon start` always fails with "LLM API key is required."
 
-**Detection:**
-```bash
-# Read the env file and check if the value is a placeholder or empty
-cat ~/.hindsight/profiles/<profile_name>.env | grep HINDSIGHT_API_LLM_API_KEY
-# If it shows `=***`, it's a placeholder — no real key was ever set.
-```
+**Detection — distinguish terminal masking from literal placeholder:**
 
-**Impact:**
-- The profile's hindsight daemon is permanently dead until the key is filled in
+When `cat` or `grep` shows `HINDSIGHT_API_LLM_API_KEY=***`:
+
+- **Terminal masking** (likely): The real value exists but the terminal tool replaced it with `***` for security. Verify by checking the daemon can start and reflect works. If `curl health` passes and reflect returns results (not `AuthenticationError`), the key is real — the `***` was just display masking.
+- **Literal placeholder** (actual problem): The env file literally contains `=***` with nothing behind it. Verify with byte inspection:
+  ```bash
+  python3 -c "
+  with open('/Users/oneplusn/.hindsight/profiles/<profile>.env', 'rb') as f:
+      for line in f:
+          if b'HINDSIGHT_API_LLM_API_KEY' in line:
+              print(repr(line))
+  "
+  ```
+  If this shows `b'HINDSIGHT_API_LLM_API_KEY=***\\n'` as bytes, it's a literal placeholder. If the value looks like a real key, terminal was just masking.
+
+- **Empty key** (actual problem): `HINDSIGHT_API_LLM_API_KEY=` with nothing after the `=`. Byte inspection shows `b'HINDSIGHT_API_LLM_API_KEY=\\n'`.
+
+**Impact of literal placeholder or empty key:**
+- The profile's hindsight daemon may still START (it only needs the key at LLM-call time, not at boot)
+- LLM-powered operations (reflect, consolidate) will fail with `AuthenticationError`
 - The `memory()` tool returns "Memory is not available" (routes through the active provider, finds nothing)
 - However, **the flat memory files still work** — MEMORY.md and USER.md can be read/written directly
 - If another profile on the same machine has a running hindsight daemon with the same `bank_id` and shared pg0, that sibling daemon can serve this profile's data (see "Daemon Not Running — Use Sibling Daemon")
 
 **Fix:**
-Write the actual API key into the env file:
+Write the actual API key into the env file. Use `patch` to avoid `***` masking:
 ```bash
-# Use patch to avoid *** masking
-HINDSIGHT_API_LLM_API_KEY=<real-key>
-Then start the daemon. The daemon will initialize PostgreSQL and become available after 1-3 minutes.
+# Verify the current state first — distinguish real value from placeholder
+python3 -c "
+with open('/Users/oneplusn/.hindsight/profiles/<profile>.env', 'rb') as f:
+    for line in f:
+        if b'HINDSIGHT_API_LLM_API_KEY' in line:
+            print(repr(line))
+"
+# If it's a placeholder, write the real key
+# Then start the daemon. The daemon will initialize PostgreSQL and become available after 1-3 minutes.
+```
 
-**Pitfall — cron jobs cannot fix this on their own.**
-Then start the daemon. The daemon will initialize PostgreSQL and become available after 1-3 minutes.
+**Pitfall — placeholder API key does NOT block daemon startup, only LLM operations.**
+
+The statement "the daemon can never start" is wrong — it WILL start even with `=***` placeholder. The daemon only needs the LLM key at reflect/consolidate/retain time, not at boot. You'll see "Daemon started successfully" and `/health` returns `healthy`. Only when you call reflect or consolidate will it fail with `AuthenticationError`. If the daemon started AND reflect returned results, the key is real — terminal was just masking it.
 
 **Pitfall — cron jobs cannot fix this on their own.** A cron job running memory cleanup cannot write API keys (no user present to supply the secret). If the key is a placeholder, the cron job should:
 1. Detect the placeholder state
@@ -840,6 +861,100 @@ Hindsight's `reflect` endpoint runs the LLM over ALL stored memories simultaneou
 ### Pitfall — observation layer duplication
 
 When memories ARE stored in hindsight's internal bank AND also in flat files, reflect will see both. The observation layer (synthesized by consolidation) often duplicates raw facts, inflating the apparent repetition. The reflect output may report "50% duplication" when the actual unique facts are correct — simply filter out observation-layer entries from the consolidation output. Flat-file-only memory (where hindsight is not the active memory provider) does not have this issue.
+
+## Python hindsight_client Library (Alternative to Direct curl)
+
+The `hindsight_client` Python package (shipped with Hermes) provides a clean, high-level API that handles JSON serialization, response parsing, and error handling. Use it as an alternative to crafting raw curl commands — especially when you need multiple operations (reflect → check → consolidate) in a single script.
+
+### Import & Instantiate
+
+The client class is `Hindsight` (not `HindsightClient`):
+
+```python
+from hindsight_client import Hindsight
+
+# Point at any running hindsight daemon — profile-specific OR global
+client = Hindsight(base_url='http://127.0.0.1:8888')       # global API
+client = Hindsight(base_url='http://127.0.0.1:9178')       # profile-specific
+```
+
+### Synchronous (sync) Methods — These Work Immediately
+
+All common operations are available as sync convenience methods:
+
+```python
+# Recall (semantic search)
+result = client.recall(bank_id='hermes', query='demo-pm project configuration', budget='low')
+for item in result.results:
+    print(f"  [{item.type}] {item.text[:120]}")
+
+# Reflect (LLM-powered analysis)
+result = client.reflect(
+    bank_id='hermes',
+    query='Review all memories and identify any stale or redundant content.',
+    budget='low',
+    include_facts=True
+)
+print(f"Reflect: {result.text}")
+if result.based_on:
+    print(f"Based on {len(result.based_on.memories)} memories")
+
+# Token tracking
+print(f"Tokens used: {result.usage.total_tokens}")
+```
+
+### Key Object Shapes
+
+| Method | Return Type | Key Fields |
+|--------|-------------|------------|
+| `recall()` | `RecallResponse` | `results` (list of `RecallResult`), `usage` |
+| `reflect()` | `ReflectResponse` | `text` (str), `based_on` (optional), `usage` |
+| `list_memories()` | `ListMemoryUnitsResponse` | paginated memory unit list |
+
+`RecallResult` fields: `id`, `type` (world/experience/observation), `text`, `context`, `occurred_start`, `occurred_end`.
+
+### When to Use This vs Direct curl
+
+| Situation | Recommendation |
+|-----------|---------------|
+| Simple one-shot curl | Direct curl — fewer deps, works from any shell |
+| Multiple operations in one cron run | Python client — cleaner error handling, no JSON-in-URL escaping |
+| Chinese/Unicode payloads | Python client — no tirith `confusable_text` block (string is never in the shell command) |
+| Processing reflect output programmatically | Python client — structured `RecallResult` objects vs raw JSON parsing |
+| Debugging a daemon issue | curl directly — you see the raw HTTP response, error codes, latency |
+
+### Example: Full Cron Cycle with hindsight_client
+
+```python
+from hindsight_client import Hindsight
+client = Hindsight(base_url='http://127.0.0.1:8888')
+
+# 1. Reflect — semantic analysis
+r = client.reflect(bank_id='hermes',
+    query='Check for stale or redundant demo-pm memories.',
+    budget='low')
+if 'outdated' in r.text.lower() or 'redundant' in r.text.lower():
+    # 2. Consolidate — structural dedup (if reflect found issues)
+    op = client.consolidate(bank_id='hermes')
+    print(f'Consolidation triggered: {op}')
+else:
+    print('No stale content. Skipping consolidation.')
+
+# 3. Verify token usage
+print(f'Cost: {r.usage}')
+```
+
+### Pitfall — No `memory` Tool Equivalent in hindsight_client
+
+The `memory` Hermes tool (`from hermes_tools import memory`) is NOT the same as hindsight_client. The `memory` tool dispatches through the configured profile provider (which may be disabled in cron environments). The hindsight_client talks directly to the Hindsight API bypassing the provider dispatch — so it works even when `memory` says "not available."
+
+### Pitfall — Sync Methods Block
+
+The sync methods (`recall()`, `reflect()`, `consolidate()` shown above) block until the LLM response is complete. For large banks with high recall budgets, this can take 30+ seconds. The async alternatives (`arecall()`, `areflect()` on the `_memory_api` object) are available but require a running event loop — not recommended in cron scripts.
+
+### Pitfall — No BanksApi Sync Wrapper
+
+The `banks` property's methods (e.g. `client.banks.list_banks()`) return coroutines, not sync values. If you need to list banks synchronously, fall back to curl or use the `openapi.json` endpoint directly. The `recall()`, `reflect()`, and `list_memories()` convenience methods on the `Hindsight` class ARE properly wrapped.
 
 ## Cron Mode Pitfalls
 

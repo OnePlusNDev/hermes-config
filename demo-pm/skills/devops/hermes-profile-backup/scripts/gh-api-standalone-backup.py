@@ -61,7 +61,7 @@ EXCLUDE_DIRS = {
     "hindsight-maintenance-logs",
     ".hub", ".curator_backups", ".curator_state",
 }
-EXCLUDE_PREFIX = {"config.yaml.bak."}
+EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_"}
 CRON_EXCLUDE = {".jobs.lock", ".tick.lock", "ticker_heartbeat", "ticker_last_success"}
 
 def git_blob_hash(filepath):
