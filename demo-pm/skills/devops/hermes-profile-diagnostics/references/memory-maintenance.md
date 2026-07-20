@@ -772,7 +772,29 @@ curl -s -X PUT "http://127.0.0.1:<port>/v1/default/banks/<tmp-bank-id>" \
 
 This is a `PUT` — the bank is created on first PUT.
 
-### Step 2 — Retain memories as items
+### Step 2 — Retain memories as items (via HTTP API — preferred)
+
+**⚠️ Avoid the CLI `hindsight memory retain` command for file content.** The CLI's `<CONTENT>` positional argument expects content inline, NOT from stdin. Passing `-` as the argument creates a stub document with `Text Length: 1` — the literal string `-` is stored instead of the piped file content. Example of the WRONG pattern:
+
+```bash
+# ❌ BROKEN — creates stub documents with Text Length: 1
+cat MEMORY.md | hindsight memory retain demo-pm - --doc-id "MEMORY.md"
+
+# Also BROKEN — content is the literal string `-`
+hindsight memory retain demo-pm - --doc-id "MEMORY.md"
+```
+
+To use the CLI safely, pass content as a direct shell argument:
+
+```bash
+# ✅ Works for small content
+content=$(cat MEMORY.md)
+hindsight memory retain demo-pm "$content" --doc-id "MEMORY.md" --async
+```
+
+⚠️ **Large content may exceed shell argument limits.** Files over ~128KB cause `Argument list too long`. For any file over a few KB, use the HTTP API instead.
+
+The HTTP API (below) is the **preferred** method for multi-item retention. It accepts structured JSON, handles Unicode/Chinese natively, and returns proper error codes.
 
 Split flat-file sections into individual `MemoryItem` objects. Each item has `content` (the fact) and optionally `timestamp`:
 
