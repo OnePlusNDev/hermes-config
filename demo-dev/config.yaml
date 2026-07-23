@@ -191,6 +191,7 @@ auxiliary:
     api_key: ''
     timeout: 120
     extra_body: {}
+    download_timeout: 30
   web_extract:
     provider: auto
     model: ''
