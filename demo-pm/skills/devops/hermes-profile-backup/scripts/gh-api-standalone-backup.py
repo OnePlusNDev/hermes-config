@@ -23,7 +23,11 @@ import time
 from pathlib import Path
 
 # ══════════════════════ CONFIG ══════════════════════
-OWNER = "OnePlusNDev"
+# Resolve OWNER dynamically from gh CLI — works for any GitHub user
+import subprocess as _sp
+_owner_result = _sp.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=15)
+OWNER = _owner_result.stdout.strip() if _owner_result.returncode == 0 else "OnePlusNDev"
+
 REPO = "hermes-config"
 BRANCH = "main"
 PROFILE_DIR = Path(os.path.expanduser("~/.hermes/profiles/demo-pm"))
@@ -40,19 +44,9 @@ EXCLUDE_NAMES = {
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
     ".bundled_manifest", ".curator_state",
-    # Ref files with hex-encoded tokens that trigger push protection
-    "2026-07-10-xxd-hexdump-token-extraction.md",
-    "2026-07-12-session-base64-token-extraction.md",
-    "2026-07-12-session-cat-heredoc-plus-python.md",
-    "demo-pm-backup-workflow-20260710.md",
-    "demo-pm-backup-workflow-20260711.md",
-    "demo-pm-backup-workflow-20260712.md",
-    "demo-pm-backup-workflow-20260713.md",
-    "demo-pm-backup-workflow-20260714.md",
-    "demo-pm-backup-workflow-20260706.md",
-    "demo-pm-backup-workflow-20260707.md",
-    "demo-pm-backup-workflow-20260708.md",
-    "demo-pm-backup-workflow-20260702.md",
+    # NOTE: reference files with encoded tokens should be pre-scanned and
+    # redacted before backup (see SKILL.md: push protection pitfalls).
+    # The graceful fallback below handles any that slip through.
 }
 EXCLUDE_DIRS = {
     "logs", "cache", "sessions", "desktop", "sandboxes",

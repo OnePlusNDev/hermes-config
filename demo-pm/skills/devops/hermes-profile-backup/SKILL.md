@@ -175,6 +175,21 @@ See also: `autonomous-ai-agents/hermes-agent/references/hermes-profile-rsync-git
 
 Use the GitHub Git Data API to create a single atomic commit with all files via blob → tree → commit → ref update.
 
+### Pre-flight: authenticate as repo owner
+
+Before any API call, verify the active `gh` account owns or has write access to the target repo:
+
+```bash
+ACTIVE_GH_USER=$(gh api user --jq '.login')
+echo "Active gh user: $ACTIVE_GH_USER"
+REPO_OWNER="OnePlusNPM"  # from the repo URL
+if [ "$ACTIVE_GH_USER" != "$REPO_OWNER" ]; then
+  gh auth switch --user "$REPO_OWNER"
+fi
+```
+
+Without this step, `gh api POST /repos/{owner}/{repo}/git/blobs` returns **HTTP 404** — not a 403! — because the authenticated account cannot write blobs to the target repo. This is easy to mistake for a missing repo or rate limit issue. Always verify before starting blob uploads.
+
 **Detailed recipe:** see `references/gh-api-git-data-backup.md`
 
 **Key steps (incremental — upload only changed files):**
@@ -187,6 +202,19 @@ Use the GitHub Git Data API to create a single atomic commit with all files via 
 4. Build a tree JSON with all entries (unchanged + new), dedup by path
 5. Create commit: `gh api repos/$OWNER/$REPO/git/commits --input <(echo "$COMMIT_PAYLOAD") --jq '.sha'`
 6. Update ref: `gh api repos/$OWNER/$REPO/git/refs/heads/main --method PATCH --field sha="$COMMIT_SHA"`
+
+### Tree construction strategy: subtree vs flat
+
+When the remote repo already has other profile directories (e.g. `demo-tester/`) and you're adding/updating only one profile (e.g. `demo-pm/`), do NOT build a single flat tree with all blob entries. Instead:
+
+1. **Create a subtree tree** for the profile directory — build a tree containing only blobs under `demo-pm/` (with the `demo-pm/` prefix stripped from each path).
+2. **Get the existing base tree** — `GET /repos/{owner}/{repo}/git/trees/{base_tree_sha}` to see what the remote already has.
+3. **Build the top-level tree** — copy all entries from the base tree, except replace the `demo-pm` entry with a single `{path: 'demo-pm', mode: '040000', type: 'tree', sha: <subtree_sha>}` entry pointing to the new subtree.
+4. **Create the top-level tree** — `POST /repos/{owner}/{repo}/git/trees` with the merged entries.
+
+This keeps each profile's tree self-contained on GitHub and avoids building a single massive tree payload. When the remote doesn't have a `demo-pm/` entry yet, add one to the top-level tree alongside existing entries.
+
+**Partial blob upload (graceful failure):** If a single blob upload returns `HTTP 422 — Secret detected in content` (GitHub push protection on a reference doc), the entire tree construction fails unless you handle the exception. Use the fallback pattern from `scripts/gh-api-standalone-backup.py`: keep the remote version of that file's blob SHA, skip the upload, and list the skipped file in the commit message.
 
 **CRITICAL: never use `git status --porcelain` to find changed files when already committed locally.** After `git commit`, the working tree is clean and `git status` returns nothing. Always use `git ls-tree -r HEAD` for the local state and diff it against the remote tree. See `references/gh-api-git-data-backup.md` for the complete Python script template.
 
@@ -311,14 +339,34 @@ When both SSH and standard HTTPS push fail (timeout or 403), attempt push with t
 TOKEN=$(gh auth token)
 if [ -n "$TOKEN" ]; then
   git remote set-url origin "https://OWNER:$TOKEN@github.com/OWNER/REPO.git"
-  timeout 60 git push origin main 2>&1
+  git push origin main 2>&1
   # Clean up — remove token from URL afterward
   git remote set-url origin https://github.com/OWNER/REPO.git
-fi
+fi```
 ```
 This is useful as a one-shot diagnostic to confirm the gh token has push access, even when curl can't reach GitHub (see Network connectivity pitfall). **Do not leave the token-embedded URL as the permanent remote** — switch back to plain HTTPS after the push.
 
 Always verify the active user before cloning or pushing, not just when a 403 fires.
+
+### `timeout` command not available on macOS
+
+The `timeout` command (from GNU coreutils) is **not** available on macOS by default. When the SKILL.md shows `timeout 60 git push`, replace it with the terminal's built-in timeout parameter instead:
+
+```bash
+# ❌ Does not work on macOS
+timeout 60 git push origin main
+
+# ✅ Use terminal timeout parameter instead
+terminal("git push origin main", timeout=90)
+```
+
+If you need `timeout` in a shell script rather than a terminal call, install coreutils via Homebrew and use `gtimeout`:
+```bash
+brew install coreutils
+gtimeout 60 git push origin main
+```
+
+This applies to the "gh auth token URL fallback" diagnostic pattern — rely on the terminal() timeout parameter, not the `timeout` binary.
 
 ### Network connectivity check for push
 `git push` may fail with "Failed to connect to github.com port 443" when the cron environment has no external network. Detect this upfront:
@@ -329,6 +377,24 @@ HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" https://github.
 - Code `000` = curl cannot reach github.com directly. **Do NOT assume push will fail** — `gh` CLI manages its own HTTP transport (via Go net/http) which may succeed where curl fails, especially when git is configured with gh's credential helper. Always attempt `git push` anyway; only fall back to Method B or report "local commit only" on actual push failure.
 - Do NOT rely on `curl -s https://github.com` returning content — the empty response is not a reliable indicator.
 - To test gh connectivity separately: `gh api repos/<owner>/<repo> --jq '.id'` succeeds if gh has a working route.
+
+### Method A → B fallback: local commit exists but push times out
+
+When `git push` succeeds locally but times out (port 443 unreachable), **do not discard the local commit**. The commit already exists in the cloned repo. Use the gh API Git Data API (Method B) to push the existing commit's tree to GitHub.
+
+**Pattern:** clone → rsync → `git commit` (OK) → `git push` (fails: `Failed to connect to github.com port 443`) → gh API push
+
+Steps:
+
+1. **Keep the cloned repo** — the commit is there. Do not `rm -rf` the temp directory.
+2. **Get local tree** — `git ls-tree -r HEAD` gives the full content-addressed snapshot. Parse mode/type/sha/path.
+3. **Get remote tree** — `gh api repos/$OWNER/$REPO/git/trees/$TREE_SHA?recursive=1` gives the remote state.
+4. **Diff** — compare `git ls-tree` entries against remote tree entries. Upload only changed/new blobs via `POST /repos/$OWNER/$REPO/git/blobs` (base64 content). Copy unchanged entries from remote tree.
+5. **Create tree, commit, update ref** — standard Method B procedure (see existing recipe). The commit message can be taken from the local commit via `git log -1 --format=%s%n%n%b`.
+
+**CRITICAL: use `git ls-tree -r HEAD`, not `git status --porcelain`.** After `git commit`, the working tree is clean and `git status` returns nothing. The local commit IS the source of truth even though status is empty (see the dedicated pitfall below).
+
+This pattern is verified working when `git push` times out (port 443 blocked) but `gh api` succeeds — `gh` uses Go's net/http transport which may have a different routing path than git's libcurl transport.
 - **Tree entry dedup**: A tree with duplicate paths causes HTTP 422. Track added paths in a set/array and skip duplicates.
 - **`gh api` vs `gh api --input`**: For large tree payloads, pipe the JSON through stdin via `--input <(echo "$PAYLOAD")` to avoid shell argument length limits.
 - **Commit author date**: Use ISO 8601 format (`date -u +"%Y-%m-%dT%H:%M:%SZ"`) for the `author.date` field. Numeric timestamps cause silent failures.
@@ -449,7 +515,82 @@ terminal("gh repo clone <owner>/<repo> /tmp/hermes-$(date +%s)", timeout=120)
 
 A 120s timeout has been verified sufficient for repos with dozens of commits and hundreds of files. If 120s also fails, use Method B (gh API Git Data API) instead — it avoids cloning entirely.
 
-### No local git clone: computing blob SHAs without `git ls-tree -r HEAD`
+### gh API 404 on blob creation when gh is on wrong account
+
+When using Method B (`gh api` Git Data API), `POST /repos/{owner}/{repo}/git/blobs` can return **HTTP 404** even though the repo exists and you verified it with `gh repo view`. This happens when `gh` is authenticated as a different user than the repo owner.
+
+**Detection:** Run `gh api user --jq '.login'` and compare to the repo owner. If they differ, that's the cause — the authenticated user cannot write blobs to another user's private repo, and GitHub returns 404 (not 403) for this access denial.
+
+**Do not mistake this for a missing repo or rate limit issue!** The first ~250 blob uploads may succeed if the wrong account has collaborator access, then fail on the rest when some secondary check kicks in. The error message is just `"Not Found (HTTP 404)"` with no further detail.
+
+**Fix:** Switch to the repo owner account before uploading any blobs:
+```bash
+gh auth switch --user $REPO_OWNER
+```
+
+After switching, retry all failed blob uploads — they will succeed.
+
+### No local git clone: manual blob-by-blob upload with subtree construction
+
+When `gh repo clone` times out (port 443 unreachable) AND the standalone script at `scripts/gh-api-standalone-backup.py` is unavailable (e.g., the session context doesn't have it loaded), you can perform the push manually with three phases:
+
+**Phase 1 — Upload all blobs (Python + gh API):**
+```python
+import subprocess, json, base64, os
+
+def gh_api(method, path, data=None):
+    cmd = ['gh', 'api', '--method', method, path]
+    if data is not None:
+        cmd.extend(['--input', '-'])
+    proc = subprocess.run(cmd, input=data, text=True, timeout=60)
+    return json.loads(proc.stdout)
+
+for root, dirs, files in os.walk(BASE_DIR):
+    for f in sorted(files):
+        fp = os.path.join(root, f)
+        rel = os.path.relpath(fp, '/tmp/hermes-config')
+        with open(fp, 'rb') as fh:
+            content = fh.read()
+        b64 = base64.b64encode(content).decode()
+        blob_data = json.dumps({'content': b64, 'encoding': 'base64'})
+        result = gh_api('POST', f'/repos/{OWNER}/{REPO}/git/blobs', blob_data)
+        # Accumulate tree entry: {path, mode, type:'blob', sha: result['sha']}
+```
+
+**Phase 2 — Get base tree, build subtree, create trees:**
+```python
+# Get base tree to preserve non-demo-pm entries (e.g. demo-tester/)
+base_tree = gh_api('GET', f'/repos/{OWNER}/{REPO}/git/trees/{base_tree_sha}')
+
+# Create demo-pm subtree: strip 'demo-pm/' prefix from blob paths
+for item in blobs:
+    item['path'] = item['path'][8:]  # remove 'demo-pm/'
+subtree = gh_api('POST', f'/repos/{OWNER}/{REPO}/git/trees',
+    json.dumps({'tree': blobs}))
+
+# Build top-level tree: keep existing entries, replace demo-pm with subtree
+top_entries = []
+for entry in base_tree['tree']:
+    if entry['path'] == 'demo-pm':
+        top_entries.append({'path':'demo-pm','mode':'040000','type':'tree','sha':subtree['sha']})
+    else:
+        top_entries.append(entry)  # copy unchanged
+top_tree = gh_api('POST', f'/repos/{OWNER}/{REPO}/git/trees',
+    json.dumps({'tree': top_entries}))
+```
+
+**Phase 3 — Create commit and update ref:**
+```python
+commit = gh_api('POST', f'/repos/{OWNER}/{REPO}/git/commits',
+    json.dumps({'message': f'backup({PROFILE}): auto config sync {DATE}',
+                'tree': top_tree['sha'], 'parents': [base_sha]}))
+gh_api('PATCH', f'/repos/{OWNER}/{REPO}/git/refs/heads/main',
+    json.dumps({'sha': commit['sha'], 'force': False}))
+```
+
+This three-phase flow was verified with 534 files (config.yaml, SOUL.md, RULES.md, 1 cron script, 529 skill files). Total time: ~3 minutes for blob creation + ~3 seconds for tree/commit/ref.
+
+**Handle 404 on individual blobs:** If some blob uploads fail with 404, check `gh auth status` to verify you're authenticated as the repo owner, not a different account. After switching, retry only the failed files by checking which paths already have entries in your accumulated tree list.
 
 When `gh repo clone` times out (port 443 unreachable) but `gh api` works, the existing Method B reference script (`references/gh-api-git-data-incremental-push.py`) cannot run — it assumes a local cloned repo with `git ls-tree -r HEAD` for the local tree state.
 
@@ -609,6 +750,22 @@ git diff --cached -- <file> | grep -nE '6768705f[0-9a-f]|R0lUSFVC|ghp_[A-Za-z0-9
 
 Pro tip: run this across ALL modified files, not just known offenders — a sibling file you didn't touch may have had its token already committed and will be re-scanned anyway.
 
+### Partial token redaction is NOT sufficient for push protection
+
+Replacing the main hex or base64 token string with `***` is NOT enough if the file still contains partially-redacted token fragments. In this session, GitHub push protection blocked 4 reference files even after the hex string was redacted, because the files still contained patterns like:
+
+- `ghp_Z1...ghiu` — partially redacted with `...` break (push protection flagged the `ghp_Z1` prefix + residual base64-like content)
+- Decoded output lines like `GITHUB_TOKEN=ghp_Z1...ghiu` — the prefix `ghp_Z1` is enough to trigger detection
+- Token-assembly lines like `ZOVGCrkIPckXiZ8J` + `GO2bghiu` = `ghp_Z1...ghiu` — the individual segments together form a detectable pattern
+
+**Three reliable approaches, in order of preference:**
+
+1. **Exclude the file entirely** — Add the filename to rsync excludes AND `.gitignore` (Method A) AND the gh API standalone script's `EXCLUDE_NAMES` set (Method B). This is the safest approach.
+2. **Complete removal** — Delete EVERY occurrence of the token in ANY form: hex, base64, decoded, partial, assembly-line. Run `grep` across the full file and remove all matches. One missed line is enough to block the upload.
+3. **Graceful fallback** — Let push protection block the individual blob, rely on the graceful skip pattern (keep remote version), and list the skipped files in the commit message. The commit still succeeds for all other files.
+
+**Detection tip:** After any redaction pass, scan ALL lines for `ghp_` (any sequence, even broken), `R0lUSFVC` (base64 GITHUB_TOKEN prefix), and `6768705f` (hex `ghp_` bytes). Do not stop after one match — push protection scans the entire blob, not just the diff.
+
 ### xxd hexdump output: the ASCII column is a second leak vector
 
 When hexdumps of token files appear in reference docs, the xxd output has **two** content channels that both need redaction:
@@ -643,10 +800,19 @@ Look for leaked artifacts:
 - `.tmp_*` files (e.g. `.tmp_cron_triage.py`, `.tmp_triage.sh`) — missing `--exclude '.tmp_*'`
 
 **Watch for push-protection triggers in sibling skill references:**
-Reference docs under other skills' `references/` dir (e.g. `pm-triage-cron/references/`) may contain hex-encoded tokens. These files should be excluded preemptively:
-- Filenames containing `hexdump`, `base64-token`, `token-extraction`
-- Filenames starting with `demo-pm-backup-workflow-` (session transcripts)
-Add these to your exclude list before the first upload to avoid push protection failures.
+Reference docs under other skills' `references/` dir (e.g. `pm-triage-cron/references/`) may contain hex-encoded or base64-encoded tokens. Before backup, scan these files proactively:
+
+```bash
+# Scan all reference docs for push-protection triggers
+grep -rn '6768705f[0-9a-f]\|R0lUSFVC\|ghp_[A-Za-z0-9]\{20,\}' demo-pm/skills/ --include='*.md' --include='*.py' 2>/dev/null
+```
+
+Apply **complete removal** of every occurrence (see "Partial token redaction" pitfall above — `ghp_Z1...ghiu` partial patterns also trigger detection). Redacting the main hex/base64 string AND the decoded output line AND any xxd hexdump columns is sufficient to pass push protection — this was verified in `references/demo-pm-backup-workflow-20260721.md`.
+
+If a file cannot be fully redacted (e.g. the token is an integral part of the documentation), fall back to the graceful skip pattern: let push protection block the blob upload, keep the remote version, and list the skipped file in the commit message. The push still succeeds for all other files.
+
+**Cannot selectively exclude from gh API method without script edit.**
+When using Method B (gh API), the rsync excludes do not apply — the script directly walks the profile filesystem. If you rely on Method B, update the script's `EXCLUDE_NAMES` set to include these specific filenames. The standalone script at `scripts/gh-api-standalone-backup.py` has a growing list that must be kept in sync with the rsync excludes and `.gitignore`.
 
 If leaked files are found, first update the rsync exclude list in the skill, then clean the clone. **Do not use plain `rm` to clean leaked files in cron mode** — tirith's `mass_file_deletion` scanner has a cumulative counter that persists across terminal calls and will eventually block all `rm` operations even for single-file deletes. Instead, use the Python batch-cleanup pattern:
 
@@ -677,6 +843,9 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260714.md` — `gh auth token` URL fallback, `git config --local credential.helper`, base64 push protection redaction on both channels, pull-rebase divergence after amend
 - `references/2026-07-16-push-protection-directory-exclusion.md` — Directory-level `.gitignore` exclusion of reference docs with hex-encoded tokens; `gh api` Git Data API fallback when SSH/HTTPS git push fails (multi-account mismatch + port 443 timeout)
 - `references/demo-pm-backup-workflow-20260717.md` — Clean backup with no push protection issues; consolidated `home/` excludes; pre-emptive redaction of hex/base64 tokens in modified files; legacy tracked credential file cleanup (`git rm --cached`)
+- `references/demo-pm-backup-workflow-20260720.md` — 12-file backup: partial token redaction insufficient for push protection; gh API fallback when git push times out on port 443
+- `references/demo-pm-backup-workflow-20260721.md` — 26-file backup: hex/base64 redaction in cross-skill SKILL.md + references (cascade); `.gitignore` gaps (`**/triage_check.py`, `**/.tmp_*`); `timeout` command unavailable on macOS; 0 push protection blocks
 - `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
 - `scripts/gh-api-standalone-backup.py` — Standalone Python script for gh API push when no local git clone is available (computes blob SHAs via pure Python, walks profile dir, handles push protection fallback)
+- `references/demo-pm-backup-workflow-20260722.md` — 534-file backup via gh API Git Data API (macOS git-remote-https TLS handshake timeout, gh auth account mismatch, subtree tree construction)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format

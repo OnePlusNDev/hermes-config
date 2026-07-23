@@ -21,6 +21,104 @@ When the user says "archive old memories and optimize with hindsight," follow th
 
 **If no files are >30 days AND files are within char limits AND reflect reports nothing outdated → there is no archive/compaction work to do.** But if hindsight operations were actually performed (daemon started, reflect + consolidate ran, archive log updated), report those findings normally — `[SILENT]` is only for truly idle runs where nothing at all was done.
 
+## CLI-First Workflow (2026-07-22 Added — Preferred for Cron)
+
+The existing HTTP API workflow below works, but the **hindsight CLI** is significantly simpler for cron jobs. No curl, no endpoint discovery, no JSON payload construction. The CLI talks directly to the running hindsight daemon (using the same connection as the Hermes agent session).
+
+**Prerequisites:** The `hindsight` CLI tool must be on `PATH` (installed at `~/.local/bin/hindsight`). It auto-discovers the daemon API URL from the environment or current profile's config. No port, bank_id, or endpoint paths needed.
+
+### Step 3a (CLI) — List and Inspect Memories
+
+```bash
+# List all memories in the bank with full metadata (dates, types, IDs)
+hindsight memory list --limit 100 -o json <bank_id>
+# Returns: array of items with date, fact_type, text, id, state, chunk_id, etc.
+# Key fields for age checking: "date" (ISO 8601), "state" ("valid"/"invalidated")
+# Key fields for dedup checking: "chunk_id" (same = chunk neighbor), "fact_type" ("observation"/"world"/"experience")
+
+# Filter items by age via Python on the output:
+hindsight memory list --limit 100 -o json demo-pm | python3 -c "
+import json, sys, datetime
+data = json.load(sys.stdin)
+now = datetime.datetime.now(datetime.timezone.utc)
+cutoff = now - datetime.timedelta(days=30)
+items = [i for i in data['items'] if datetime.datetime.fromisoformat(i['date']) < cutoff]
+print(f'{len(items)} items older than 30 days')
+for i in items: print(f'  {i[\"id\"][:8]} {i[\"date\"]}: {i[\"text\"][:80]}')
+"
+```
+
+### Step 3b (CLI) — Bank Stats (Quick Health)
+
+```bash
+hindsight bank stats <bank_id> -o json
+# Returns: total_nodes, total_links, nodes_by_fact_type, links_by_link_type,
+#           pending_operations, failed_operations
+# Key: pending_operations=0 + failed_operations=0 → healthy
+```
+
+### Step 4 (CLI) — Reflect (Semantic Analysis)
+
+```bash
+# CLI syntax: hindsight memory reflect <BANK_ID> <QUERY> [--output json]
+hindsight memory reflect demo-pm \
+  "Check for outdated, redundant, or contradictory memories. Summarize current memory health." \
+  --output json
+
+# Response shape:
+# {
+#   "text": "The current memory health is up to date with no reported issues...",
+#   "usage": {"input_tokens": 5761, "output_tokens": 49, "total_tokens": 5810}
+# }
+```
+
+**Advantages over the HTTP API reflect:**
+- No need to write JSON payload to `/tmp/` to avoid tirith `confusable_text` blocks (Chinese queries work natively)
+- No curl or endpoint discovery needed
+- The `--output json` flag returns parseable output with token usage tracking
+- Response auto-includes token usage for cost monitoring
+
+### Step 5 (CLI) — Check Operations (Instead of Polling)
+
+```bash
+# List recent operations including consolidation status
+hindsight operation list <bank_id> -o json
+# Returns: array of operations with id, task_type, items_count, status, created_at
+# Key: look for the most recent "consolidation" operation with status="completed"
+```
+
+### Bonus (CLI) — Check Mental Models
+
+```bash
+hindsight mental-model list <bank_id> -o json
+# Returns: array of mental models (empty = none exist, which is normal)
+```
+
+### CLI vs HTTP API — When to Use Which
+
+| Task | CLI | HTTP API |
+|------|-----|----------|
+| List memories by age | ✅ `memory list` → Python filter | ❌ Need `memories-timeseries` + graph endpoints |
+| Quick bank health | ✅ `bank stats` one-liner | ✅ `curl stats` but need port + bank_id discovery |
+| Semantic analysis (reflect) | ✅ Simpler — no JSON payload | ❌ Must craft JSON, handle tirith blocks |
+| Check pending ops | ✅ `operation list` one-liner | ❌ Need `curl` + `op_id` discovery |
+| Mental model inspection | ✅ `mental-model list` only CLI | ❌ No equivalent endpoint |
+| Write operations (retain/consolidate) | ❌ CLI has pitfalls (stdin, arg limits) | ✅ Preferred — structured JSON |
+| Multi-bank bulk operations | ❌ One bank per call | ✅ Batch-compatible |
+| Debugging daemon connectivity | ❌ CLI errors are opaque | ✅ Raw HTTP response codes |
+
+**Bottom line:** For **read-only inspection and analysis** (what a memory-cleanup cron does 90% of the time), prefer the CLI. For **write operations** (retaining new memories, trigger consolidation), use the HTTP API.
+
+### CLI Short Reference for Standard Execution Flow
+
+```
+Standard check:        hindsight memory list --limit 100 -o json <bank> | age-check
+Health check:          hindsight bank stats <bank> -o json
+Reflect analysis:      hindsight memory reflect <bank> "query" --output json
+Pending ops:           hindsight operation list <bank> -o json
+Mental models:         hindsight mental-model list <bank> -o json
+```
+
 ### Step 2b — Compact Over-Limit Memory Files
 
 Even when no content is >30 days old, memory files frequently **exceed the char limit** (MEMORY.md limit: 2200, USER.md limit: 1375 per config.yaml). When they do, compact rather than archive:

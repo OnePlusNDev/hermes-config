@@ -149,6 +149,6 @@ For routine memory cleanup (archiving old memories, triggering consolidation, re
 → `references/memory-maintenance.md` — Hindsight HTTP API endpoints for consolidation, recovery, timeseries queries, bank stats, daemon-fallback (proxy through sibling daemon OR global :8888 API), and two flat-file optimization workflows (A: embedded reflect query, B: temp bank + retain).
 
 ## Reference
-→ `references/memory-maintenance.md` — Memory cleanup/optimization via Hindsight HTTP API. Includes: ARCHIVE.md running-log pattern, **bank name discovery (step 3a)**, **terminal masking vs literal placeholder detection**, daemon startup with placeholder key (boots fine, LLM ops fail), consolidation pitfalls, cron-mode pitfalls.
+→ `references/memory-maintenance.md` — Memory cleanup/optimization via Hindsight HTTP API **or** the simpler hindsight CLI (`memory list`, `bank stats`, `memory reflect`, `operation list`, `mental-model list`). Includes: ARCHIVE.md running-log pattern, **bank name discovery (step 3a)**, **terminal masking vs literal placeholder detection**, daemon startup with placeholder key (boots fine, LLM ops fail), consolidation pitfalls, cron-mode pitfalls.
 - `references/multi-daemon-setup-recipe.md` — Full architecture, incident log, and health verification commands from multi-profile Hindsight setup.
 - `references/multi-profile-daemon-verification.md` — Full command transcript from a real multi-profile diagnosis session.
