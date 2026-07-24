@@ -580,6 +580,52 @@ SELECT COUNT(*) FROM sessions WHERE archived = 1;
 
 The CLI wrapper `hermes sessions prune --older-than 30d` is preferred over raw SQL for cleanup, but raw SQL is useful for inspection and dry-run reports.
 
+## `memory clear` Interactive Confirmation
+
+The `hindsight memory clear <bank>` command prompts for confirmation before erasing all memories. In non-interactive environments (cron jobs, scripts), the prompt blocks execution:
+
+```bash
+Are you sure you want to clear ALL memories for bank 'hermes'? This cannot be undone. [y/N]: 
+```
+
+### Bypassing the Prompt
+
+**✅ Shell pipe (`echo y | cmd`) works reliably:**
+
+```python
+r = subprocess.run("echo y | hindsight-embed -p hermes memory clear hermes", 
+                   shell=True, env=env, capture_output=True, text=True, timeout=60)
+```
+
+The `shell=True` flag is required — `echo` is a shell builtin, not an executable.
+
+**❌ `subprocess.run(input="y\\n")` does NOT work for hindsight CLI prompts:**
+
+```python
+# This does NOT work — the prompt remains unanswered
+r = subprocess.run(["hindsight-embed", "-p", "hermes", "memory", "clear", "hermes"],
+                   input="y\n", ...)  # ← stdin is consumed but prompt stays
+```
+
+The hindsight CLI prompt may use direct terminal read (not stdin), or `input_data` encoding doesn't match what it expects. Always use `shell=True` with `echo y` for this particular prompt.
+
+**⚠️ `memory clear` is destructive and irreversible.** Always backup recent memories first (export via `memory list -o json`) before clearing. The `retain` command may fail after clear if the LLM API key is invalid (see "All Operations Fail with AuthenticationError" above), so clearing without a valid backup means data loss.
+
+### Restoring After Clear
+
+After `memory clear`, restore recent memories by re-importing them:
+
+```python
+for item in recent_memories:
+    text = item.get("text", "")
+    r = subprocess.run(
+        ["hindsight-embed", "-p", "hermes", "memory", "retain", "hermes", text],
+        env=env, capture_output=True, text=True, timeout=30
+    )
+```
+
+If retain returns `AuthenticationError` (500 Internal Server Error), the LLM API key is invalid or unreachable. See the "All Operations Fail with AuthenticationError" section above for diagnosis steps. Without a valid key, `retain` will never succeed — the data in the backup JSON file is the only copy.
+
 ## Daemon Not Running — API Key Placeholder (`***`)
 
 A common chronic condition: the `hindsight-embed profile create` command generates the `.env` file with `HINDSIGHT_API_LLM_API_KEY=***` as a literal placeholder. If the real key was never written into this file, **the daemon can never start** — not just for this session, but permanently. The env file exists, the profile is registered, but `hindsight-embed daemon start` always fails with "LLM API key is required."

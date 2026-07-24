@@ -76,6 +76,7 @@ rsync -a --delete \
   --exclude 'ollama_cloud_models_cache.json' \
   --exclude 'provider_models_cache.json' \
   --exclude 'home/' \
+  --exclude 'lsp/' \
   --exclude '.local/' \
   --exclude '.skills_prompt_snapshot.json' \
   --exclude '.update_check' \
@@ -139,6 +140,8 @@ if [ ! -f .gitignore ]; then
 # Home dir state — entire home/ is user-local config, never back up
 **/home/
 **/.local/
+# Dev tool runtimes — node_modules, pyright, LSP servers
+**/lsp/
 # Downloaded binaries
 **/bin/tirith
 # Media caches
@@ -266,7 +269,9 @@ When neither `git clone` nor `gh api` are available, write a Python script via `
 - `bin/tirith` — downloaded binary
 - `desktop/sessions.json`, `desktop/` — runtime session data
 - `sandboxes/` — sandbox container state
-- `home/` — entire user home directory (SSH socket, gh CLI credentials, cache dotfiles, shell rc files)
+- `**/home/` — entire user home directory (SSH socket, gh CLI credentials, cache dotfiles, shell rc files)
+- `**/lsp/` — dev tool runtimes (node_modules, pyright, LSP servers)
+- `lsp/` — dev tool runtimes (node_modules, pyright type stubs, LSP servers — 5400+ files)
 - `home/.hermes/` — nested profile state (memory daemon db dirs)
 - `.local/` — local state at profile root (gh device-id, other CLI credentials)
 
@@ -787,6 +792,7 @@ git status --short | grep '\\.lock$' | head -10
 
 Look for leaked artifacts:
 - `home/` files — if any appear, the `--exclude 'home/'` rsync flag is missing (or .gitignore `**/home/` is missing)
+- `lsp/` files — if any appear, the `--exclude 'lsp/'` rsync flag (or `.gitignore` `**/lsp/`) is missing; lsp/ can add 5000+ node_modules files
 - `sessions/` JSON dumps — if present, rsync is missing `--exclude 'sessions/'`
 - `.usage.json*` or `.usage.json.lock` — missing `--exclude 'skills/.usage.json*'`
 - `*.bak.*` — missing `--exclude '*.bak*'`

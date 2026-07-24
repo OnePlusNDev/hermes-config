@@ -53,6 +53,7 @@ EXCLUDE_DIRS = {
     "audio_cache", "image_cache", "pairing", "plans",
     "hooks", "skins", "workspace", ".local", "home", "bin",
     "hindsight-maintenance-logs",
+    "lsp",
     ".hub", ".curator_backups", ".curator_state",
 }
 EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_"}
