@@ -22,7 +22,7 @@ When a `references/` file documents a token-extraction technique and contains ac
 |---|---|---|
 | Full hex string of token | Python code blocks (`h = '6768...'`) | `h = '***'` |
 | Hexdump output | xxd output blocks | Replace bytes with `*`, ASCII with `*` |
-| Partial token fragments | Shell output comments (`# → ghp_Z1...ghiu`) | `# → ghp_***...***` |
+| Partial token fragments | Shell output comments (`# → ghp_***...***`) | `# → ghp_***...***` |
 | Token injection commands | curl/sh code blocks (`Authorization: token ghp_...`) | Already redacted by terminal `***` (verify) |
 
 ### 4. Files backed up

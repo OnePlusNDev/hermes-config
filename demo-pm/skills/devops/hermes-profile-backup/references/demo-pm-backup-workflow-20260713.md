@@ -9,14 +9,14 @@ Cron-mode backup of `demo-pm` profile to `OnePlusNDev/hermes-config` repo. Metho
 3. **git push rejected** by GitHub Push Protection (GH013): 3 reference docs contained hex-encoded / base64-encoded / partially-shielded GITHUB_TOKEN patterns:
    - `2026-07-10-xxd-hexdump-token-extraction.md` — xxd output with hex bytes of the token and a Python hex literal
    - `2026-07-12-session-base64-token-extraction.md` — base64-encoded token string
-   - `2026-07-12-session-cat-heredoc-plus-python.md` — `ghp_Z1...ghiu` in prose text
+   - `2026-07-12-session-cat-heredoc-plus-python.md` — `ghp_***...***` in prose text
 
 4. **Redaction pass**: 10+ `patch()` calls across 3 files:
    - xxd hex bytes → `2a2a 2a2a...`
    - ASCII column → `***`
    - Hex string literal `'6768705f...'` → `'***'`
    - Base64 string `R0lUSFVC...` → `***`
-   - Partial token `ghp_Z1...ghiu` → `ghp_***...***`
+   - Partial token `ghp_***...***` → `ghp_***...***`
    - Token fragment `ZOVGCrkIPckXiZ8J` → `***`
    - Full concatenation line → `ghp_***...***`
 

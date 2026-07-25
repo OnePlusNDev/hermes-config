@@ -40,10 +40,10 @@ cat ~/.hermes/profiles/demo-pm/.env | grep GITHUB_TOKEN
 
 # 但 grep|sed 提取能成功（证明文件里有真实 token）：
 grep '^GITHUB_TOKEN=*** ~/.hermes/profiles/demo-pm/.env | sed 's/^GITHUB_TOKEN=*** | head -1
-# 输出: ghp_Z1...ghiu  ← 真实的 token，不是 ***
+# 输出: ghp_***...***  ← 真实的 token，不是 ***
 ```
 
-grep 的模式 `^GITHUB_TOKEN=` 匹配了 `.env` 中的 `GITHUB_TOKEN=ghp_Z1...ghiu`，sed 移除前缀后留下 real token。如果文件里存的是字面量 `***`，sed 后的输出会是 `***`——但实际上输出是 `ghp_Z1...ghiu`，**证明文件里有真实 token**。
+grep 的模式 `^GITHUB_TOKEN=` 匹配了 `.env` 中的 `GITHUB_TOKEN=ghp_***...***`，sed 移除前缀后留下 real token。如果文件里存的是字面量 `***`，sed 后的输出会是 `***`——但实际上输出是 `ghp_***...***`，**证明文件里有真实 token**。
 
 **这意味着：**
 - ✅ `.env` 文件在磁盘上存储的是**真实 token**
@@ -364,7 +364,7 @@ result = subprocess.run(['gh', 'auth', 'token', '-u', 'OnePlusNPM'],
                        capture_output=True, text=True)
 token = result.stdout.strip()
 
-# 如果 token 在终端显示中被 mask（如 ghp_Z1...ghiu），用 hex 中转：
+# 如果 token 在终端显示中被 mask（如 ghp_***...***），用 hex 中转：
 hex_token = token.encode().hex()
 print(f"TOKEN_HEX: {hex_token}")
 # 输出: TOKEN_HEX: 6768705f5a31537966...   ← 纯 hex，不受 mask 影响
@@ -578,7 +578,7 @@ export $(grep -v '^#' ~/.hermes/profiles/demo-pm/.env | xargs) && gh issue list 
 **2026-07-01 验证——keyring 状态因会话而异：**
 1. **`gh issue list --repo=... --assignee=PM_USER` 跨用户读探针**：即使 `gh` 认证为 `OnePlusNDev`，`gh issue list --repo=demo-oneplusn/demo-workflow --assignee=OnePlusNPM` 正确返回了 `[]`（无任务），同时 broad probe 正确返回了 4 条 open issue。证实跨用户读探针完全可靠。
 2. **`gh auth status` 仅显示 `OnePlusNDev`**（2026-07-01 状态）：当时 keyring 中没有 `OnePlusNPM`，`gh auth switch -u OnePlusNPM` 和 `gh auth token -u OnePlusNPM` 均不可用。
-3. **`.env` 文件有真实 token**（终端输出被屏蔽）：`grep '^GITHUB_TOKEN=' .env | sed 's/^GITHUB_TOKEN=//'` 输出了 `ghp_Z1...ghiu` 而非 `***`。如果文件是字面量 `***`，sed 输出应是 `***`。此处的 `ghp_Z1...ghiu` 证明文件内有真实 token。见上述 3.1 节的表。
+3. **`.env` 文件有真实 token**（终端输出被屏蔽）：`grep '^GITHUB_TOKEN=' .env | sed 's/^GITHUB_TOKEN=//'` 输出了 `ghp_***...***` 而非 `***`。如果文件是字面量 `***`，sed 输出应是 `***`。此处的 `ghp_***...***` 证明文件内有真实 token。见上述 3.1 节的表。
 4. **`python3 -c` 和 `execute_code` 在 cron 模式下均被阻止**：无法使用 `execute_code()` 或 `python3 -c "..."` 读取 .env。
 
 **⚠️ 关键前提：gh keyring 内容随会话变化，不能假设某用户存在或不存在。每次 cron 运行必须实时检查。**

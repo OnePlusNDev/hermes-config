@@ -1,7 +1,7 @@
 # Backup Workflow — 2026-07-20
 
 ## Summary
-12-file backup. git push timed out on port 443; used gh API Git Data API fallback (local commit → gh API push). 4 reference files blocked by push protection despite partial redaction — learned that `ghp_Z1...ghiu` and similar partial patterns are still caught.
+12-file backup. git push timed out on port 443; used gh API Git Data API fallback (local commit → gh API push). 4 reference files blocked by push protection despite partial redaction — learned that `ghp_***...***` and similar partial patterns are still caught.
 
 ## Files Changed
 - **5 modified**: `cron/jobs.json`, `memories/archive/ARCHIVE.md`, `hermes-profile-backup/SKILL.md`, `memory-maintenance.md`, `pm-triage-cron/SKILL.md`
@@ -10,10 +10,10 @@
 ## Push-Protected Files (4 — all under `pm-triage-cron/references/`)
 | File | Why blocked | Verdict |
 |------|-------------|---------|
-| `2026-07-10-xxd-hexdump-token-extraction.md` | hex string redacted but `ghp_Z1...ghiu` and token-assembly line remained | partial redaction insufficient |
-| `2026-07-12-session-base64-token-extraction.md` | base64 string redacted but decoded `ghp_Z1...ghiu` remained | partial redaction insufficient |
+| `2026-07-10-xxd-hexdump-token-extraction.md` | hex string redacted but `ghp_***...***` and token-assembly line remained | partial redaction insufficient |
+| `2026-07-12-session-base64-token-extraction.md` | base64 string redacted but decoded `ghp_***...***` remained | partial redaction insufficient |
 | `2026-07-12-session-cat-heredoc-plus-python.md` | embedded token reference in context paragraph | entire file flagged |
-| `2026-07-16-session-gh-repo-view-precheck.md` | "extracted token `ghp_Z1...ghiu`" in procedure description | partial redaction insufficient |
+| `2026-07-16-session-gh-repo-view-precheck.md` | "extracted token `ghp_***...***`" in procedure description | partial redaction insufficient |
 
 Redaction done on files that DID pass push protection:
 - `pm-triage-cron/SKILL.md`: hex string line 525 redacted to `***`; base64 prefix comment line 410 redacted to `***`
