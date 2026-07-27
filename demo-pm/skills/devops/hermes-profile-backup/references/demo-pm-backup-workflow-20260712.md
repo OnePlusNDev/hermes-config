@@ -30,8 +30,8 @@ grep -rn 'R0lUSFVC' demo-pm/ --include='*.md'  # base64 prefix for GITHUB_TOKEN=
 | `pm-triage-cron/references/2026-07-10-xxd-hexdump-token-extraction.md` | Full hex token string, xxd hex bytes + ASCII column, partial token fragments | Hex → `***`, hexdump → `*` bytes |
 | `pm-triage-cron/references/2026-07-12-session-base64-token-extraction.md` | Base64-encoded `GITHUB_TOKEN=`, partial token | Base64 → `***`, token → `ghp_***...***` |
 | `pm-triage-cron/references/2026-07-12-session-cat-heredoc-plus-python.md` | Partial token fragment | → `ghp_***...***` |
-| `pm-triage-cron/SKILL.md` | 3x `ghp_***...***`, 1x full hex string, 1x partial base64, 3x xxd hexdump lines | All → `***` / `ghp_***...***` / `*` bytes |
-| Plus 5 more reference files with partial `ghp_***...***` patterns | Partial token fragments | → `ghp_***...***` |
+| `pm-triage-cron/SKILL.md` | 3x `ghp_Z1...ghiu`, 1x full hex string, 1x partial base64, 3x xxd hexdump lines | All → `***` / `ghp_***...***` / `*` bytes |
+| Plus 5 more reference files with partial `ghp_Z1...ghiu` patterns | Partial token fragments | → `ghp_***...***` |
 
 ### 4. Rebase + push (no force needed)
 

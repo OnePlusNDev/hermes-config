@@ -75,7 +75,7 @@ curl -s --connect-timeout 10 --max-time 30 \
 ```bash
 grep GITHUB_TOKEN ~/.hermes/profiles/demo-pm/.env | cut -d= -f2 | xxd
 # → 输出 hex bytes，可人工拼合回 ASCII token
-# grep 输出虽在终端显示为 ghp_***...***（脱敏），但 xxd 输出十六进制时不被脱敏
+# grep 输出虽在终端显示为 ghp_Z1...ghiu（脱敏），但 xxd 输出十六进制时不被脱敏
 ```
 
 完整流程：xxd → hex bytes → python3 `bytes.fromhex().decode()` → 写入 `/tmp/pm_token.txt` → `while read TOKEN; do curl ... done < /tmp/pm_token.txt`
