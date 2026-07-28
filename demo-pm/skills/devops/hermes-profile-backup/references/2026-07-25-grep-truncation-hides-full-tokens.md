@@ -5,7 +5,7 @@
 During the 2026-07-25 backup run, `grep -F "ghp_" file.md` showed:
 
 ```
-36:1. ... 成功提取到完整 token `ghp_***...***`
+36:1. ... 成功提取到完整 token `[TOKEN_REDACTED]`
 ```
 
 The `...` looked like a **partial/truncated token** in the file content. It was actually **terminal display wrapping** — the terminal wrapped the long line, and the model read the wrapped display as literal `...` content.
@@ -15,7 +15,7 @@ The `...` looked like a **partial/truncated token** in the file content. It was 
 The file actually contained the **full 40-character token**:
 
 ```
-***
+[TOKEN_REDACTED]
 ```
 
 `sed -n '36p' file.md | xxd` confirmed this — the file had the complete unredacted GitHub PAT as literal text, not a truncated/partial pattern at all.
@@ -88,6 +88,6 @@ Stage 3 in the 2026-07-25 backup found the full token (redacted), confirming sta
 14 files across two skill directories were redacted:
 - `pm-triage-cron/SKILL.md` — full hex string + partial base64
 - 6 `pm-triage-cron/references/*.md` — full ghp token, hex encoding, base64 encoding
-- `hermes-profile-backup/SKILL.md` — partial `ghp_***...***` pattern
-- 3 `hermes-profile-backup/references/*.md` — partial `ghp_***...***` pattern
+- `hermes-profile-backup/SKILL.md` — partial `[TOKEN_REDACTED]` pattern
+- 3 `hermes-profile-backup/references/*.md` — partial `[TOKEN_REDACTED]` pattern
 - `github-issues/references/pm-triage-cron-workflow.md` — partial pattern

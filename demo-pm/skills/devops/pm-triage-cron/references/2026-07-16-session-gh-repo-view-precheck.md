@@ -33,10 +33,10 @@ gh repo view demo-oneplusn/demo-workflow --json name,owner
 
 **完整链路：**
 
-1. 使用 `openssl base64` 解码 `.env` → 成功提取到完整 token `ghp_***...***Dwx2MB******`
+1. 使用 `openssl base64` 解码 `.env` → 成功提取到完整 token `[TOKEN_REDACTED]`
 2. 尝试在 `terminal()` 中使用 curl 调用 GitHub API：
    ```bash
-   curl -s -H "Authorization: token ghp_***...***D..." "https://api.github.com/..."
+   curl -s -H "Authorization: token ghp_Z1SyfZD..." "https://api.github.com/..."
    ```
 3. ✅ **tirith 拦截：** `Security scan — [HIGH] GitHub PAT detected: A credential matching a known provider pattern was found in the input.`
 4. 命令被挂起为 `status: "pending_approval"`，cron 模式下无法批准

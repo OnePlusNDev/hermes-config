@@ -8,10 +8,20 @@ need a cloned repo: it computes blob SHAs directly from file contents using
 hashlib.sha1(f"blob {size}\\0{content}"), collects files by walking the
 profile directory, and compares against the remote tree.
 
+OWNER resolution (⚠️ collaborator caveat):
+  By default, OWNER is the active gh user (gh api user --jq .login).
+  When the active user is a COLLABORATOR on a repo owned by another account
+  (e.g. active user OnePlusNPM on repo OnePlusNDev/hermes-config), the API
+  endpoint URL must use the REPO OWNER, not the active user. Set the
+  REPO_OWNER environment variable to override:
+
+    REPO_OWNER=OnePlusNDev python3 /tmp/gh-api-standalone-backup.py
+
+  Without REPO_OWNER, the script tries repos/ACTIVE_USER/REPO and gets 404.
+
 Usage:
   python3 /tmp/gh-api-standalone-backup.py
-
-Modify the CONFIG section at the top for your environment.
+  REPO_OWNER=OnePlusNDev python3 /tmp/gh-api-standalone-backup.py
 """
 import base64
 import hashlib
@@ -23,10 +33,14 @@ import time
 from pathlib import Path
 
 # ══════════════════════ CONFIG ══════════════════════
-# Resolve OWNER dynamically from gh CLI — works for any GitHub user
+# OWNER = the REPO OWNER (not necessarily the active gh user!).
+# Prefer REPO_OWNER env var for the collaborator-access pattern.
+# Fall back to active gh user (quickest for single-account setups).
 import subprocess as _sp
-_owner_result = _sp.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=15)
-OWNER = _owner_result.stdout.strip() if _owner_result.returncode == 0 else "OnePlusNDev"
+_active_gh_user = _sp.run(["gh", "api", "user", "--jq", ".login"],
+                           capture_output=True, text=True, timeout=15)
+_default_owner = _active_gh_user.stdout.strip() if _active_gh_user.returncode == 0 else "OnePlusNDev"
+OWNER = os.environ.get("REPO_OWNER", _default_owner)
 
 REPO = "hermes-config"
 BRANCH = "main"

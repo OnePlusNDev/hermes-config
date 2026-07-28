@@ -429,7 +429,7 @@ remote:            path: demo-pm/skills/.../reference.md:45
    |----------------|---------|-----------|
    | Hex bytes encoding token | `6768705f5a315379665a...` (decodes to `ghp_...`) | `***` |
    | Base64 encoding token | `R0lUSFVCX1RPS0VOPWdocF9a...` (decodes to `GITHUB_TOKEN=...`) | `***` |
-   | Partial shielded token | `ghp_***...***` | `ghp_***...***` |
+   | Partial shielded token | `[GHP_REDACTED]` | `[GHP_REDACTED]` (do NOT use `ghp_***...***` — `ghp_` prefix still triggers detection) |
    | xxd hexdump lines (both columns!) | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex with `2a2a...`, ASCII with `***` |
    | Python hex-to-string code | `h = '6768705f...'` | `h = '***'` |
 
@@ -453,10 +453,10 @@ remote:            path: demo-pm/skills/.../reference.md:45
 |----------------|---------|---------------|
 | Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `***` |
 | Base64-encoded token line | `R0lUSFVCX1RPS0VOPWdocF9a...` (decodes to `GITHUB_TOKEN=ghp_...`) | Replace with shorter redacted base64 (e.g. `R0lUSFVCX1RPS0VOPWdocF8qCg==` which decodes to `GITHUB_TOKEN=***`) |
-| Partial shielded token | `ghp_***...***` | Replace with `ghp_***...***` |
+| Partial shielded token | `[GHP_REDACTED]` | `[GHP_REDACTED]` (do NOT use `ghp_***...***` — `ghp_` prefix still triggers detection) |
 | Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
 | Python hex-to-string code | `h = '676870...'` | Replace hex literal with `***` |
-| Decoded assignment line | `GITHUB_TOKEN=ghp_***...***` | Replace token value with `[REDACTED]` |
+| Decoded assignment line | `GITHUB_TOKEN=[TOKEN_REDACTED]` | Replace token value with `[REDACTED]` |
 
 **If multiple files trigger the rule:** The error lists all of them. Redact all files in one pass before amending — a single `--amend` with all fixes is more efficient than iterating one-per-run.
 
@@ -497,7 +497,7 @@ GitHub's secret scanning push rules scan every blob uploaded via the Git Data AP
 | Pattern in file | Example | How to redact |
 |----------------|---------|---------------|
 | Hex bytes of a token | `6768705f5a315379...` (decodes to `ghp_...`) | Replace entire hex string with `***` |
-| Partial shielded token | `ghp_***...***` | Replace with `ghp_***...***` |
+| Partial shielded token | `[GHP_REDACTED]` | `[GHP_REDACTED]` (do NOT use `ghp_***...***` — `ghp_` prefix still triggers detection) |
 | Full hexdump lines | `00000070: 5f54 4f4b ...  ghp_Z1Syf` | Replace hex portion with `*` bytes, ASCII portion with `*` |
 | Python hex-to-string code | `h = '676870...'` | Replace hex literal with `***` |
 
@@ -535,6 +535,36 @@ gh auth switch --user $REPO_OWNER
 ```
 
 After switching, retry all failed blob uploads — they will succeed.
+
+### Standalone script OWNER resolution wrong when active user is collaborator
+
+The standalone script at `scripts/gh-api-standalone-backup.py` resolves `OWNER` dynamically from `gh api user --jq '.login'`. When the active gh user is a **collaborator** on a repo owned by a *different* account, this resolves to the wrong name:
+
+```
+Active user: OnePlusNPM (has collaborator write access)
+Repo owner:  OnePlusNDev
+Script sets OWNER = "OnePlusNPM"  →  tries repos/OnePlusNPM/hermes-config/...  →  404
+```
+
+The API endpoint URL must reference the **repo owner**, not the active user. The API call succeeds as a collaborator — the URL itself just uses the wrong owner path.
+
+**Detection:** Before running the script, compare active user vs repo owner:
+
+```bash
+ACTIVE=$(gh api user --jq '.login')
+REPO_OWNER=$(gh api repos/OnePlusNDev/hermes-config --jq '.owner.login')
+echo "Active: $ACTIVE  Repo owner: $REPO_OWNER"
+```
+
+**Fix:** Set the `REPO_OWNER` environment variable:
+
+```bash
+REPO_OWNER=OnePlusNDev python3 /tmp/gh-api-standalone-backup.py
+```
+
+This is a different pattern from the `gh auth switch` pitfall above — here the active user already has access (collaborator), so no account switch is needed. The fix is purely about using the correct owner in the endpoint URL.
+
+See `references/demo-pm-backup-workflow-20260727.md` for the full session transcript.
 
 ### No local git clone: manual blob-by-blob upload with subtree construction
 
@@ -717,6 +747,8 @@ git diff --cached -- <legacy-file>  # should show no changes
 
 When a reference doc contains an encoded token (hex in `.md` or `.py`), the **parent SKILL.md** often embeds the **same code snippet** as a documentation example. Redacting only the reference doc is not enough — the SKILL.md must be redacted too, because it's a separate blob with its own push-protection scan.
 
+**⚠️ Include the backup skill's own SKILL.md in scan scope.** The `hermes-profile-backup/SKILL.md` itself can contain full tokens re-introduced by source-profile changes. This session (2026-07-26) had the full hex token embedded in a Python code block inside the backup skill's own SKILL.md (line 812), but the initial redaction script only targeted sibling skills' reference files. Always include the backup skill's own SKILL.md and references/ in the TARGET_FILES list when building a redaction script.
+
 **Example from real session:**
 - `pm-triage-cron/references/2026-07-10-xxd-hexdump-token-extraction.md` line 51 contained `h = '6768705f...'` (hex-encoded token)
 - `pm-triage-cron/SKILL.md` line 523 had the **identical** hex string — embedded as a code sample from the session that the SKILL.md documents
@@ -760,9 +792,9 @@ Pro tip: run this across ALL modified files, not just known offenders — a sibl
 
 Replacing the main hex or base64 token string with `***` is NOT enough if the file still contains partially-redacted token fragments. In this session, GitHub push protection blocked 4 reference files even after the hex string was redacted, because the files still contained patterns like:
 
-- `ghp_***...***` — partially redacted with `...` break (push protection flagged the `ghp_Z1` prefix + residual base64-like content)
-- Decoded output lines like `GITHUB_TOKEN=ghp_***...***` — the prefix `ghp_Z1` is enough to trigger detection
-- Token-assembly lines like `ZOVGCrkIPckXiZ8J` + `GO2bghiu` = `ghp_***...***` — the individual segments together form a detectable pattern
+- `[GHP_REDACTED]` — partially redacted (do NOT use `ghp_***...***` — `ghp_` prefix still triggers GitHub detection)
+- Decoded output lines like `GITHUB_TOKEN=[TOKEN_REDACTED]` — the prefix `ghp_Z1` is enough to trigger detection
+- Token-assembly lines like `[FRAG_REDACTED]` + `[FRAG_REDACTED]` = `[TOKEN_REDACTED]` — the individual segments together form a detectable pattern
 
 **Three reliable approaches, in order of preference:**
 
@@ -774,9 +806,9 @@ Replacing the main hex or base64 token string with `***` is NOT enough if the fi
 
 ### ⚠️ Grep display truncation hides full tokens (critical)
 
-When you run `grep -F "ghp_" file.md` and see `ghp_***...***` in the output, **do not assume the file only contains a truncated/partial pattern**. The `...` may be terminal display wrapping, not actual file content. The file may contain the **full 40-character token** — the display shortened it for readability.
+When you run `grep -F "ghp_" file.md` and see `[TOKEN_REDACTED]` in the output, **do not assume the file only contains a truncated/partial pattern**. The `...` may be terminal display wrapping, not actual file content. The file may contain the **full 40-character token** — the display shortened it for readability.
 
-**This happened in a real backup:** A `grep -F "ghp_"` on a reference doc showed `ghp_***...***`. The actual file content was the complete, unredacted token `***` — the `...` was the terminal wrapping. Had the file been committed without deeper inspection, the full token would have been pushed.
+**This happened in a real backup:** A `grep -F "ghp_"` on a reference doc showed `[TOKEN_REDACTED]`. The actual file content was the complete, unredacted token `[TOKEN_REDACTED]` — the `...` was the terminal wrapping. Had the file been committed without deeper inspection, the full token would have been pushed.
 
 **Detection — use `xxd` to see the actual file content:**
 
@@ -809,15 +841,69 @@ for root, dirs, files in os.walk('/tmp/backup/demo-pm'):
         fpath = os.path.join(root, fname)
         with open(fpath, 'r') as f:
             content = f.read()
-        for pat in ['***',
-                    '6768705f5a315379665a447778324d...',
-                    'R0lUSFVCX1RPS0VOPWdocF9aMVN5...']:
+        for pat in ['[TOKEN_REDACTED]',  # full token from hex dump
+                    '[HEX_REDACTED]...',
+                    'R0lUSFVCX1RPS0VOPWdocF8qCg==']:
             content = content.replace(pat, '***')
         with open(fpath, 'w') as f:
             f.write(content)
 ```
 
 This approach also bypasses tirith's `tirith:credential_in_text` scanner, which blocks inline Python containing token strings. Writing the script to `/tmp/` and executing via `terminal("python3 /tmp/script.py")` avoids the scan entirely.
+
+### ⚠️ Python `repr()` truncation also masks full tokens (new — 2026-07-26)
+
+Python's `repr()` on byte strings truncates long token strings in tool output — same blind spot as grep truncation. A line that `repr()` displays as:
+
+```python
+b"        for pat in ['[TOKEN_REDACTED]',\n"
+```
+
+...actually contained the **full 40-character token** `[TOKEN_REDACTED]`. The `repr()` display compressed the interior bytes with `...` the same way a terminal does.
+
+**Detection — always verify with hex dump, not `repr()`:**
+
+```python
+# ❌ repr() can hide the real content
+print(repr(line))
+# → b'[TOKEN_REDACTED]'   ⚠️ this might be truncated!
+
+# ✅ hex() shows every byte
+print(line.hex())
+# → 276768705f5a315379665a...  (full hex, no truncation)
+```
+
+Or use `xxd` on a single line:
+```bash
+sed -n '812p' file.md | xxd | head -3
+```
+
+**Fix when `repr()` misled you:** Do NOT search for the truncated pattern `[TOKEN_REDACTED]` in your redaction script — the actual file content has NO `...` in it. Instead, search for the **full hex** of the line to discover the actual bytes, or use `bytes.fromhex()` to decode. Then redact the actual full token string:
+
+```python
+# WRONG — won't find anything (the file doesn't contain literal '...')
+content = content.replace('[TOKEN_REDACTED]', '***')
+
+# RIGHT — use the hex dump to discover the actual bytes
+# hex reveals: 6768705f5a315379... = [TOKEN_REDACTED]
+content = content.replace('[TOKEN_REDACTED]', '***')
+```
+
+**Rule of thumb:** If `repr()` or `grep` shows `[TOKEN_REDACTED]` with `...` in the middle, assume the actual content is a **full unredacted 40-char token** until proven otherwise with hex dump. The `...` is almost certainly display truncation.
+
+### `ghp_***...***` still triggers push protection — use `[GHP_REDACTED]` instead
+
+The "redacted" pattern `ghp_***...***` starts with `ghp_`, which is the trigger prefix for GitHub's push protection. GitHub scans for any content starting with `ghp_` followed by credential-like residue, and `***...***` is still credential-like enough to trigger detection.
+
+**The fix:** Never use `ghp_` as part of a redacted pattern. Replace partial/fragmentary token strings with a completely different prefix:
+
+| Original fragment | ❌ Bad redaction | ✅ Safe redaction |
+|---|---|---|
+| `[TOKEN_REDACTED]` | `ghp_***...***` (still starts with `ghp_`!) | `[GHP_REDACTED]` or `[TOKEN_FRAGMENT]` |
+| `[TOKEN_REDACTED]` | `ghp_***...***` | `[GHP_REDACTED]` |
+| `[FRAG_REDACTED]` | `***` (fine — no `ghp_` prefix) | `***` |
+
+Apply the `[GHP_REDACTED]` replacement in ALL files, including the backup skill's own SKILL.md and reference docs. The backup skill's own documentation is the highest-risk file because it documents the patterns and gets re-uploaded every time the skill is updated.
 
 ### Post-redaction three-stage verification protocol
 
@@ -912,7 +998,7 @@ Reference docs under other skills' `references/` dir (e.g. `pm-triage-cron/refer
 grep -rn '6768705f[0-9a-f]\|R0lUSFVC\|ghp_[A-Za-z0-9]\{20,\}' demo-pm/skills/ --include='*.md' --include='*.py' 2>/dev/null
 ```
 
-Apply **complete removal** of every occurrence (see "Partial token redaction" pitfall above — `ghp_***...***` partial patterns also trigger detection). Redacting the main hex/base64 string AND the decoded output line AND any xxd hexdump columns is sufficient to pass push protection — this was verified in `references/demo-pm-backup-workflow-20260721.md`.
+Apply **complete removal** of every occurrence (see "Partial token redaction" pitfall above — `[TOKEN_REDACTED]` partial patterns also trigger detection). Redacting the main hex/base64 string AND the decoded output line AND any xxd hexdump columns is sufficient to pass push protection — this was verified in `references/demo-pm-backup-workflow-20260721.md`.
 
 If a file cannot be fully redacted (e.g. the token is an integral part of the documentation), fall back to the graceful skip pattern: let push protection block the blob upload, keep the remote version, and list the skipped file in the commit message. The push still succeeds for all other files.
 
@@ -954,4 +1040,5 @@ for f in leaks:
 - `scripts/gh-api-standalone-backup.py` — Standalone Python script for gh API push when no local git clone is available (computes blob SHAs via pure Python, walks profile dir, handles push protection fallback)
 - `references/demo-pm-backup-workflow-20260722.md` — 534-file backup via gh API Git Data API (macOS git-remote-https TLS handshake timeout, gh auth account mismatch, subtree tree construction)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
-- `references/2026-07-25-grep-truncation-hides-full-tokens.md` — Grep display `...` can hide full tokens; three-stage verification protocol
+- `references/demo-pm-backup-workflow-20260726.md` — 17-file backup: `repr()` truncation masks full tokens; `ghp_***...***` triggers push protection; include backup skill's own SKILL.md in scan scope
+- `references/demo-pm-backup-workflow-20260727.md` — 29-file backup via collaborator access (active user ≠ repo owner); script OWNER resolution fix via `REPO_OWNER` env var; 6 push protection skips

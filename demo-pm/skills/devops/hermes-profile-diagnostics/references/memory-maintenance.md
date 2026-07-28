@@ -21,6 +21,24 @@ When the user says "archive old memories and optimize with hindsight," follow th
 
 **If no files are >30 days AND files are within char limits AND reflect reports nothing outdated → there is no archive/compaction work to do.** But if hindsight operations were actually performed (daemon started, reflect + consolidate ran, archive log updated), report those findings normally — `[SILENT]` is only for truly idle runs where nothing at all was done.
 
+### Extended Hindsight Outage — Escalation & Fallback
+
+When the hindsight daemon is unavailable (profile + global + all siblings down), the cron must decide whether to `[SILENT]` or produce a visible report. The rule:
+
+| Scenario | Deliverable |
+|----------|-------------|
+| Hindsight down ≤3 consecutive days, files all <30d | `[SILENT]` — transient blip, not worth reporting |
+| Hindsight down 4–13 consecutive days, files all <30d | `[SILENT]` — chronic but well-documented in ARCHIVE.md |
+| Hindsight down ≥14 consecutive days | **Visible report** — chronic condition has persisted past the standard check cadence and needs user awareness |
+| Hindsight down AND files approaching 30d threshold | Visible report — at-risk state (files will require archiving before hindsight returns) |
+| Hindsight finally recovers after extended outage | Visible report — "hindsight is back" signal, trigger full reflect + consolidate |
+
+**The ARCHIVE.md running log is the single source of truth** for counting consecutive outage days. After each run, read the last N entries to determine streak length. Do not store a counter in memory — rely on the persistent log.
+
+**No-sibling-available == full fallback to flat files.** When ALL known hindsight daemons are down (profile port, global :8888, AND any sibling from `ps aux | grep hindsight-api`), the cron cannot run reflect or consolidate. The fallback is: check file modification ages, check file character limits, update ARCHIVE.md, and decide `[SILENT]` vs visible report using the table above. The flat-file operations (read_file, patch, write_file) always work — they don't route through hindsight.
+
+**Successful archival events reset the counter.** If a run actually archives files (moves snapshots, compacts content), the outage counter resets to 0 — the cron did its job despite hindsight being down. Only consecutive runs where NOTHING was done (no archiving, no compaction, hindsight unreachable) count toward the escalation threshold.
+
 ## CLI-First Workflow (2026-07-22 Added — Preferred for Cron)
 
 The existing HTTP API workflow below works, but the **hindsight CLI** is significantly simpler for cron jobs. No curl, no endpoint discovery, no JSON payload construction. The CLI talks directly to the running hindsight daemon (using the same connection as the Hermes agent session).
