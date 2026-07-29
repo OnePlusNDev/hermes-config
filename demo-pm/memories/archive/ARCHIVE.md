@@ -1,7 +1,7 @@
 # ARCHIVE.md — demo-pm 记忆归档
 
-> 记忆清理时间: 2026-07-28
-> 清理工具: Hindsight v0.8.2（profile daemon :9178，已通过 HF_HUB_OFFLINE=1 绕过缓存校验）
+> 记忆清理时间: 2026-07-12
+> 清理工具: Hindsight v0.8.2（全局 API :8888）
 
 ---
 
@@ -31,5 +31,17 @@
 | 日期 | 操作 | 结果 |
 |------|------|------|
 | 2026-07-12 | 初始归档 + Hindsight consolidation/dedup | MEMORY.md -51% (3,241→1,578), USER.md -13% (1,398→1,215) |
-| 2026-07-13 ~ 07-27 | 15 天连续例行清理（已合并） | ✅ 期间所有日期均无 30+天文件级记忆需归档，MEMORY.md/USER.md 持续保持 < 30 天新鲜度；Hindsight bank 内 48 fact 虽创建于 06-14~06-17（41~44 天前），但均为持久活跃配置事实（Feishu/LLM/Gateway/Issue规则），非归档对象；Jul 25 后 Hindsight daemon 因 HF 模型下载被拒持续不可用，回退手动检查；session DB 会话自 06-22 起达 35d+ 但仍属历史非归档对象 |
-| 2026-07-28 | Hindsight reflect + consolidation + ARCHIVE.md 压缩 | ✅ 无 30+天内存文件需归档（MEMORY.md 16d / USER.md 16d 均新鲜）；Hindsight profile daemon :9178 重新启用（HF_HUB_OFFLINE=1 绕过缓存校验），bank reflect 确认 48 facts 均为活跃配置无需归档；consolidation 全部 completed 无待处理；ARCHIVE.md 压缩 15 天冗余日志（6,192→1,634 字符，-74%）；已记忆 HF_HUB_OFFLINE=1 工作流供后续使用 |
+| 2026-07-13 | Hindsight 尝试 | ⚠️ demo-pm hindsight daemon 未运行（API key 未配置）；全局 :8888 daemon 健康但属于 dev-01 银行，无法直接操作 demo-pm 记忆 |
+| 2026-07-14 | 例行检查 | ✅ 无 30+天数据；MEMORY.md(1d/1,578B)、USER.md(1d/1,215B) 均新鲜；字符数在限制内；state.db 1133 会话皆 <30d |
+| 2026-07-15 | 例行检查 + Hindsight reflect/consolidate | ✅ 无 30+天数据；MEMORY.md(2d/1,578B)、USER.md(2d/1,215B) 均新鲜且 < 字符限制；Hindsight hermes bank (20 facts) reflect 确认无过时内容，consolidation ✅ (op #74)；demo-tester bank (30 facts, last Jul 10) 健康；全局 :8888 daemon 运行中 |
+| 2026-07-16 | 例行检查 + Hindsight reflect/consolidate | ✅ 无 30+天数据；MEMORY.md(4d/1,578B)、USER.md(4d/1,215B) 均新鲜且 < 字符限制；Hindsight reflect 确认无冗余/过时内容 ✅；consolidation 无重复事实需合并 ✅；demo-pm hindsight daemon 未运行（9178），通过全局 :8888 API 执行；archive snapshots (Jul 10) 仅 6 天尚不需归档 |
+| 2026-07-17 | 深度清理 + Hindsight reflect/consolidate | ✅ 无 30+天数据；MEMORY.md(5d/1,578B)、USER.md(5d/1,215B) 均新鲜且 < 限制；Hindsight `demo-pm-memory` bank (54 facts, last Jul 7) reflect → 无超30天内容；consolidation ✅ (op已完成，无重复)；session DB (1,283 sessions, 首 Jun 22) 无 30d+ 会话；daemon 临时启动并停止 |
+| 2026-07-18 | 深度反射分析 + Hindsight reflect/consolidate | ✅ 无 30+天文件记忆（MEMORY.md 6d/USER.md 6d 均新鲜）；Hindsight bank 全量 reflect 分析通过（21 observations + 32 world + 1 experience，全部 31-34 天但为持久事实）；reflect 识别 ~10 组 observation↔world 冗余对及 7 条 Issue #9 碎片化记忆 → consolidation daemon (2 slots) 已在后台自动处理；daemon 已停止；默认 profile 记忆已合并至 profile 级，USER-20260617.bak (31d) 已在 archive 中 |
+| 2026-07-19 | 新建 Hindsight `demo-pm` bank + 完整数据摄入 + reflect/consolidate | ✅ 无 30+天数据；MEMORY.md(7d/1,578B)、USER.md(7d/1,578B) 均新鲜；Hindsight 全局 :8888 daemon 健康；新建 `demo-pm` bank 并完整摄入 MEMORY.md + USER.md → 28 memory units (14 obs + 10 exp + 4 world)，198 links (6 entity + 90 semantic + 102 temporal)；consolidation 全部 ✅ 完成无重复；无 30+天文件需归档 |
+| 2026-07-20 | 例行 reflect + consolidation | ✅ 无 30+天数据；MEMORY.md(8d/1,578B)、USER.md(8d/1,215B) 均新鲜且 < 字符限制；Hindsight `demo-pm` bank (28 facts, last Jul 19) reflect 确认全部最新 ✅；consolidation 已完成无新增 (op #9, deduplicated)；全局 :8888 daemon 健康 |
+| 2026-07-21 | 例行检查 + Hindsight reflect/consolidate | ✅ 无 30+天数据；MEMORY.md(9d/1,578B)、USER.md(9d/1,215B) 均新鲜且 < 字符限制；Hindsight `demo-pm` bank (28 facts, 14 obs+10 exp+4 world, 198 links) reflect ✅ 未发现过时或冗余内容；consolidation ✅ (op #10, completed)；全局 :8888 daemon 健康 |
+| 2026-07-22 | 全量 reflect + 归档检查 | ✅ 4 banks reflect 均通过，无过时/冗余/矛盾记忆；consolidation 已验证无待处理操作；demo-pm(28事实/198链接) hermes(38) demo-dev(38) demo-tester(24) 全部<30天；file-level MEMORY.md(10d/1,578B) USER.md(10d/1,215B) 均新鲜 |
+| 2026-07-24 | 例行清理 + Hindsight reflect/consolidate | ✅ 无 30+天文件（MEMORY.md 11d/1,578B, USER.md 11d/1,215B）；profile daemon :9178 首次可用（demo-pm-memory bank, 54 nodes, 0 pending/failed ops）；full reflect → 健康度 🟡 良好（1 歧义、1 未决、~12 组观察↔记忆冗余但 consolidation 已完成无待处理）；session DB 1632 会话自 06-22 起，首会话 ~32d 已达到归档条件 |
+| 2026-07-25 | 例行清理 + Hindsight reflect/consolidate | ✅ 无 30+天文件（MEMORY.md 13d/1,578B, USER.md 13d/1,215B 均新鲜）；Hindsight :9178 profile daemon 重启成功，reflect 确认 3 项已知过期配置（App Secret 10014、Scheduler 权限、FEISHU_ALLOW_ALL_USERS 失效），consolidation 均已完成；bank 48 memory units 全部 38-41d 但为活跃配置事实，非归档对象；file 级无 30+天数据需处理 |
+| 2026-07-26 | 例行清理 + Hindsight 不可用 | ✅ 无 30+天文件（MEMORY.md 14d/1,578B, USER.md 14d/1,215B 均新鲜）；Hindsight profile daemon :9178 启动失败（HF embedding 模型下载 `huggingface.co` 连接被拒）；回退手动检查：内容均新鲜无过期；session DB 1,732 会话自 06-22 起 34d，仍为会话历史非归档对象；file 级无 30+天数据需处理 |
+| 2026-07-27 | 例行清理 + Hindsight 不可用 | ✅ 无 30+天文件（MEMORY.md 15d/1,578B, USER.md 15d/1,215B 均新鲜）；双 daemon 均不可用：hermes(:8888) PG 迁移失败，demo-pm(:9178) HF 模型下载连接被拒；回退手动检查：内容均新鲜无过期；BGE 模型缓存存在但 daemon 无法通过 HF 下载校验；session DB ~1,800 会话自 06-22 起 35d，属会话历史非记忆归档对象；file 级无 30+天数据需归档 |

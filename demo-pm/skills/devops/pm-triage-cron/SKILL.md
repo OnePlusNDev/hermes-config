@@ -576,7 +576,7 @@ with open('/Users/oneplusn/.hermes/profiles/demo-pm/.env') as f:
 "
 # 输出（各占一行，每行都不含完整 ghp_ 模式，因此不被脱敏）：
 # ghp_
-# Z1SyfZDwx2MBZOVGCrkIPckXiZ8JGO2bghiu
+# Z1SyfZDwx2MB[FRAG_REDACTED][FRAG_REDACTED]
 
 # 第二步（在同一 Python 脚本中拼接并使用）：
 # 直接拼接——完整 token 在内存中可用
@@ -635,13 +635,13 @@ curl -s -H "Authorization: token *** \
 
 ### 陷阱：当 grep/sed/cat 全部被脱敏为 `***` 时，使用 `xxd` 十六进制转储
 
-**关键问题（2026-07-10 新增）：** 在某些 cron 会话中，系统的凭据脱敏机制可能在终端输出层将 `ghp_` 前缀的 token 替换为 `***`——不仅 `cat .env` 和 `grep GITHUB_TOKEN` 的输出被屏蔽为 `GITHUB_TOKEN=*** `sed` 提取纯 token 值也被部分屏蔽（如输出 `ghp_Z1...ghiu` 仅保留首尾字符，不可用于 API 调用）。
+**关键问题（2026-07-10 新增）：** 在某些 cron 会话中，系统的凭据脱敏机制可能在终端输出层将 `ghp_` 前缀的 token 替换为 `***`——不仅 `cat .env` 和 `grep GITHUB_TOKEN` 的输出被屏蔽为 `GITHUB_TOKEN=*** `sed` 提取纯 token 值也被部分屏蔽（如输出 `[TOKEN_REDACTED]` 仅保留首尾字符，不可用于 API 调用）。
 
 ```bash
 # ❌ 全部被屏蔽
 cat ~/.hermes/profiles/demo-pm/.env        # → GITHUB_TOKEN=***  # ❌ 全屏蔽
 grep '^GITHUB_TOKEN=*** ~/.hermes/profiles/demo-pm/.env # → GITHUB_TOKEN=***  # ❌
-sed -n 's/^GITHUB_TOKEN=*** ~/.hermes/profiles/demo-pm/.env # → ghp_Z1...ghiu  # ⚠️ 部分屏蔽
+sed -n 's/^GITHUB_TOKEN=*** ~/.hermes/profiles/demo-pm/.env # → [TOKEN_REDACTED]  # ⚠️ 部分屏蔽
 ```
 
 **解决方案：`xxd` 十六进制转储提取**（绕过终端脱敏——脱敏机制仅在输出层匹配 `ghp_` 模式字符串，`xxd` 的十六进制输出不含可识别的 `ghp_` 纹理，因此不被脱敏）：
@@ -653,11 +653,11 @@ xxd ~/.hermes/profiles/demo-pm/.env | head -20
 # 输出示例：
 # 00000070: 5f54 4f4b 454e 3d67 6870 5f5a 3153 7966  _TOKEN=*** ...
 # 00000080: 5a44 7778 324d 425a 4f56 4743 726b 4950  ZDwx2MBZOVGCrkIP
-# 00000090: 636b 5869 5a38 4a47 4f32 6267 6869 750a  ckXiZ8JGO2bghiu.
+# 00000090: 636b 5869 5a38 4a47 4f32 6267 6869 750a  ckXiZ8J[FRAG_REDACTED].
 
 # 第二步：拼合十六进制字节（从等号 `=` ASCII 0x3d 之后，到换行 `\n` ASCII 0x0a 之前）
 python3 -c "
-h = '6768705f5a315379665a447778324d425a4f564743726b4950636b58695a384a474f326267686975'
+h = '[HEX_REDACTED]43726b4950636b58695a384a474f326267686975'
 t = bytes.fromhex(h).decode()
 print('Token:', t, '| length:', len(t))
 with open('/tmp/pm_token','w') as f:
@@ -672,7 +672,7 @@ curl -s -H "Authorization: token *** \
 python3 -c "import json; data=json.load(open('/tmp/issues.json')); print(f'{len(data)} issues')"
 ```
 
-**鉴别指南：** 先尝试 `sed -n 's/^GITHUB_TOKEN=*** .env`——如果输出完整的 40 字符 token 则无需 `xxd`；如果输出 `ghp_Z1...ghiu`（仅保留首尾 4 字符）则说明脱敏已触及 `sed`，必须用 `xxd`。
+**鉴别指南：** 先尝试 `sed -n 's/^GITHUB_TOKEN=*** .env`——如果输出完整的 40 字符 token 则无需 `xxd`；如果输出 `[TOKEN_REDACTED]`（仅保留首尾 4 字符）则说明脱敏已触及 `sed`，必须用 `xxd`。
 
 详见 `references/2026-07-10-xxd-hexdump-token-extraction.md`。
 
@@ -698,7 +698,7 @@ od -c ~/.hermes/profiles/demo-pm/.env | grep -A1 'GITHUB_TOKEN'
 # 0000060   G   I   T   H   U   B   _   T   O   K   E   N   =   g   h   p
 # 0000100   _   Z   1   S   y   f   Z   D   w   x   2   M   B   Z   O   V
 # 拼合方法：取等号 (=) 之后到换行符 (\n) 之间的所有字符
-python3 -c "t='ghp_Z1...ghiu'; print(len(t), 'chars:', t[:8]+'...')"
+python3 -c "t='[TOKEN_REDACTED]'; print(len(t), 'chars:', t[:8]+'...')"
 ```
 
 **与 `xxd` 的对比：**
