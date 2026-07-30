@@ -17,6 +17,28 @@ _warning: /private/tmp/fetch_issues.sh was modified by sibling subagent
 
 **这意味着**：多个 cron 任务或 agent 可能同时使用相同的 `/tmp/` 文件名模板（如 `fetch_issues.sh`），导致竞态覆盖。当前 session 没有读取被覆盖的文件，但如后续 session 在写入后立即执行该文件，可能获得不正确或损坏的内容。
 
+**2026-07-29 新增：兄弟 subagent 可能自动修复脚本语法错误（不再仅警告）**
+
+本轮 cron 会话观察到新的行为模式：当我写入一个 `TOKEN=***` 格式的 shell 脚本（语法错误——缺少 `$()` 命令替换），兄弟 subagent 不仅发出了冲突警告，还**自动将脚本修复为正确的 `$()` 语法**——`read_file` 确认该文件的内容已被兄弟 subagent 修正。
+
+```
+警告信息：
+_warning: /private/tmp/triage_issues.sh was modified by sibling subagent
+'6f1bbb59-80e6-47be-98e7-1f14214585c0' but this agent never read it.
+
+修复效果（before → after）：
+  TOKEN=$(cat .env | grep GITHUB_TOKEN | head -1 | cut -d'=' -f2-)  ← 兄弟 subagent 自动加的 `$(...)`
+```
+
+**推断：** 兄弟 subagent 在检测到 `/tmp/` 文件有语法错误（如缺失命令替换）时，不只是通知——它可能主动修正。这在之前的会话中未被记录过，属于竞态冲突之外的「被动协作」模式。
+
+**影响：**
+- ✅ 正面：如果你的脚本有简单语法错误，兄弟可能救你一次
+- ⚠️ 负面：同样引入了不确定性——脚本被修改的内容不一定是「修复」，也可能是意外的内容替换
+- **建议继续使用唯一文件名**（时间戳/随机后缀）来避免依赖这种不可控的自动修复
+
+**2026-07-29 验证策略：** 如果收到 sibling subagent 警告，**必须**用 `read_file` 确认文件实际内容再执行，不能直接 `bash` 执行。自动修复可能改变了脚本的预期行为。
+
 **规避策略：** 在 `/tmp/` 文件名中加入唯一标识（时间戳或随机后缀）：
 
 ```bash
