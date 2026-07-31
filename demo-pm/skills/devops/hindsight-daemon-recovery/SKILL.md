@@ -13,11 +13,48 @@ Hindsight daemon fails to start because HuggingFace model download validation ti
 - When `huggingface.co` is unreachable (network issue, rate limit), these requests timeout and retry (5 retries, 1s-16s backoff = ~31s per model)
 - The daemon blocks startup until all model verifications pass
 
-## Solution: HF_HUB_OFFLINE=1
-Set this environment variable to skip remote validation and use cached models directly:
+## Solution: HF_HUB_OFFLINE=1 + Correct Python Environment
+
+Set `HF_HUB_OFFLINE=1` to skip remote validation and use cached models directly. **Use `hindsight-embed` from the hermes-agent venv** — the uv-managed binary may lack the tiktoken BPE cache and fail with SSL errors before it even reaches HF model validation:
 
 ```bash
-HF_HUB_OFFLINE=1 hindsight-embed -p <profile_name> daemon start
+# ✅ Correct: use hermes-agent venv's hindsight-embed
+~/.hermes/hermes-agent/venv/bin/hindsight-embed -p <profile_name> daemon start
+```
+
+```bash
+# ❌ May fail: uv-managed binary (tiktoken BPE SSL download)
+/Users/oneplusn/.cache/uv/archive-v0/.../bin/hindsight-embed daemon start
+# → [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred — can't download cl100k_base
+```
+
+### Step 0 — Verify the env file has a real API key
+
+The env file at `~/.hindsight/profiles/<profile>.env` may be a template with `***` as placeholder. Check before starting:
+
+```bash
+grep HINDSIGHT_API_LLM_API_KEY ~/.hindsight/profiles/<profile>.env
+# → If output is `HINDSIGHT_API_LLM_API_KEY=***` → the file is a template, not configured!
+# → The actual key must be filled in from a working profile's env file
+```
+
+To fix a template env file, copy env vars from a profile that works (e.g. `hermes`):
+
+```bash
+# Copy hermes env as base, then adjust port and model
+cp ~/.hindsight/profiles/hermes.env ~/.hindsight/profiles/<profile>.env
+sed -i '' 's/HINDSIGHT_API_PORT=9177/HINDSIGHT_API_PORT=<desired_port>/' ~/.hindsight/profiles/<profile>.env
+sed -i '' 's/HINDSIGHT_API_LLM_MODEL=glm-4-flash/HINDSIGHT_API_LLM_MODEL=<desired_model>/' ~/.hindsight/profiles/<profile>.env
+```
+
+### Step 1 — Source env vars and start
+
+The port is read from the env file's `HINDSIGHT_API_PORT`, NOT from a CLI argument. `hindsight-embed daemon start` does NOT accept `--port`:
+
+```bash
+# Source env vars then start
+env $(cat ~/.hindsight/profiles/<profile>.env | grep -v "^#" | xargs) \
+  ~/.hermes/hermes-agent/venv/bin/hindsight-embed daemon start
 ```
 
 ## Verifying Cached Models
@@ -50,3 +87,5 @@ hindsight -p <name> memory reflect <bank_id> <prompt>
 - Daemon startup can take 30-60s depending on model loading; use `terminal(background=true)` + poll
 - After the daemon starts with `HF_HUB_OFFLINE=1`, it runs normally until stopped or idle-timeout
 - The `hindsight-embed daemon stop` command may report "not running" even when the daemon is active — check with `ps aux | grep hindsight-api` for confidence
+- **Two-stage startup failure**: The daemon may fail in TWO successive stages — first tiktoken BPE SSL download (fails before HF check), then HuggingFace model timeout (fails during model init). The `HF_HUB_OFFLINE=1` fix only addresses stage 2. For stage 1, use the hermes-agent venv's hindsight-embed binary (it has cl100k_base cached) rather than the uv-managed one.
+- **Env file may be a template**: Check `HINDSIGHT_API_LLM_API_KEY` in the env file — if it shows `***`, the file was never configured. Copy from a working profile's env (see Step 0 above).

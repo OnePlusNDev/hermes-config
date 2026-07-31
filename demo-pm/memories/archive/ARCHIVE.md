@@ -32,4 +32,5 @@
 |------|------|------|
 | 2026-07-12 | 初始归档 + Hindsight consolidation/dedup | MEMORY.md -51% (3,241→1,578), USER.md -13% (1,398→1,215) |
 | 2026-07-13 ~ 07-27 | 15 天连续例行清理（已合并） | ✅ 期间所有日期均无 30+天文件级记忆需归档，MEMORY.md/USER.md 持续保持 < 30 天新鲜度；Hindsight bank 内 48 fact 虽创建于 06-14~06-17（41~44 天前），但均为持久活跃配置事实（Feishu/LLM/Gateway/Issue规则），非归档对象；Jul 25 后 Hindsight daemon 因 HF 模型下载被拒持续不可用，回退手动检查；session DB 会话自 06-22 起达 35d+ 但仍属历史非归档对象 |
-| 2026-07-28 | Hindsight reflect + consolidation + ARCHIVE.md 压缩 | ✅ 无 30+天内存文件需归档（MEMORY.md 16d / USER.md 16d 均新鲜）；Hindsight profile daemon :9178 重新启用（HF_HUB_OFFLINE=1 绕过缓存校验），bank reflect 确认 48 facts 均为活跃配置无需归档；consolidation 全部 completed 无待处理；ARCHIVE.md 压缩 15 天冗余日志（6,192→1,634 字符，-74%）；已记忆 HF_HUB_OFFLINE=1 工作流供后续使用 |
+|| 2026-07-28 | Hindsight reflect + consolidation + ARCHIVE.md 压缩 | ✅ 无 30+天内存文件需归档（MEMORY.md 16d / USER.md 16d 均新鲜）；Hindsight profile daemon :9178 重新启用（HF_HUB_OFFLINE=1 绕过缓存校验），bank reflect 确认 48 facts 均为活跃配置无需归档；consolidation 全部 completed 无待处理；ARCHIVE.md 压缩 15 天冗余日志（6,192→1,634 字符，-74%）；已记忆 HF_HUB_OFFLINE=1 工作流供后续使用 |
+| 2026-07-30 | 手动清理（Hindsight daemon 不可用：HF 下载超时 + tiktoken SSL） | ✅ 无 30+天内存文件需归档（MEMORY.md 18d / USER.md 18d 均新鲜）；归档 3 个 32d 旧 session dump（已移入 archive/sessions/）；Hindsight daemon 无法启动：HF 模型下载超时（中国网络限制）+ tiktoken BPE 缓存缺失 + demo-pm.env 原为模板（API key=***），已修复 env 但 daemon 仍因 HF 连通性无法启动 |
