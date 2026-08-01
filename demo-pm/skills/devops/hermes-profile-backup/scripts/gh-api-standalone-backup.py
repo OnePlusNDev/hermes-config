@@ -54,10 +54,11 @@ EXCLUDE_NAMES = {
     "state.db", "state.db-shm", "state.db-wal",
     ".hermes_history", "interrupt_debug.log", "processes.json",
     ".update_check", ".skills_prompt_snapshot.json",
-    "triage_check.py", "cron_triage.py",
+    "triage_check.py", "cron_triage.py", "triage_issues.py",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
     ".bundled_manifest", ".curator_state",
+    "response_store.db", "feishu_seen_message_ids.json",
     # NOTE: reference files with encoded tokens should be pre-scanned and
     # redacted before backup (see SKILL.md: push protection pitfalls).
     # The graceful fallback below handles any that slip through.
@@ -70,7 +71,7 @@ EXCLUDE_DIRS = {
     "lsp",
     ".hub", ".curator_backups", ".curator_state",
 }
-EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "memory_backup_"}
+EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "memory_backup_", "._"}
 CRON_EXCLUDE = {".jobs.lock", ".tick.lock", "ticker_heartbeat", "ticker_last_success"}
 
 def git_blob_hash(filepath):

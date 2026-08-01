@@ -21,9 +21,9 @@ base64 -i ~/.hermes/profiles/demo-pm/.env
 ```
 
 提取到的 GITHUB_TOKEN 行 base64 片段：
-`[B64_REDACTED]`
+`[TOKEN_B64_REDACTED]`
 
-解码：`GITHUB_TOKEN=[TOKEN_REDACTED]`
+解码：`GITHUB_TOKEN=[GHP_REDACTED]`
 
 token 长度：40 字符（ghp_ + 36 字符 hex），classic PAT。
 

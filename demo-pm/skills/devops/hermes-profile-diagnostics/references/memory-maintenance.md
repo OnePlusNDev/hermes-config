@@ -45,6 +45,13 @@ The existing HTTP API workflow below works, but the **hindsight CLI** is signifi
 
 **Prerequisites:** The `hindsight` CLI tool must be on `PATH` (installed at `~/.local/bin/hindsight`). It auto-discovers the daemon API URL from the environment or current profile's config. No port, bank_id, or endpoint paths needed.
 
+**⚠️ Pitfall — the `hindsight` CLI defaults to `http://localhost:8888`, NOT the profile daemon.** Newer CLI builds default to the global API and return `✗ API server error (500)` against the local profile daemon when :8888 is down. Fix: point it at the profile daemon with the env var:
+
+```bash
+export HINDSIGHT_API_URL=http://localhost:9178   # <profile's port>
+hindsight memory list --limit 100 -o json <bank_id>
+```
+
 ### Step 3a (CLI) — List and Inspect Memories
 
 ```bash
@@ -195,9 +202,9 @@ for f in ~/.hermes/memories/*.md ~/.hermes/profiles/<profile>/memories/*.md; do
 done
 
 # Clean up old sessions via CLI (more reliable than raw sqlite3)
-hermes sessions prune --older-than 30d
-# Or dry-run first:
-hermes sessions prune --older-than 30d --dry-run
+hermes sessions prune --older-than 30
+# NOTE: --older-than takes an INT (days), NOT a '30d' suffix (that errors: invalid int value)
+# No --dry-run flag exists in current versions — inspect via SQL first, then prune with --yes
 ```
 
 Use `hermes memory status` to determine the active provider. If hindsight is NOT the provider, the Hindsight API endpoints below won't apply — the memory lives either in built-in files or a different backend.

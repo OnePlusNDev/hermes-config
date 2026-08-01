@@ -33,7 +33,7 @@ gh repo view demo-oneplusn/demo-workflow --json name,owner
 
 **完整链路：**
 
-1. 使用 `openssl base64` 解码 `.env` → 成功提取到完整 token `[TOKEN_REDACTED]`
+1. 使用 `openssl base64` 解码 `.env` → 成功提取到完整 token `[GHP_REDACTED]`
 2. 尝试在 `terminal()` 中使用 curl 调用 GitHub API：
    ```bash
    curl -s -H "Authorization: token ghp_Z1SyfZD..." "https://api.github.com/..."
