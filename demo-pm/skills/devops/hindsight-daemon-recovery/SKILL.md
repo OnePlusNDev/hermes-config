@@ -49,13 +49,30 @@ sed -i '' 's/HINDSIGHT_API_LLM_MODEL=glm-4-flash/HINDSIGHT_API_LLM_MODEL=<desire
 
 ### Step 1 — Source env vars and start
 
-The port is read from the env file's `HINDSIGHT_API_PORT`, NOT from a CLI argument. `hindsight-embed daemon start` does NOT accept `--port`:
+**⚠️ ALWAYS pass `-p <profile>`.** `hindsight-embed daemon start` does NOT accept `--port`, but the actual port comes from the PROFILE registration (selected via `-p`), NOT from `HINDSIGHT_API_PORT` in the env file. Observed failure (2026-08-01): sourced demo-pm.env (which contains `HINDSIGHT_API_PORT=9178`) but ran `daemon start` WITHOUT `-p` → daemon booted on :8888 (default/global profile), printed "✓ Daemon started successfully!", then the wrapper exited and the daemon crashed — no listener on 8888 OR 9178. Correct:
 
 ```bash
-# Source env vars then start
+# Source env vars then start — -p <profile> is REQUIRED, not optional
 env $(cat ~/.hindsight/profiles/<profile>.env | grep -v "^#" | xargs) \
-  ~/.hermes/hermes-agent/venv/bin/hindsight-embed daemon start
+  ~/.hermes/hermes-agent/venv/bin/hindsight-embed -p <profile> daemon start
 ```
+
+Pre-flight ground truth — check the profile's registered port and whether a daemon is already running:
+
+```bash
+hindsight-embed profile list -o json   # per-profile: port, daemon_running (bool)
+```
+
+### Step 1b — Verify AFTER the banner, on the PROFILE's port
+
+**⚠️ "Daemon started successfully!" is NOT proof the daemon survived.** The wrapper can print the banner and exit while the daemon dies shortly after (wrong port, crash). Never trust the banner — verify the listener and health on the profile's own port:
+
+```bash
+lsof -i :<profile_port>                # demo-pm = 9178; must show a LISTEN entry
+curl -s http://127.0.0.1:<profile_port>/health   # {"status":"healthy","database":"connected"}
+```
+
+Only after both pass is the daemon actually usable. PG init can still take 30-60s after the listener appears.
 
 ## Verifying Cached Models
 Both required models must be fully downloaded:
