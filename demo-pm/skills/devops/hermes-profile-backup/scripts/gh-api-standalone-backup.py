@@ -248,14 +248,17 @@ for repo_path, full_path in all_to_upload:
     print(f"    BLOB {repo_path}: {result['sha'][:12]}")
 
 # ── Step 5: Copy unchanged ─────────────────────
+# CRITICAL: copy ALL remote entries (not just PROFILE/ + .gitignore).
+# A prior version only copied f"{PROFILE}/" and ".gitignore", which DELETED
+# every other profile directory (demo-dev, demo-tester) from the repo tree
+# (2026-08-02 incident: 526 files lost, restored via repair commit).
 unchanged = 0
 for path, entry in remote_blob_map.items():
     if path in added_paths:
         continue
-    if path.startswith(f"{PROFILE}/") or path == ".gitignore":
-        if path not in deleted:
-            add_entry(path, entry["mode"], entry["type"], entry["sha"])
-            unchanged += 1
+    if path not in deleted:
+        add_entry(path, entry["mode"], entry["type"], entry["sha"])
+        unchanged += 1
 print(f"  {unchanged} unchanged merged")
 
 # ── Step 6: Create tree ────────────────────────
