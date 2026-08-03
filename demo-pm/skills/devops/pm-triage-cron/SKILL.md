@@ -579,7 +579,7 @@ m = re.search(r'^GITHUB_TOKEN=* content, re.MULTILINE)
 base64 -i ~/.hermes/profiles/demo-pm/.env
 
 # 输出样本（base64 不触发脱敏——输出不含 ghp_ 模式串）：
-# R0lUSFVCX1RPS0VOPWdocF9a...YmdoaXUK
+# [BASE64_REDACTED]
 
 # 第二步：用 Python 解码并提取 token
 # 复制 GITHUB_TOKEN 行对应的 base64 片段，然后：
@@ -689,12 +689,12 @@ xxd ~/.hermes/profiles/demo-pm/.env | head -20
 
 # 输出示例：
 # 00000070: 5f54 4f4b 454e 3d67 6870 5f5a 3153 7966  _TOKEN=*** ...
-# 00000080: 5a44 7778 324d 425a 4f56 4743 726b 4950  ZDwx2MBZOVGCrkIP
-# 00000090: 636b 5869 5a38 4a47 4f32 6267 6869 750a  ckXiZ8JGO2bghiu.
+# 00000080: 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a  ****************
+# 00000090: 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a 2a2a  ****************
 
 # 第二步：拼合十六进制字节（从等号 `=` ASCII 0x3d 之后，到换行 `\n` ASCII 0x0a 之前）
 python3 -c "
-h = '6768705f5a315379665a447778324d425a4f564743726b4950636b58695a384a474f326267686975'
+h = '***'
 t = bytes.fromhex(h).decode()
 print('Token:', t, '| length:', len(t))
 with open('/tmp/pm_token','w') as f:
