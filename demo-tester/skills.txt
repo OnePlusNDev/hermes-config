@@ -32,6 +32,7 @@
 │ touchdesigner-mcp       │ creative             │ builtin │ builtin │ enabled │
 │ jupyter-live-kernel     │ data-science         │ builtin │ builtin │ enabled │
 │ hermes-profile-diagnos… │ devops               │ local   │ local   │ enabled │
+│ hermes-profile-github-… │ devops               │ local   │ local   │ enabled │
 │ hindsight-memory-maint… │ devops               │ local   │ local   │ enabled │
 │ himalaya                │ email                │ builtin │ builtin │ enabled │
 │ codebase-inspection     │ github               │ builtin │ builtin │ enabled │
@@ -78,5 +79,5 @@
 │ test-driven-development │ software-development │ builtin │ builtin │ enabled │
 │ code-verification       │ testing              │ local   │ local   │ enabled │
 └─────────────────────────┴──────────────────────┴─────────┴─────────┴─────────┘
-0 hub-installed, 67 builtin, 8 local — 75 enabled, 0 disabled
+0 hub-installed, 67 builtin, 9 local — 76 enabled, 0 disabled
 
