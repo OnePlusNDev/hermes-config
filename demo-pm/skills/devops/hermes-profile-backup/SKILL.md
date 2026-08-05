@@ -415,6 +415,24 @@ git push origin main
 
 Run the check immediately before `git push`, not just at the start of the run. The repo-local credential helper (Approach B) is still worth setting for stale-cache cases, but `gh auth switch` is the reliable fix when the active account itself is wrong.
 
+### GITHUB_TOKEN env var overrides `gh auth switch` (cron environment)
+
+Verified 2026-08-05: in cron mode the environment has `GITHUB_TOKEN` set, and `gh auth switch --user <owner>` fails silently — `gh api user` still returns the env-var account. Symptom: blob upload returns HTTP 404 even though the keyring has the repo owner logged in.
+
+```bash
+# ❌ switch has no effect while GITHUB_TOKEN is set
+gh auth switch --user OnePlusNDev   # prints "using GITHUB_TOKEN env for auth" warning
+gh api user --jq '.login'           # still returns the env-var account
+
+# ✅ clear the env var first, then switch
+unset GITHUB_TOKEN
+gh auth switch --user OnePlusNDev
+gh api user --jq '.login'           # now OnePlusNDev
+gh api repos/$OWNER/hermes-config --jq '.permissions.push'  # true = can push
+```
+
+Also: a collaborator account can LOSE write access between runs (OnePlusNPM had push access in 2026-07-27, read-only by 2026-08-05). Check `gh api repos/$OWNER/$REPO --jq '.permissions.push'` before choosing the account — don't assume collaborator access persists.
+
 ### `timeout` command not available on macOS
 
 The `timeout` command (from GNU coreutils) is **not** available on macOS by default. When the SKILL.md shows `timeout 60 git push`, replace it with the terminal's built-in timeout parameter instead:
