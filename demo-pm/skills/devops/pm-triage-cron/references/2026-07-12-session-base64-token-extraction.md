@@ -21,7 +21,7 @@ base64 -i ~/.hermes/profiles/demo-pm/.env
 ```
 
 提取到的 GITHUB_TOKEN 行 base64 片段：
-`[TOKEN_B64_REDACTED]`
+`[BASE64_REDACTED]`
 
 解码：`GITHUB_TOKEN=[GHP_REDACTED]`
 

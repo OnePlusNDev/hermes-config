@@ -63,6 +63,20 @@ Pre-flight ground truth — check the profile's registered port and whether a da
 hindsight-embed profile list -o json   # per-profile: port, daemon_running (bool)
 ```
 
+**Cleaner variant — start via a launcher script file (cron-safe, no key on the command line).** Instead of interpolating env vars into the shell command, write a small script and run it with `terminal(background=true)`:
+
+```bash
+#!/bin/bash
+set -e
+export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT=86400
+set -a
+. <(grep -v '^#' ~/.hindsight/profiles/<profile>.env | grep -v '^$')
+set +a
+exec ~/.hermes/hermes-agent/venv/bin/hindsight-embed -p <profile> daemon start
+```
+
+Process-substitution sourcing reads the real API key from the file at runtime — the key never appears in the shell command string, so terminal `***` masking can't corrupt it (the `env $(cat ... | xargs)` inline variant puts the key into argv, which the terminal tool may mask). Verified 2026-08-03: demo-pm daemon healthy on :9178 ~10s after launch with this pattern.
+
 ### Step 1b — Verify AFTER the banner, on the PROFILE's port
 
 **⚠️ "Daemon started successfully!" is NOT proof the daemon survived.** The wrapper can print the banner and exit while the daemon dies shortly after (wrong port, crash). Never trust the banner — verify the listener and health on the profile's own port:

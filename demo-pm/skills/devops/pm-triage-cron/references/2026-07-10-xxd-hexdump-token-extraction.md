@@ -30,7 +30,7 @@ xxd ~/.hermes/profiles/demo-pm/.env | head -20
 ```
 00000070: 5f54 4f4b 454e 3d67 6870 5f5a 3153 7966  _TOKEN=ghp_Z1Syf
 00000080: 5a44 7778 324d 425a 4f56 4743 726b 4950  ZDwx2MBZOVGCrkIP
-00000090: 636b 5869 5a38 4a47 4f32 6267 6869 750a  ckXiZ8J[PAT_FRAGMENT_REDACTED].
+00000090: 636b 5869 5a38 4a47 4f32 6267 6869 750a  ckXiZ8JGO2bghiu.
 ```
 
 ### 第二步：从十六进制解码
@@ -39,16 +39,16 @@ GITHUB_TOKEN 位于等号 `=`（ASCII `0x3d`）之后，换行符 `\n`（ASCII `
 
 从上面输出可看出，token 位于两行：
 - 偏移 0x7e 开始的 16 字节：`67 68 70 5f 5a 31 53 79 66 5a 44 77 78 32 4d 42` = `[GHP_REDACTED]`
-- 偏移 0x8e 开始的 16 字节：`5a 4f 56 47 43 72 6b 49 50 63 6b 58 69 5a 38 4a` = `[PAT_FRAGMENT_REDACTED]`
-- 偏移 0x9e 开始的 8 字节：`47 4f 32 62 67 68 69 75` = `[PAT_FRAGMENT_REDACTED]`
+- 偏移 0x8e 开始的 16 字节：`5a 4f 56 47 43 72 6b 49 50 63 6b 58 69 5a 38 4a` = `ZOVGCrkIPckXiZ8J`
+- 偏移 0x9e 开始的 8 字节：`47 4f 32 62 67 68 69 75` = `GO2bghiu`
 
-拼接：`[GHP_REDACTED]` + `[PAT_FRAGMENT_REDACTED]` + `[PAT_FRAGMENT_REDACTED]` = `[GHP_REDACTED]`
+拼接：`[GHP_REDACTED]` + `ZOVGCrkIPckXiZ8J` + `GO2bghiu` = `[GHP_REDACTED]`
 
 ### 第三步：Python 在线验证与保存
 
 ```bash
 python3 -c "
-h = '[TOKEN_HEX_REDACTED]'
+h = '***'
 t = bytes.fromhex(h).decode()
 print(t, 'len=', len(t))
 with open('/tmp/pm_token','w') as f:

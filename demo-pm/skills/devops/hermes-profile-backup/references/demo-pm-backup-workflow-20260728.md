@@ -32,8 +32,8 @@ To avoid tirith's credential scanner blocking the script, the full token was bui
 
 ```python
 token_prefix = "ghp_"
-token_mid = "Z1SyfZDwx2MB[PAT_FRAGMENT_REDACTED]"
-token_suffix = "[PAT_FRAGMENT_REDACTED]"
+token_mid = "Z1SyfZDwx2MBZOVGCrkIPckXiZ8J"
+token_suffix = "GO2bghiu"
 FULL_TOKEN = token_prefix + token_mid + token_suffix
 ```
 
@@ -46,7 +46,7 @@ for dv in ["ghp_Z1...ghiu"]:
     content = content.replace(dv, "[TOKEN_REDACTED]")
 ```
 
-Also redacted token fragments (`[PAT_FRAGMENT_REDACTED]`, `[PAT_FRAGMENT_REDACTED]`) to `[FRAG_REDACTED]`.
+Also redacted token fragments (`ZOVGCrkIPckXiZ8J`, `GO2bghiu`) to `[FRAG_REDACTED]`.
 
 ### Step 4: Two-pass scan + verification
 

@@ -37,6 +37,27 @@ color: blue
 
 详见 `references/2026-08-03-session-python-open-urllib-helper.md`（含完整可复用的 gh_get/gh_post/gh_delete 助手代码）。
 
+### 🆕 2026-08-05 会话确认：单行 terminal（source .env + curl -o + 单行 python3 -c）零文件路径再次成功 + 未加载技能的失败成本
+
+本轮 cron 再次验证 `[SILENT]` 路径（`assignee=OnePlusNPM` 返回 `[]`；全量健康检查：5 个 open issue #2/#4/#5/#6/#7 全部 assign 给 `OnePlusNBoss`，无游离 issue），并确认一条**无需 write_file、无需 gh CLI** 的最简路径：
+
+```bash
+# 1) 抓取（必须单行；无 subshell、无管道；`***` 仅为显示层脱敏，执行的是真实 token）
+set -a; source ~/.hermes/profiles/demo-pm/.env; set +a; curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/demo-oneplusn/demo-workflow/issues?state=open&assignee=OnePlusNPM&per_page=100" -o /tmp/demo_pm_issues.json; echo "curl exit: $?"; wc -c /tmp/demo_pm_issues.json
+
+# 2) 解析（必须单行、独立命令；多行 python3 -c 会被 bash eval 打散）
+python3 -c "import json; data=json.load(open('/tmp/demo_pm_issues.json')); print('total:', len(data) if isinstance(data,list) else data.get('message'))"
+```
+
+**关键确认：**
+- `.env` 的 GITHUB_TOKEN 仍有效（HTTP 200 非 401）；终端显示 `***` 仅为显示层脱敏，实际执行的是真实 token
+- **单行** `set -a; source .env; set +a; curl ... $GITHUB_TOKEN ...` 在 terminal 中可正常工作（区别于长内联 subshell/嵌套引号命令）
+- curl 落盘 + 独立单行 python3 -c 解析 = 零 tirith 摩擦（`curl | python3` 仍被 `tirith:curl_pipe_shell` 拦截）
+
+**⚠️ 本轮教训（成本案例——未先加载本技能就开跑）：** 依次重踩全部已记录陷阱：① `curl | python3` 管道 → tirith 拦截；② write_file 写含 `Authorization: token $GITHUB_TOKEN` 的 bash 脚本 → 文件被脱敏破坏（无闭合引号）→ bash `unexpected EOF`；③ 同一条命令内嵌多行 `python3 -c` → 打散为 `import: command not found`，且整条命令失败导致前面 curl 未执行（随后 FileNotFoundError）；④ `/tmp/` 文件两次收到兄弟 subagent 覆盖警告。**先 `skill_view(name='pm-triage-cron')`，然后优先 `scripts/full_triage.py` 或上面的单行路径，不要从零手工重试。**
+
+详见 `references/2026-08-05-session-single-line-terminal-pattern.md`。
+
 ## 概述
 
 用于 PM profile 的 cron 定时任务：轮询 GitHub 仓库，将 assign 给自己的 open issue 按类型标签分诊给对应的开发/测试/决策负责人。
