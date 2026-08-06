@@ -93,7 +93,7 @@ def gh_delete_assignees(url, assignees, token):
 
 
 def classify_issue(issue):
-    """Determine issue type and target assignee. Returns (type, assignee, reason)."""
+    """Determine issue type and target assignee. Returns (type, assignee, size, reason)."""
     labels = [l["name"] for l in issue.get("labels", [])]
     title = issue.get("title", "")
     body = issue.get("body", "") or ""
@@ -101,24 +101,44 @@ def classify_issue(issue):
 
     type_label = next((l for l in labels if l.startswith("type:")), None)
 
+    # 规模评估：按正文长度粗分（小/中/大）
+    body_len = len(body)
+    if body_len >= 800:
+        size = "大（正文较长，涉及内容较多）"
+    elif body_len >= 200:
+        size = "中"
+    else:
+        size = "小"
+
+    # 意图识别优先级 1：type 标签最优先
+    if type_label in ("type:feature", "type:bug"):
+        return ("feature/bug", ASSIGNEE_MAP["dev"], size,
+                "此问题带有开发类型标签，涉及开发实现或缺陷修复，需要开发工程师处理")
+    if type_label == "type:verification":
+        return ("verification", ASSIGNEE_MAP["test"], size,
+                "此问题带有验证类型标签，涉及测试验证或代码审查，需要测试工程师处理")
+    if type_label in ("type:research", "type:docs"):
+        return ("research/docs", ASSIGNEE_MAP["boss"], size,
+                "此问题带有调研/文档类型标签，暂交老板判断")
+
+    # 意图识别优先级 2：无 type 标签时用标题/正文关键词
     has_dev = any(k in combined for k in DEV_KEYWORDS)
     has_test = any(k in combined for k in TEST_KEYWORDS)
     has_doc = any(k in combined for k in DOC_KEYWORDS)
     has_research = any(k in combined for k in RESEARCH_KEYWORDS)
 
-    if type_label in ("type:feature", "type:bug") or has_dev:
-        return ("feature/bug", ASSIGNEE_MAP["dev"],
-                "此问题涉及开发实现或缺陷修复，需要开发工程师处理")
-    elif type_label == "type:verification" or has_test:
-        return ("verification", ASSIGNEE_MAP["test"],
-                "此问题涉及测试验证或代码审查，需要测试工程师处理")
-    elif type_label in ("type:research", "type:docs") or has_doc or has_research:
-        tl = str(type_label) if type_label else "无"
-        return ("research/docs", ASSIGNEE_MAP["boss"],
-                f"此问题涉及调研或文档编写（标签: {tl}），暂交老板判断")
-    else:
-        return ("unknown", ASSIGNEE_MAP["boss"],
-                f"未能明确识别问题类型（标签: {labels}），暂交老板决策")
+    if has_dev:
+        return ("feature/bug", ASSIGNEE_MAP["dev"], size,
+                "标题/正文含开发实现或缺陷修复关键词，需要开发工程师处理")
+    if has_test:
+        return ("verification", ASSIGNEE_MAP["test"], size,
+                "标题/正文含测试验证或代码审查关键词，需要测试工程师处理")
+    if has_doc or has_research:
+        return ("research/docs", ASSIGNEE_MAP["boss"], size,
+                "标题/正文含调研或文档关键词，暂交老板判断")
+
+    return ("unknown", ASSIGNEE_MAP["boss"], size,
+            "未能明确识别问题类型，暂交老板决策")
 
 
 # -- Main --------------------------------------------------------------------
@@ -146,7 +166,7 @@ def main():
     for issue in issues:
         num = issue["number"]
         title = issue["title"]
-        issue_type, assignee, reason = classify_issue(issue)
+        issue_type, assignee, size, reason = classify_issue(issue)
 
         print(f"Issue #{num}: {title[:60]}")
         print(f"  Type: {issue_type} -> {assignee}")
@@ -158,7 +178,7 @@ def main():
             "## 自动分诊报告\n\n"
             "**识别类型**：" + issue_type + "\n"
             "**标签检测**：" + (type_label or "无 type 标签") + "\n"
-            "**规模评估**：single-issue / 单任务规模\n\n"
+            "**规模评估**：" + size + "\n\n"
             "**指派给**：@" + assignee + "\n"
             "**理由**：" + reason + "\n\n"
             "---\n"

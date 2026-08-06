@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 2121
+        "completed": 2169
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.279443+08:00",
-      "next_run_at": "2026-08-05T20:30:00+08:00",
-      "last_run_at": "2026-08-05T20:10:29.697983+08:00",
+      "next_run_at": "2026-08-06T20:30:00+08:00",
+      "last_run_at": "2026-08-06T20:13:50.037746+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -58,17 +58,17 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 44
+        "completed": 45
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.468781+08:00",
-      "next_run_at": "2026-08-06T20:00:00+08:00",
-      "last_run_at": "2026-08-04T20:10:02.131606+08:00",
-      "last_status": "error",
-      "last_error": "RuntimeError: [Errno 32] Broken pipe",
+      "next_run_at": "2026-08-07T20:00:00+08:00",
+      "last_run_at": "2026-08-05T20:20:06.263302+08:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": null,
@@ -96,17 +96,17 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 44
+        "completed": 45
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.660220+08:00",
-      "next_run_at": "2026-08-05T21:00:00+08:00",
-      "last_run_at": "2026-08-04T21:09:11.373766+08:00",
-      "last_status": "error",
-      "last_error": "RuntimeError: [Errno 32] Broken pipe",
+      "next_run_at": "2026-08-06T21:00:00+08:00",
+      "last_run_at": "2026-08-05T21:12:38.871687+08:00",
+      "last_status": "ok",
+      "last_error": null,
       "last_delivery_error": null,
       "deliver": "local",
       "origin": null,
@@ -115,5 +115,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-08-05T20:10:29.698670+08:00"
+  "updated_at": "2026-08-06T20:13:50.038424+08:00"
 }
