@@ -77,6 +77,8 @@ exec ~/.hermes/hermes-agent/venv/bin/hindsight-embed -p <profile> daemon start
 
 Process-substitution sourcing reads the real API key from the file at runtime — the key never appears in the shell command string, so terminal `***` masking can't corrupt it (the `env $(cat ... | xargs)` inline variant puts the key into argv, which the terminal tool may mask). Verified 2026-08-03: demo-pm daemon healthy on :9178 ~10s after launch with this pattern.
 
+**Ready-made launcher (demo-pm):** the same script is saved at `~/.hermes/profiles/demo-pm/scripts/start_hindsight_daemon.sh` — reuse it instead of recreating: run with `terminal(background=true)` → `bash ~/.hermes/profiles/demo-pm/scripts/start_hindsight_daemon.sh`, then poll `curl -s http://127.0.0.1:9178/health` until healthy. Re-verified 2026-08-06 (healthy in ~10s). Note: a sibling subagent may rewrite this file — read it before relying on it if the content looks different.
+
 ### Step 1b — Verify AFTER the banner, on the PROFILE's port
 
 **⚠️ "Daemon started successfully!" is NOT proof the daemon survived.** The wrapper can print the banner and exit while the daemon dies shortly after (wrong port, crash). Never trust the banner — verify the listener and health on the profile's own port:

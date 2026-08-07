@@ -88,6 +88,26 @@ with open(os.path.expanduser("~/.hermes/profiles/demo-pm/.env")) as f:
 
 详见 `references/2026-08-06-session-dynamic-key-construction.md`。
 
+### 🆕 2026-08-07 会话确认：write_file bash 脚本含 token 字面量的损坏率比预期更高（3/4），inline 单行 terminal 仍是验证首选
+
+本轮 cron 再次 `[SILENT]`（`assignee=OnePlusNPM` → `[]`；全量健康检查 5 个 open issue #2/#4/#5/#6/#7 全部 assign 给 `OnePlusNBoss`），并给出一个**新的频率数据点**：
+
+**write_file 写 bash 脚本含 `Authorization: token $GITHUB_TOKEN` 字面量：本次 4 次尝试中 3 次实际损坏**（pm_check2/pm_check3/pm_final 均报 `unexpected EOF while looking for matching '"'`；仅第一个 pm_check.sh 成功）。对比 2026-08-03 记录（当时该模式「新增失败」、1 次破坏），**现在应默认该写法大概率损坏**——不要赌 lint OK，write_file 的响应显示 `***` 不能证明内容安全。
+
+**同会话中 inline 单行 terminal 模式 2/2 全部成功**（真实执行 token，`***` 仅为显示层脱敏）：
+
+```bash
+cd ~/.hermes/profiles/demo-pm && set -a && source .env && set +a && curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/demo-oneplusn/demo-workflow/issues?state=open&assignee=OnePlusNPM&per_page=100" -o /tmp/pm_mine.json && echo "bytes:" && wc -c < /tmp/pm_mine.json && cat /tmp/pm_mine.json
+```
+
+**结论（比 08-03 更强）：** 需要 curl 认证时，优先 **inline 单行 terminal**（source .env + 变量引用）；需要脚本文件时，优先 **Python open() 读 .env + 字符串拼接** 或 **scripts/full_triage.py**；尽量**避免 write_file 写 bash 脚本并内嵌 token 字面量**。
+
+**其他小陷阱：**
+- macOS 的 `cat` 是 BSD 版：`cat -A` 报 `illegal option -- A`（GNU 选项）。查看行尾/结构用 `cat -e` 或 `awk '{print NR": "substr($0,1,12)"...["length($0)"]"}'`（本次用后者成功确认 `.env` 共 10 行，含 GITHUB_* 与 DEEPSEEK_API_KEY 等）。
+- `.env` 不只含 GITHUB 变量（还有 GATEWAY_PORT、AGENT_NAME、DEEPSEEK_API_KEY 等）——`source .env` 会一次性载入全部，属预期行为。
+
+详见 `references/2026-08-07-session-inline-terminal-reconfirmed.md`。
+
 
 
 用于 PM profile 的 cron 定时任务：轮询 GitHub 仓库，将 assign 给自己的 open issue 按类型标签分诊给对应的开发/测试/决策负责人。

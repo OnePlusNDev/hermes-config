@@ -333,6 +333,7 @@ terminal("bash /tmp/clean_backup.sh")
 ### GitHub username casing
 - `gh repo view oneplusn/hermes-config` may fail with "Could not resolve to a Repository" even though `OnePlusNDev/hermes-config` works.
 - Always resolve the exact username first: `gh api user --jq '.login'` → use that value in repo references.
+- **Same-name repos on multiple accounts:** Multiple accounts can each own a repo with the same name — `OnePlusNDev/hermes-config` AND `OnePlusNTester/hermes-config` both exist, but only OnePlusNDev's contains `demo-pm/` (OnePlusNTester's has just `demo-tester/`). Before pushing, confirm the repo whose tree actually contains your profile dir: `gh api repos/$OWNER/$REPO/contents/ --jq '.[].name'`. A same-named repo on another account is NOT the backup target — pushing there would silently back up to the wrong place (verified 2026-08-06).
 - If `gh repo create <owner>/<repo>` fails with "cannot create a repository for <owner>", switch to the correct active user with `gh auth switch --user <username>` and retry with the repo name only.
 ### gh auth account mismatch (push denied with 403)
 
@@ -738,8 +739,10 @@ When using the gh API to push (method B), the remote branch HEAD can advance bet
 ERROR updating ref: HTTP error: gh: Update is not a fast forward (HTTP 422)
 ```
 
-**Fix:** Re-read the remote HEAD, diff the local tree against the new remote tree, upload any additional diffs, and retry with the new HEAD as the parent:
-1. `gh api repos/{owner}/{repo}/git/ref/heads/main --jq '.object.sha'` — get the new HEAD
+**Fix (simplest — just re-run the script):** When using the standalone script (`scripts/gh-api-standalone-backup.py`), simply run it again. It re-reads the remote HEAD at Step 2 on every invocation, so the re-run creates the commit with the CURRENT HEAD as parent. Blob uploads are idempotent (same content → same SHA), so re-uploading costs nothing. Verified 2026-08-06: first run hit HTTP 422 on ref update (a concurrent demo-dev backup advanced HEAD mid-run), second run succeeded with zero manual tree surgery.
+
+**Fix (manual):** Re-read the remote HEAD, diff the local tree against the new remote tree, upload any additional diffs, and retry with the new HEAD as the parent:
+1. `gh api repos/{owner}/{repo}/git/refs/heads/main --jq '.object.sha'` — get the new HEAD
 2. Get the new remote tree recursively
 3. Recompute the local tree and diff — most files will already have been uploaded, so only new blobs need uploading
 4. Rebuild subtree, top tree, commit (with new HEAD as parent), update ref
@@ -956,6 +959,12 @@ Consequences:
   gh api "repos/$OWNER/$REPO/git/trees/main?recursive=1" --jq '[.tree[] | select(.type=="blob") | (.path | split("/")[0])] | group_by(.) | map({dir: .[0], count: length})'
   ```
 - Also scan files that were ALREADY committed in a prior run when you modify them — a full hex token from an older backup may be re-uploaded in a new blob (2026-08-03: `pm-triage-cron/SKILL.md` was modified this run, re-uploading its full hex token which had never been flagged before).
+
+### Remote leak-check false positives from substring matching
+
+Broad substring checks over remote tree paths (`home/`, `.local/`, `gateway`, etc.) flag legitimate files: `skills/smart-home/` matches `home/`, and openhue docs contain `~/.local/bin/openhue` (a normal install path in documentation, not the `.local/` credentials dir). Verified 2026-08-06: two files flagged by a path-substring leak check, both clean on content inspection.
+
+**Fix:** When a leak check flags a file, verify the ACTUAL matched content before treating it as a leak — fetch the remote blob and grep for the sensitive pattern. Path-substring matches on `skills/*` directory names are almost always false positives; the real excludes are about directory PRESENCE (`**/home/`, `**/.local/` as config/credential dirs), not about the substring appearing inside a filename or documentation path. Only act on a leak flag after the content check confirms a real secret.
 
 ### ⚠️ Grep display truncation hides full tokens (critical)
 

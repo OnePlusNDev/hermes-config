@@ -1150,8 +1150,15 @@ r = client.reflect(bank_id='hermes',
     query='Check for stale or redundant demo-pm memories.',
     budget='low')
 if 'outdated' in r.text.lower() or 'redundant' in r.text.lower():
-    # 2. Consolidate — structural dedup (if reflect found issues)
-    op = client.consolidate(bank_id='hermes')
+    # 2. Consolidate — structural dedup. ⚠️ Hindsight.consolidate() does NOT
+    #    exist in hindsight_client v0.8.2 (raises AttributeError). Use the
+    #    HTTP API instead: POST /v1/default/banks/<bank_id>/consolidate
+    #    with body '{}' → {"operation_id": "...", "deduplicated": bool}
+    import urllib.request, json
+    req = urllib.request.Request(
+        'http://127.0.0.1:8888/v1/default/banks/hermes/consolidate',
+        data=b'{}', headers={'Content-Type': 'application/json'}, method='POST')
+    op = json.loads(urllib.request.urlopen(req, timeout=30).read())
     print(f'Consolidation triggered: {op}')
 else:
     print('No stale content. Skipping consolidation.')
@@ -1171,6 +1178,19 @@ The sync methods (`recall()`, `reflect()`, `consolidate()` shown above) block un
 ### Pitfall — No BanksApi Sync Wrapper
 
 The `banks` property's methods (e.g. `client.banks.list_banks()`) return coroutines, not sync values. If you need to list banks synchronously, fall back to curl or use the `openapi.json` endpoint directly. The `recall()`, `reflect()`, and `list_memories()` convenience methods on the `Hindsight` class ARE properly wrapped.
+
+### Pitfall — No `consolidate()` Method on `Hindsight` (v0.8.2)
+
+Verified 2026-08-06: `client.consolidate(bank_id=...)` raises `AttributeError: 'Hindsight' object has no attribute 'consolidate'`. The reflect convenience method works, but consolidation must go through the HTTP API:
+
+```bash
+curl -s -X POST http://127.0.0.1:<port>/v1/default/banks/<bank_id>/consolidate \
+  -H "Content-Type: application/json" -d '{}'
+# → {"operation_id":"...","deduplicated":false}
+#   deduplicated=false → work was performed; true → bank already optimal
+```
+
+Then poll `GET /v1/default/banks/<bank_id>/operations/<operation_id>` until `status == "completed"`, and confirm via bank stats that `pending_operations: 0` / `failed_operations: 0`. The `{}` ASCII payload is tirith-safe (no Chinese chars), so plain curl works without the temp-file workaround. Observed 2026-08-06: op completed on first poll (~4s), bank stayed at 48 nodes / 0 pending / 0 failed.
 
 ## Cron Mode Pitfalls
 
