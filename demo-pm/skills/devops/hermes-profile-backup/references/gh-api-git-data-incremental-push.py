@@ -133,14 +133,19 @@ for path in all_to_upload:
     print(f"    BLOB {path}: {blob['sha'][:12]}")
 
 # ── Step 5: Copy unchanged entries (skip deleted) ──────────────────
+# ⚠️ Copy EVERY remote blob not added and not deleted — sibling profiles
+# (demo-dev/, demo-tester/, tester-01/, ...) must be preserved. The buggy
+# version only copied PROFILE/ + .gitignore and silently DELETED all sibling
+# dirs on push (2026-08-02 standalone script; 2026-08-07 reference script
+# replay). `deleted` below only holds PROFILE/ + .gitignore paths missing
+# locally, so copying all non-deleted entries preserves siblings.
 unchanged = 0
 for path, entry in remote_blob_map.items():
     if path in added_paths:
         continue
-    if path.startswith(f"{PROFILE}/") or path == ".gitignore":
-        if path not in deleted:  # actively deleted files are omitted
-            add_entry(path, entry["mode"], entry["type"], entry["sha"])
-            unchanged += 1
+    if path not in deleted:  # actively deleted files are omitted
+        add_entry(path, entry["mode"], entry["type"], entry["sha"])
+        unchanged += 1
 print(f"  {unchanged} unchanged entries merged")
 
 # ── Step 6: Create tree ─────────────────────────────────────────────
