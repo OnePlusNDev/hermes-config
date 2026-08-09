@@ -827,9 +827,9 @@ If a cron job asks to \"optimize memory with hindsight,\" the answer is: trigger
 
 When hindsight is the active memory provider, the file `<profile>/memory.db` exists but is **always 0 bytes**. Hindsight stores data in its own embedded PostgreSQL (`<profile>/home/.pg0/instances/hindsight-*/`), not in this SQLite file. If you `ls -la memory.db` and see 0 bytes, that's normal — don't mistake it for an uninitialized or failed memory system.
 
-## Daemon Restart Latency (1-3+ Minutes)
+## Daemon Restart Latency (variable: ~15s warm PG vs 1-3+ min cold)
 
-After an idle-timeout shutdown, restarting the daemon via `hindsight-embed -p <name> daemon start` takes **1-3+ minutes** because the embedded PostgreSQL must reinitialize. During this window:
+After an idle-timeout shutdown, restarting the daemon via `hindsight-embed -p <name> daemon start` takes **1-3+ minutes** only when the embedded PostgreSQL must initialize from scratch. If pg0 PostgreSQL is already running (check `ps aux | grep postgres` — a sibling or global :8888 daemon on the same machine shares `~/.pg0`), the profile daemon becomes healthy in **~15 seconds** (observed 2026-08-08: poll `curl health` every 5s, healthy on 3rd poll). During the startup window (warm or cold):
 - `hindsight-embed daemon status` reports \"Daemon is not running\"
 - `curl http://127.0.0.1:<port>/api/health` returns connection refused
 - `hindsight-embed bank list` times out
