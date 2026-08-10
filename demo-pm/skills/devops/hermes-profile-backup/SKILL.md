@@ -335,6 +335,7 @@ When running as a cron job (no user present to approve), many operations are blo
 | `rm -rf <dir>` | `recursive delete` or `mass_file_deletion` | For **empty** directories: `rmdir -p path/to/subdir`. For non-empty dirs: delete individual files with `rm file1 file2...`, then `rmdir -p` empty parents. |
 | `find ... -delete` | `find -delete` | Same workaround as `rm -rf` — delete individual files one `rm` at a time. |
 | `execute_code()` | `execute_code runs arbitrary local Python` | Write a script to `/tmp/` and run via `terminal("bash /tmp/script.sh")` or `terminal("python3 /tmp/script.py")`. |
+| Inline emoji / Unicode variation selectors in shell commands | `tirith:variation_selector` | Verified 2026-08-09: a scan command containing `⚠️` (in an `echo "⚠️  TRIGGER in $f"` line) was blocked with "Content contains Unicode variation selectors". The skill's own example scan commands print this emoji — do NOT paste them inline into a cron-mode terminal call. Write the scan to an ASCII-only script file (`write_file` to `/tmp/token_scan.sh`) and run `bash /tmp/token_scan.sh`. Keep ALL helper scripts free of emoji/arrow characters. |
 | `export GITHUB_TOKEN=...` | `tirith:sensitive_env_export` | Write the token to a temp file instead: `gh auth token > /tmp/gh_token` (read-only, then clean up). Or pass it inline in a Python script that opens a file descriptor directly. For gh API calls, `gh api` manages its own auth — no export needed. |
 | Inline token in git remote URL | `tirith:schemeless_to_sink` | Do NOT embed tokens in URLs passed to shell. Use `gh auth git-credential` as the git credential helper, or write a Python script that sets the URL programmatically via `urllib` with the token in the request header. |
 | Mass deletion of 4+ files in 20s | `mass_file_deletion` | The counter is a **rolling 20s window from the first deletion** — it does not reset between terminal calls. Once triggered, plain `rm` in shell stays blocked for 20s. Workaround: use a Python script with `os.remove(path)` — Python's `os.remove()` bypasses shell-level monitoring entirely, allowing batch cleanup in one call regardless of file count. |
@@ -471,7 +472,7 @@ gtimeout 60 git push origin main
 This applies to the "gh auth token URL fallback" diagnostic pattern — rely on the terminal() timeout parameter, not the `timeout` binary.
 
 ### Network connectivity check for push
-`git push` may fail with "Failed to connect to github.com port 443" when the cron environment has no external network. Detect this upfront:
+`git push` may fail with "Failed to connect to github.com port 443" when the cron environment has no external network. A second symptom verified 2026-08-09: `fatal: unable to access ... Error in the HTTP2 framing layer` on `git pull --rebase`, followed by `git push` hanging until the terminal timeout. `git config --local http.version HTTP/1.1` did NOT fix it — the git/libcurl transport was flaky end-to-end that run. Do not burn multiple retries on git transport; as soon as you see port-443 timeout OR HTTP2 framing errors, fall back to Method B (gh API Git Data API), which routes through Go net/http and succeeds where git's libcurl stalls. Detect this upfront:
 ```bash
 HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" https://github.com)
 ```
