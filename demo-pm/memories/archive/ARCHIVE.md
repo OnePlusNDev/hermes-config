@@ -1,6 +1,6 @@
 # ARCHIVE.md — demo-pm 记忆归档
 
-> 记忆清理时间: 2026-08-01
+> 记忆清理时间: 2026-08-12
 > 清理工具: Hindsight v0.8.2（profile daemon :9178，HF_HUB_OFFLINE=1 启动）
 
 ---
@@ -11,18 +11,20 @@
 |------|---------|------|------|
 | `MEMORY-20260710.snapshot.md` | 2026-07-10 | 2,826 B | 旧版 MEMORY.md.bak |
 | `USER-20260710.snapshot.md` | 2026-07-10 | 1,335 B | 旧版 USER.md.bak |
+| `MEMORY-20260812.snapshot.md` | 2026-07-12 | 1,578 B | 达到 30 天归档窗口的 MEMORY.md |
+| `USER-20260812.snapshot.md` | 2026-07-12 | 1,215 B | 达到 30 天归档窗口的 USER.md |
 
 ## 整理摘要
 
-- **MEMORY.md**: 3,241 → 1,578 字符（-51%），压缩表格、合并冗余行、移除格式噪音
-- **USER.md**: 1,398 → 1,215 字符（-13%），精简表述
-- **Hindsight 优化**: 触发 `hermes` 银行 consolidation（dedup）和 reflection（LLM 搜索+摘要）
-- **30+天旧记忆**: ✅ 无（最早条目 2026-06-14）
+- **MEMORY.md**: 3,241 → 1,578 字符（-51%），压缩表格、合并冗余行、移除格式噪音；2026-08-12 达 30 天窗口，内容仍为活跃持久配置，刷新头部日期后保留
+- **USER.md**: 1,398 → 1,215 字符（-13%），精简表述；2026-08-12 达 30 天窗口，内容仍为活跃协作协议，刷新头部日期后保留
+- **Hindsight 优化**: 触发 `demo-pm-memory` 银行 reflect（include_facts=True）确认 48 facts 无过期/冗余/矛盾；consolidation completed（op dc86574b，deduplicated=false）
+- **30+天旧记忆**: ✅ 无（bank 内 48 facts 均为活跃持久配置；本次文件归档为 30 天窗口例行快照）
 
 ## 保留策略
 
 - 镜像文件 (`.bak`) 归档后删除，原始内容已浓缩至当前文件
-- 下次清理: 2026-08-12 或满 30 天时
+- 下次清理: 2026-09-12 或满 30 天时
 
 ---
 
@@ -43,3 +45,5 @@
 | 2026-08-07 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天文件需归档（MEMORY.md 25d / USER.md 25d 均新鲜，字符数均低于上限）；Hindsight daemon :9178 成功启动（HF_HUB_OFFLINE=1 + venv binary + `-p demo-pm`，idle-timeout 86400，~10s 后 healthy）；bank reflect（include_facts=True，hindsight_client）确认 48 facts（~52d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，memory health good，无需归档；consolidation completed（op 13ab10fb，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
 | 2026-08-08 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天文件需归档（MEMORY.md 26d / USER.md 26d 均新鲜，字符数均低于上限）；Hindsight daemon :9178 成功启动（HF_HUB_OFFLINE=1 + venv binary + `-p demo-pm`，idle-timeout 86400，~15s 后 healthy）；bank reflect（include_facts=True，hindsight_client）确认 48 facts（~53d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，memory health good，无需归档；consolidation completed（op 081fb5ea，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
 | 2026-08-09 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天文件需归档（MEMORY.md 27d / USER.md 27d 均新鲜，字符数均低于上限，均未达 30d 阈值，08-11 起将进入归档窗口）；Hindsight daemon :9178 成功启动（HF_HUB_OFFLINE=1 + venv binary + `-p demo-pm`，idle-timeout 86400，~10s 后 healthy）；bank reflect（include_facts=True，hindsight_client）确认 48 facts（~54d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，无需归档；consolidation completed（op 9279d004，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
+| 2026-08-11 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天文件需归档（MEMORY.md 29d / USER.md 29d 均新鲜，字符数低于上限：1220/559 chars；默认 profile USER.md 25d 亦新鲜）；Hindsight daemon :9178 成功启动（HF_HUB_OFFLINE=1 + venv binary + launcher 脚本，~5s 后 healthy）；bank reflect（hindsight_client，include_facts=True）确认 48 facts（~55d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，无需归档；consolidation completed（op c40e231d，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
+| 2026-08-12 | 30 天归档 + Hindsight reflect + consolidation（清理 cron） | ✅ MEMORY.md / USER.md 达 30 天归档窗口（均为 30d，Jul 12 修改）：已生成快照 MEMORY-20260812.snapshot.md（1,578 B）/ USER-20260812.snapshot.md（1,215 B）入 archive/，内容均为活跃持久配置故刷新头部日期后保留；字符数低于上限（1220/559 chars）；Hindsight daemon :9178 成功启动（launcher 脚本，~5s 后 healthy）；bank reflect（hindsight_client，include_facts=True）确认 48 facts（~56d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾；consolidation completed（op dc86574b，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |

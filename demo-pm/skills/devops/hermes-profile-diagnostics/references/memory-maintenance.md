@@ -111,6 +111,11 @@ Observed 2026-08-02 with glm-4-flash on the demo-pm daemon: the CLI and plain HT
 - **HTTP `POST /reflect` with `mode: full`** returned a generic refusal: *"I don't have direct access to review the contents of the memory bank... I cannot identify any outdated..."* — the LLM was NOT fed the bank facts.
 - **✅ `hindsight_client.reflect(bank_id=..., query=..., budget='low', include_facts=True)`** returned the full analysis (e.g. "The configuration facts from 2026-06-14 to 06-17 ... are still valid to keep").
 
+**Retry pattern for truncated tool-call reflect (glm-4-flash).** Observed 2026-08-11: even `hindsight_client.reflect(..., include_facts=True)` returned a truncated tool-call on the FIRST attempt — `text` was `search_observations\n{"query": "redundant or duplicate information"}` instead of an analysis. Do NOT restart the daemon or switch transport — the fix is **query phrasing**: retry with a query that explicitly demands a direct conclusion, e.g. `'给出当前记忆健康度评估：是否存在需要归档的过期事实（30天以上）、重复信息或矛盾信息？请直接回答结论。'`. This returned a clean one-line answer on the second attempt (6.8K input tokens). Rules learned:
+- Ask the LLM to 「直接回答结论」 (answer directly with a conclusion) — open-ended multi-part English queries invite the `search_observations` tool call, and the CLI/client captures the tool-call text as the final answer.
+- Keep the query single-intent and conclusion-oriented; verify `text` is not a bare tool-call name before trusting it.
+- The existing "restart daemon, retry with --budget low" advice applies to daemon crashes (connection refused), NOT to truncated tool-call responses — different failure, different fix.
+
 **Run it from the hermes-agent venv python** — the module is NOT in system python:
 ```bash
 /Users/oneplusn/.hermes/hermes-agent/venv/bin/python3 -c "
