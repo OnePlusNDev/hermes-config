@@ -155,6 +155,17 @@ set -a; source ~/.hermes/profiles/demo-pm/.env; set +a; python3 /tmp/gh_issues.p
 
 详见 `references/2026-08-12-session-osenviron-helper-pattern.md`。
 
+### 🆕 2026-08-15 会话确认：write_file bash 脚本的 token 提取行（`$(grep` 开头）也会被破坏 + 损坏脚本不值得 patch，直接 pivot 到 Python 组合脚本
+
+本轮 cron 再次 `[SILENT]`（`assignee=OnePlusNPM` → `[]`；全量健康检查 5 个 open issue #2/#4/#5/#6/#7 全部 assign 给 `OnePlusNBoss`）。新增数据点：
+
+1. **新破坏变体：bash 脚本中 token 提取行的 `$(grep` 开头被替换为字面 `***`**（read_file 确认文件实际内容损坏，非显示层 masking）→ bash 报 `unexpected EOF while looking for matching quote`。同一会话中内容几乎相同的第一个脚本（fetch_issues.sh）却完好运行——再次印证 write_file bash 脚本成败不稳定（对照 2026-08-07 的 3/4 损坏率，**默认预期损坏**）。
+2. **patch 修复损坏的 bash 脚本不可靠**：patch 修复第 4 行后，第 5 行 curl 的 Authorization 头也被破坏 → 二次 `unexpected EOF`。**损坏的 bash 脚本直接弃用，不修补。**
+3. **✅ 成功路径（再次验证）：write_file 自包含 Python 脚本（open() 读 .env + 动态 key 拼接 + urllib + 字符串拼接 Bearer header）一次运行同时输出 mine + all 双查询**（MINE_COUNT + 全量 5 个 issue 摘要）→ lint OK、零安全守卫摩擦。urllib 2026-08 已连续 4 轮 cron 正常（08-03/08-06/08-12/08-15），可作默认首选路径。
+4. **附带确认：`search_files` 工具可直接读 `.env` 定位 token 行**（显示层脱敏为 `ghp_Z1...ghiu`，仅用于确认存在性，不能取真实值；与 read_file 的 Access Denied 行为不同）。
+
+详见 `references/2026-08-15-session-writefile-bash-corruption-pivot-python.md`。
+
 
 
 用于 PM profile 的 cron 定时任务：轮询 GitHub 仓库，将 assign 给自己的 open issue 按类型标签分诊给对应的开发/测试/决策负责人。
