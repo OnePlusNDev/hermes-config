@@ -97,8 +97,12 @@ for line in local_raw.strip().split("\n"):
 print(f"  Local tracked in scope: {len(local_entries)}")
 
 # ── Step 3: diff ──────────────────────────────────────────────────────
-changed = [p for p, l in local_entries.items() if remote_blob_map.get(p, {}).get("sha") != l["sha"]]
+# NOTE: paths absent from remote (new_files) must be EXCLUDED from `changed` —
+# otherwise new files land in BOTH lists and get uploaded twice (idempotent,
+# harmless, but prints them as "M" instead of "A"). Verified 2026-08-15.
 new_files = [p for p in local_entries if p not in remote_blob_map]
+changed = [p for p, l in local_entries.items()
+           if p in remote_blob_map and remote_blob_map[p]["sha"] != l["sha"]]
 deleted = [p for p in remote_blob_map
            if (p.startswith(f"{PROFILE}/") or p == ".gitignore") and p not in local_entries]
 print(f"  Modified: {len(changed)}, New: {len(new_files)}, Deleted: {len(deleted)}")
