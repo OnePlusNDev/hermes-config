@@ -504,7 +504,7 @@ This applies to the "gh auth token URL fallback" diagnostic pattern — rely on 
 ```bash
 HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" https://github.com)
 ```
-- Code `200` = reachable. Proceed with push.
+- Code `200` = reachable, but does NOT guarantee git's libcurl transport works. Verified 2026-08-17: curl returned 200 AND `gh api` worked fine, yet `git pull --rebase` and `git push` BOTH timed out on port 443 (75s each). The failure is specific to git/libcurl, not general network — do not retry git; go straight to Method B (subtree script pushed cleanly on first attempt, absorbing the concurrent remote HEAD).
 - Code `000` = curl cannot reach github.com directly. **Do NOT assume push will fail** — `gh` CLI manages its own HTTP transport (via Go net/http) which may succeed where curl fails, especially when git is configured with gh's credential helper. Always attempt `git push` anyway; only fall back to Method B or report "local commit only" on actual push failure.
 - Do NOT rely on `curl -s https://github.com` returning content — the empty response is not a reliable indicator.
 - To test gh connectivity separately: `gh api repos/<owner>/<repo> --jq '.id'` succeeds if gh has a working route.
