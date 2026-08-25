@@ -55,6 +55,7 @@ EXCLUDE_NAMES = {
     ".hermes_history", "interrupt_debug.log", "processes.json",
     ".update_check", ".skills_prompt_snapshot.json",
     "triage_check.py", "cron_triage.py", "triage_issues.py",
+    "triage_v5.py", "triage_fetch.py", "query_issues.py",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
     ".bundled_manifest", ".curator_state",
@@ -71,7 +72,8 @@ EXCLUDE_DIRS = {
     "lsp",
     ".hub", ".curator_backups", ".curator_state",
 }
-EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "tmp_", "memory_backup_", "._"}
+EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "tmp_", "memory_backup_", "._",
+                  "pm_triage_", "pm_healthcheck_"}
 CRON_EXCLUDE = {".jobs.lock", ".tick.lock", "ticker_heartbeat", "ticker_last_success"}
 
 def git_blob_hash(filepath):
