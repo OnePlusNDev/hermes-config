@@ -461,6 +461,17 @@ git push origin main
 
 Run the check immediately before `git push`, not just at the start of the run. The repo-local credential helper (Approach B) is still worth setting for stale-cache cases, but `gh auth switch` is the reliable fix when the active account itself is wrong.
 
+**The flip happens even with `GITHUB_TOKEN` UNSET — the pre-push check is mandatory every run.** Verified 2026-08-25: pre-flight showed active = OnePlusNDev (owner, push=true), `GITHUB_TOKEN` not set in the cron environment, yet right before push the active account had flipped to OnePlusNPM. The flip is a keyring race between co-running profiles/cron/gateway sessions sharing the keyring, NOT an env-var override — do not skip the pre-push check just because `GITHUB_TOKEN` is unset. The combined check+switch+push one-liner (with `unset GITHUB_TOKEN` inside the branch) worked cleanly in cron mode and avoids an extra round trip:
+
+```bash
+ACTIVE=$(gh api user --jq '.login')
+if [ "$ACTIVE" != "$REPO_OWNER" ]; then
+  unset GITHUB_TOKEN
+  gh auth switch --user "$REPO_OWNER"
+fi
+git push origin main
+```
+
 ### GITHUB_TOKEN env var overrides `gh auth switch` (cron environment)
 
 Verified 2026-08-05: in cron mode the environment has `GITHUB_TOKEN` set, and `gh auth switch --user <owner>` fails silently — `gh api user` still returns the env-var account. Symptom: blob upload returns HTTP 404 even though the keyring has the repo owner logged in.
@@ -1320,3 +1331,4 @@ for f in leaks:
 - `references/demo-pm-backup-workflow-20260815.md` — clean Method A→B run: config.yaml all `api_key: ''` (no plaintext, no key_env replacement needed); `git pull --rebase` transport timeout (`Recv failure`) → subtree script with remote-HEAD parent absorbs concurrent advance (no manual rebase); post-push verification (0 plaintext keys, siblings intact); subtree script Step 3 double-upload fix
 - `references/demo-pm-backup-workflow-20260816.md` — clean Method A run (5 files + legacy cleanup): curl 000 but clone/pull-rebase/push all worked (confirms 000 ≠ push failure); tirith `confusable_domain` false positive when `)` follows a URL in a command substitution (split the command); legacy tracked `pm_triage_*.py` in cron/ + scripts/ SUBDIRS caught by post-push tree grep → `git rm --cached` cleanup commit
 - `references/demo-pm-backup-workflow-20260818.md` — clean 4-file Method A→B run: account flip confirmed again mid-run (pre-push check after commit); copy subtree script to /tmp before patching WORKTREE (avoids stale-constant phantom diff in next backup); curl 200 + gh api OK + git HTTP2 framing failure → subtree script first-try success; post-push verification with awk distribution check (blob count 596 → 597 = +1 new file)
+- `references/demo-pm-backup-workflow-20260825.md` — clean 3-file Method A run: all `api_key: ''` (no plaintext, no key_env replacement needed); account flip to OnePlusNPM occurred even with GITHUB_TOKEN UNSET (keyring race, not env override — pre-push check mandatory every run); concurrent remote advance handled by `git pull --rebase` + push; post-push verification (0 plaintext keys, 598 blobs, siblings intact)
