@@ -55,7 +55,7 @@ EXCLUDE_NAMES = {
     ".hermes_history", "interrupt_debug.log", "processes.json",
     ".update_check", ".skills_prompt_snapshot.json",
     "triage_check.py", "cron_triage.py", "triage_issues.py",
-    "triage_v5.py", "triage_fetch.py", "query_issues.py",
+    "triage_v5.py", "triage_fetch.py", "query_issues.py", "get_token.sh",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
     ".bundled_manifest", ".curator_state",
@@ -73,7 +73,7 @@ EXCLUDE_DIRS = {
     ".hub", ".curator_backups", ".curator_state",
 }
 EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "tmp_", "memory_backup_", "._",
-                  "pm_triage_", "pm_healthcheck_"}
+                  "pm_triage_", "pm_health", "gh_health", "healthcheck_"}
 CRON_EXCLUDE = {".jobs.lock", ".tick.lock", "ticker_heartbeat", "ticker_last_success"}
 
 def git_blob_hash(filepath):
@@ -104,6 +104,12 @@ def should_exclude(rel_path: str) -> bool:
 
     # Cron artifacts
     if fname in CRON_EXCLUDE:
+        return True
+
+    # Root-level health_* diagnostics read .env (e.g. health_check.py, health_0828.py).
+    # Scoped to root: nested legit files (e.g. skills/creative/comfyui/scripts/health_check.py)
+    # must NOT be excluded.
+    if len(parts) == 1 and fname.startswith("health_"):
         return True
 
     # cron/output/ — everything under it
