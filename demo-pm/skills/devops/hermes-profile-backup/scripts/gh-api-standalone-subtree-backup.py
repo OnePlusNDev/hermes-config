@@ -53,6 +53,7 @@ EXCLUDE_NAMES = {
     ".update_check", ".skills_prompt_snapshot.json",
     "triage_check.py", "cron_triage.py", "triage_issues.py",
     "triage_v5.py", "triage_fetch.py", "query_issues.py",
+    "triage_verify.py",
     "get_token.sh",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
