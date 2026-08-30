@@ -21,12 +21,13 @@ Caught 3 exclude gaps on 2026-08-27:
 - healthcheck_*.py (root-level diagnostics that read .env for GITHUB_TOKEN)
 
 Usage:
-  REPO_OWNER=OnePlusNPM python3 /tmp/preflight-backup-scan.py
+  REPO_OWNER=OnePlusNDev python3 /tmp/preflight-backup-scan.py
 
 NOTE: EXCLUDE_* sets below must stay in sync with
 scripts/gh-api-standalone-subtree-backup.py and the rsync/.gitignore lists in
 SKILL.md.
 """
+import base64
 import hashlib
 import json
 import os
@@ -35,7 +36,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-OWNER = os.environ.get("REPO_OWNER", "OnePlusNPM")
+OWNER = os.environ.get("REPO_OWNER", "OnePlusNDev")
 REPO = "hermes-config"
 BRANCH = "main"
 PROFILE_DIR = Path(os.path.expanduser("~/.hermes/profiles/demo-pm"))
@@ -177,10 +178,24 @@ def main():
         m2 = pat_hex.findall(text)
         m3 = pat_b64.findall(text)
 
-        def real(matches):
-            return [m for m in matches if "xxx" not in m and "..." not in m and "xx" not in m]
+        def real(matches, decode_b64=False):
+            out = []
+            for m in matches:
+                if "xxx" in m or "..." in m or "xx" in m:
+                    continue
+                if decode_b64:
+                    # b64 of doc placeholders (e.g. GITHUB_TOKEN=ghp_*) is a
+                    # recurring false positive — decode and filter placeholder chars
+                    try:
+                        dec = base64.b64decode(m).decode("utf-8", errors="replace")
+                    except Exception:
+                        dec = ""
+                    if "*" in dec or "xxx" in dec or "..." in dec or "xx" in dec:
+                        continue
+                out.append(m)
+            return out
 
-        r1, r2, r3 = real(m1), real(m2), real(m3)
+        r1, r2, r3 = real(m1), real(m2), real(m3, decode_b64=True)
         if r1 or r2 or r3:
             issues.append((repo_path, r1[:3], r2[:3], r3[:3]))
 
