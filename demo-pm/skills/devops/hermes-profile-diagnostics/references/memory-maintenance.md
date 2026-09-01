@@ -564,6 +564,8 @@ memories/
 - 如果文件变长，在顶部保留最新的 20 行并裁剪旧条目
 
 **⚠️ 表格行首必须是单个 `|`，不要用 `||`。** 用 patch 工具向清理日志表追加行时，fuzzy matching 容易把行首写成 `||`（2026-08-01 实际发生），破坏 markdown 表格渲染。追加后用 read_file 复查该行以 `| 2026-` 开头（行号前缀不算）。
+
+**追加行时用唯一锚点（op_id）做 old_string，不要用整行。** 清理日志表的相邻行结构高度相似（只差日期、op_id、字符数），用整行做 old_string 会 fuzzy-match 到大量历史行（2026-08-31 实际发生：12 matches，patch 报错）。正确做法：old_string 只取上一行末尾的唯一片段，例如 `consolidation completed（op 7bf02ae5，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |`，new_string = 该片段 + 换行 + 新行。用该行独有的 op_id（如 `7bf02ae5`）确认锚点唯一。
 ```
 
 **Rules:**
