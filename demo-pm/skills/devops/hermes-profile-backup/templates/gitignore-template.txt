@@ -6,6 +6,8 @@
 **/state.db*
 **/logs/
 **/cache/
+**/__pycache__/
+**/*.pyc
 **/sessions/
 **/desktop/
 **/sandboxes/

@@ -71,6 +71,7 @@ EXCLUDE_DIRS = {
     "hindsight-maintenance-logs",
     "lsp",
     ".hub", ".curator_backups", ".curator_state",
+    "__pycache__",
 }
 EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "tmp_", "memory_backup_", "._",
                   "pm_triage_", "pm_health", "gh_health", "healthcheck_"}

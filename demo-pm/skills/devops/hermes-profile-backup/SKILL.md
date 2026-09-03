@@ -58,7 +58,7 @@ files carry tokens → re-run preflight until diff + scan are clean → run back
 
 ⚠️ A local clone that EXISTS is not enough for Method A — it must be CURRENT. `git status` only compares against the local `origin/main` ref, which can itself be stale. Verify `git rev-parse HEAD` against `gh api repos/<owner>/<repo>/git/refs/heads/main --jq '.object.sha'`; if the clone is behind, a Method A push would diverge — use Method B instead (verified 2026-08-29: clone at ed4bcb8, remote at c928b535).
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-01; full list in Reference Files).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-02; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
@@ -73,6 +73,8 @@ rsync -a --delete \
   --exclude 'state.db*' \
   --exclude 'logs/' \
   --exclude 'cache/' \
+  --exclude '__pycache__/' \
+  --exclude '*.pyc' \
   --exclude 'sessions/' \
   --exclude 'desktop/' \
   --exclude 'sandboxes/' \
@@ -879,6 +881,7 @@ The exclude list in the `rsync` command and the repo's `.gitignore` should stay 
 - `**/._*` — macOS AppleDouble metadata files (e.g. `._cron_triage_runner.py`); rsync creates them when syncing extended attributes — never commit
 - `**/response_store.db` — Feishu/gateway response SQLite DB (runtime data, same class as `state.db`; verified present in demo-pm profile 2026-08-10)
 - `**/feishu_seen_message_ids.json` — Feishu seen-message runtime state (tiny JSON, not config; remote .gitignore already excludes it)
+- `**/__pycache__/`, `**/*.pyc` — Python bytecode caches (discovered 2026-09-03: preflight showed `A demo-pm/skills/devops/pm-triage-cron/scripts/__pycache__/full_triage.cpython-313.pyc`; runtime artifact, not config — added to all script EXCLUDE_DIRS, rsync list, gitignore template the same run)
 
 ### ⚠️ Blanket prefix excludes can silently DELETE legit nested files — scope root-only patterns
 
@@ -1260,41 +1263,9 @@ for f in leaks:
 ## Reference Files
 
 - `references/gh-api-git-data-backup.md` — Detailed recipe for Method B (Git Data API)
-- `references/demo-pm-backup-workflow-20260710.md` — Annotated real-run transcript
-- `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction, gh API push fallback, .gitignore expansion
-- `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction (xxd hex+ASCII column both redacted), successful gh API fallback when git push failed on port 443 timeout, `.gitignore` expansion to 40+ patterns
-- `references/demo-pm-backup-workflow-20260712.md` — git credential helper 403 despite matching active gh user (detection + fix); broader file-scan discovery when GitHub push protection fires on an amended commit; rebase + regular push after divergence
-- `references/demo-pm-backup-workflow-20260706.md` — Cron-mode backup confirming curl `000` ≠ push failure; multi-account gh auth switch pattern (active account ≠ repo owner); 10-file incremental backup
-- `references/demo-pm-backup-workflow-20260707.md` — Session documenting the `git ls-tree -r` vs `git status` bug and incremental gh API push pattern
-- `references/demo-pm-backup-workflow-20260713.md` — Rebase conflict resolution (theirs/.gitignore, ours/content), multi-file push protection redaction
-- `references/demo-pm-backup-workflow-20260714.md` — `gh auth token` URL fallback, `git config --local credential.helper`, base64 push protection redaction on both channels, pull-rebase divergence after amend
-- `references/2026-07-16-push-protection-directory-exclusion.md` — Directory-level `.gitignore` exclusion of reference docs with hex-encoded tokens; `gh api` Git Data API fallback when SSH/HTTPS git push fails (multi-account mismatch + port 443 timeout)
-- `references/demo-pm-backup-workflow-20260717.md` — Clean backup with no push protection issues; consolidated `home/` excludes; pre-emptive redaction of hex/base64 tokens in modified files; legacy tracked credential file cleanup (`git rm --cached`)
-- `references/demo-pm-backup-workflow-20260720.md` — 12-file backup: partial token redaction insufficient for push protection; gh API fallback when git push times out on port 443
-- `references/demo-pm-backup-workflow-20260721.md` — 26-file backup: hex/base64 redaction in cross-skill SKILL.md + references (cascade); `.gitignore` gaps (`**/triage_check.py`, `**/.tmp_*`); `timeout` command unavailable on macOS; 0 push protection blocks
 - `references/gh-api-git-data-incremental-push.py` — Reusable Python script for incremental comparison-based push (uses `git ls-tree -r`, filters remote tree to blob entries only, uploads only changed blobs)
 - `scripts/gh-api-standalone-backup.py` — Standalone Python script for gh API push when no local git clone is available (computes blob SHAs via pure Python, walks profile dir, handles push protection fallback)
 - `scripts/gh-api-standalone-subtree-backup.py` — Use when clone fails AND repo is large (590+ blobs): no-clone filesystem-walk + recursive subtree construction (avoids flat-tree 422 that the standalone script hits on large repos). Verified 2026-08-26.
 - `scripts/gh-api-incremental-push-subtree.py` — Incremental gh API push when a local clone exists AND the repo is large (589+ blobs): recursive subtree tree construction that avoids the flat-tree HTTP 422 "input too large" failure (verified 2026-08-10)
-- `references/demo-pm-backup-workflow-20260722.md` — 534-file backup via gh API Git Data API (macOS git-remote-https TLS handshake timeout, gh auth account mismatch, subtree tree construction)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
-- `references/demo-pm-backup-workflow-20260726.md` — 17-file backup: `repr()` truncation masks full tokens; `ghp_***...***` triggers push protection; include backup skill's own SKILL.md in scan scope
-- `references/demo-pm-backup-workflow-20260727.md` — 29-file backup via collaborator access (active user ≠ repo owner); script OWNER resolution fix via `REPO_OWNER` env var; 6 push protection skips
-- `references/demo-pm-backup-workflow-20260728.md` — 14-file backup: rsync imports full tokens from source profile; filesystem-walk gh API push; Method B fast-forward recovery (remote HEAD advanced during upload)
-- `references/demo-pm-backup-workflow-20260801.md` — 11-file backup: two new junk-file patterns (`._*` AppleDouble, `tmp_*.py` no-dot temp); active gh account flipped mid-run and repo-local helper alone didn't fix 403 — re-check `gh api user` right before push; redaction regex `{8,}` threshold
-- `references/demo-pm-backup-workflow-20260803.md` — 2-commit backup: full 80-hex-char token passed push protection (pre-upload scan is the real gate); script `EXCLUDE_PREFIX` drift on `tmp_`; post-push remote-blob verification pattern
-- `references/demo-pm-backup-workflow-20260807.md` — `TMPDIR=` prefix bug (relative rsync DST created a literal `TMPDIR=` dir under cwd; locate via marker + mdfind); incremental-push Step 5 sibling-profile deletion replay + repair (589 blobs restored); GITHUB_TOKEN env override of gh auth switch in cron mode
-- `references/demo-pm-backup-workflow-20260808.md` — clean 6-file backup via Method B fallback; new exclude patterns `pm_healthcheck_*.py` + `triage_fetch.py`/`triage_v5.py`; legacy tracked temp-script cleanup commit (`git rm --cached`); `--jq` regex escaping failure → temp-file+grep verification; fuzzy-match patch pitfall on the skill's own bullet lists
-- `references/demo-pm-backup-workflow-20260811.md` — clean 4-file Method A run: flagged b64 example verified remote-existing (no redaction needed); remote `.gitignore` drift from template; new `pm_triage_*.py` exclude family; tirith `delete in root path` blocks `/tmp` cleanup → skip cleanup; concurrent push → pull --rebase → push
-- `references/demo-pm-backup-workflow-20260813.md` — clean 12-file Method A run: new `query_issues.py` exclude gap (name matches no prefix pattern — detect any untracked root `.py` that reads .env); live `.gitignore` backfilled `triage_fetch.py`/`triage_v5.py`; concurrent push → pull --rebase → push; `git status` grep false-positive on `pm-triage-cron/` skill dir names
-- `references/demo-pm-backup-workflow-20260815.md` — clean Method A→B run: config.yaml all `api_key: ''` (no plaintext, no key_env replacement needed); `git pull --rebase` transport timeout (`Recv failure`) → subtree script with remote-HEAD parent absorbs concurrent advance (no manual rebase); post-push verification (0 plaintext keys, siblings intact); subtree script Step 3 double-upload fix
-- `references/demo-pm-backup-workflow-20260816.md` — clean Method A run (5 files + legacy cleanup): curl 000 but clone/pull-rebase/push all worked (confirms 000 ≠ push failure); tirith `confusable_domain` false positive when `)` follows a URL in a command substitution (split the command); legacy tracked `pm_triage_*.py` in cron/ + scripts/ SUBDIRS caught by post-push tree grep → `git rm --cached` cleanup commit
-- `references/demo-pm-backup-workflow-20260818.md` — clean 4-file Method A→B run: account flip confirmed again mid-run (pre-push check after commit); copy subtree script to /tmp before patching WORKTREE (avoids stale-constant phantom diff in next backup); curl 200 + gh api OK + git HTTP2 framing failure → subtree script first-try success; post-push verification with awk distribution check (blob count 596 → 597 = +1 new file)
-- `references/demo-pm-backup-workflow-20260825.md` — clean 3-file Method A run: all `api_key: ''` (no plaintext, no key_env replacement needed); account flip to OnePlusNPM occurred even with GITHUB_TOKEN UNSET (keyring race, not env override — pre-push check mandatory every run); concurrent remote advance handled by `git pull --rebase` + push; post-push verification (0 plaintext keys, 598 blobs, siblings intact)
-- `references/demo-pm-backup-workflow-20260826.md` — first no-clone+subtree merged script run (clone 443 timeout + 598-blob repo): created `scripts/gh-api-standalone-subtree-backup.py`; new `get_token.sh` exclude family (root-level .sh diagnostics that source .env); tracked legacy exclude removed from remote via deleted-diff (no git rm --cached needed in Method B)
-- `references/demo-pm-backup-workflow-20260827.md` — 56-blob Method B run: preflight scan caught 3 exclude gaps pre-upload (`tmp_triage/` dir, `gh_health_*.sh`, `healthcheck_*.py` — .env readers); b64 doc-example triage by decode (`R0lUSFVCX1RPS0VOPWdocF8qCg==` = `GITHUB_TOKEN=***`); post-push leak-grep false positive on a `healthcheck` filename in a skill doc
-- `references/demo-pm-backup-workflow-20260828.md` — 2-commit Method B run: 7 new root health diag scripts read .env; `pm_health`/`gh_health` broadening; ⚠️ blanket `health_` near-miss would delete legit nested comfyui health_check.py → root-scoped (pitfall above)
-- `references/demo-pm-backup-workflow-20260829.md` — Method B: b1724919 (5M+1A); new `triage_verify.py` exclude gap (root .env reader); preflight b64 doc-placeholder false-positive fix (`real()` decodes b64, filters placeholder chars); rule: local clone present ≠ Method A, verify local HEAD == remote HEAD first
-- `references/demo-pm-backup-workflow-20260830.md` — Method B: daab0134 (4M+3A) + follow-up 2bb2b656 (run note lands as separate commit, shows as `A` next run — expected); preflight CLEAN; demo-pm 590 blobs, siblings intact
-- `references/demo-pm-backup-workflow-20260831.md` — Method B: a1a6cd1a (5M+1A) + follow-up ea4f18cd; OnePlusNTester active at start (read-only, `push=false`) → switch + `.permissions.push` confirm before Method B; clone stale (ed4bcb8) → Method B; preflight CLEAN; demo-pm 591 blobs
-- `references/demo-pm-backup-workflow-20260901.md` — clean Method B run: main 0b65d1e2 (4M+0A+0D); config.yaml all 15 api_key empty → no key_env replacement needed; clone still stale (ed4bcb8 vs remote a91acd40) → Method B standalone-subtree; preflight CLEAN; post-push: 0 plaintext keys, no sensitive files, demo-pm 592 blobs, siblings intact (demo-dev 5, demo-tester 8, tester-01 5)
+- **Dated run notes (20260706 → present): full per-run summaries in `references/dated-runs-index.md` — append new runs there, NOT to this SKILL.md list (SKILL.md sits at the 100K char ceiling).** Individual transcripts: `references/demo-pm-backup-workflow-YYYYMMDD.md`. Latest: `demo-pm-backup-workflow-20260902.md` — clean Method B run (main ff785db0 3M+2A + follow-up 2107ebb1 run-note commit).
