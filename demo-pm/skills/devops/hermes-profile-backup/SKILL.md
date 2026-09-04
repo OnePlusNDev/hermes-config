@@ -129,6 +129,8 @@ rsync -a --delete \
   --exclude 'healthcheck_*.py' \
   --exclude '/health_*' \
   --exclude 'tmp_triage/' \
+  --exclude '/tmp/' \
+  --exclude '/tmp_pm/' \
   --exclude '._*' \
   --exclude 'memory_backup_*.json' \
   --exclude 'feishu_seen_message_ids.json' \

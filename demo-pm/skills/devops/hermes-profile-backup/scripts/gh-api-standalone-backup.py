@@ -113,6 +113,12 @@ def should_exclude(rel_path: str) -> bool:
     if len(parts) == 1 and fname.startswith("health_"):
         return True
 
+    # Root-level tmp dirs (tmp/, tmp_pm/) hold PM-triage diagnostic scripts that
+    # read .env for GITHUB_TOKEN (discovered 2026-09-04). Scoped to root: a blanket
+    # "tmp" dir exclude would swallow legit nested dirs.
+    if parts[0] in ("tmp", "tmp_pm"):
+        return True
+
     # cron/output/ — everything under it
     if "cron" in parts and "output" in parts:
         return True
