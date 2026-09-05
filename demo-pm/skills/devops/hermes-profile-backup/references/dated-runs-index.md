@@ -6,6 +6,12 @@ The lessons/pitfalls each run uncovered live in the main SKILL.md body; this ind
 searchable per-run summary. New runs: append a bullet here (NOT to SKILL.md — it is at the
 100K char ceiling) and add the dated file under references/.
 
+Run-note writing rule: the dated note + index bullet are committed BY the same-session
+follow-up push, so the follow-up SHA is unknowable while writing them — describe the planned
+follow-up content (e.g. "run note + index bullet + exclude syncs") instead of leaving `TBD`,
+and don't re-edit just to fill in the SHA (that forces a 3rd commit; the next run's diff shows
+it landed — 09-04 run followed this, 09-03 did not and left an uncommitted index edit behind).
+
 - `references/demo-pm-backup-workflow-20260710.md` — Annotated real-run transcript
 - `references/demo-pm-backup-workflow-20260711.md` — 44-file backup: hexdump token redaction (xxd hex+ASCII column both redacted), successful gh API fallback when git push failed on port 443 timeout, `.gitignore` expansion to 40+ patterns
 - `references/demo-pm-backup-workflow-20260712.md` — git credential helper 403 despite matching active gh user (detection + fix); broader file-scan discovery when GitHub push protection fires on an amended commit; rebase + regular push after divergence
