@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Cross-check helper: authoritative list endpoint + full health check."""
+"""Crosscheck: verify triage state with authoritative list endpoint.
+
+1. Query open issues assigned to OnePlusNPM (authoritative list endpoint).
+2. Query ALL open issues in repo, print assignee health check.
+"""
 import json
 import os
 import urllib.request
 
-PROFILE_DIR = os.path.expanduser("~/.hermes/profiles/demo-pm")
-ENV_PATH = os.path.join(PROFILE_DIR, ".env")
+GH_USERNAME = "OnePlusNPM"
 REPO = "demo-oneplusn/demo-workflow"
-ME = "OnePlusNPM"
+ENV_PATH = os.path.expanduser("~/.hermes/profiles/demo-pm/.env")
 
 
 def get_token():
@@ -23,7 +26,7 @@ def gh_get(url, token):
     req = urllib.request.Request(url)
     req.add_header("Authorization", "token " + token)
     req.add_header("Accept", "application/vnd.github.v3+json")
-    req.add_header("User-Agent", "PM-Triage-Cron/1.1")
+    req.add_header("User-Agent", "PM-Triage-Cron-Crosscheck/1.1")
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
 
@@ -31,27 +34,30 @@ def gh_get(url, token):
 def main():
     token = get_token()
 
-    # 1) Authoritative list endpoint: open issues assigned to me
-    list_url = "https://api.github.com/repos/" + REPO + "/issues?state=open&assignee=" + ME + "&per_page=100"
-    mine = gh_get(list_url, token)
-    print("LIST assigned-to-me count:", len(mine))
-    for i in mine:
-        print("  #%d %s" % (i["number"], i["title"][:70]))
+    # 1. Issues assigned to PM (authoritative)
+    pm_url = ("https://api.github.com/repos/" + REPO
+              + "/issues?state=open&assignee=" + GH_USERNAME + "&per_page=50")
+    pm_issues = gh_get(pm_url, token)
+    print("PM-assigned open issues (list endpoint):", len(pm_issues))
+    for i in pm_issues:
+        print("  #%d: %s" % (i["number"], i["title"][:70]))
 
-    # 2) Full health check: all open issues and their assignees
-    all_url = "https://api.github.com/repos/" + REPO + "/issues?state=open&per_page=100"
+    # 2. Full health check: all open issues and their assignees
+    all_url = ("https://api.github.com/repos/" + REPO
+               + "/issues?state=open&per_page=50")
     all_issues = [i for i in gh_get(all_url, token) if "pull_request" not in i]
-    print("ALL open issues (excl PRs):", len(all_issues))
+    print("\nAll open issues:", len(all_issues))
     for i in all_issues:
-        assignees = [a["login"] for a in i.get("assignees", [])]
-        labels = [l["name"] for l in i.get("labels", [])]
-        print("  #%d assignees=%s labels=%s | %s" % (i["number"], assignees, labels, i["title"][:60]))
+        labels = ",".join(l["name"] for l in i.get("labels", []))
+        assignees = ",".join(a["login"] for a in i.get("assignees", [])) or "(none)"
+        print("  #%d: assignee=[%s] labels=[%s] %s"
+              % (i["number"], assignees, labels, i["title"][:60]))
 
     # Decision
-    if len(mine) == 0:
-        print("CROSSCHECK: confirmed 0 issues assigned to PM -> SILENT")
+    if len(pm_issues) == 0:
+        print("\nCROSSCHECK_RESULT: NO_PM_TASKS")
     else:
-        print("CROSSCHECK: %d issue(s) still assigned to PM -> need triage" % len(mine))
+        print("\nCROSSCHECK_RESULT: PM_TASKS_FOUND")
 
 
 if __name__ == "__main__":

@@ -58,7 +58,15 @@ files carry tokens → re-run preflight until diff + scan are clean → run back
 
 ⚠️ A local clone that EXISTS is not enough for Method A — it must be CURRENT. `git status` only compares against the local `origin/main` ref, which can itself be stale. Verify `git rev-parse HEAD` against `gh api repos/<owner>/<repo>/git/refs/heads/main --jq '.object.sha'`; if the clone is behind, a Method A push would diverge — use Method B instead (verified 2026-08-29: clone at ed4bcb8, remote at c928b535).
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-02; full per-run index in `references/dated-runs-index.md`).
+Practice note (2026-09-05): runs 09-01 → 09-05 all went STRAIGHT to Method B
+standalone-subtree with NO clone attempt — the repo is 590+ blobs and
+git/libcurl transport has repeatedly timed out in cron mode, while the script
+never needs a worktree and absorbs concurrent HEAD advances by re-reading the
+remote ref (this run: preflight saw 02a146c2, script started on de474c3d, same
+4M+1A diff — no re-run needed). Attempt Method A only when you specifically
+need a local worktree.
+
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-05; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
@@ -1019,7 +1027,7 @@ This is the reliable form of the tree-leak check; single-path exact checks (`sel
 
 ### Patching this skill's own bullet lists — fuzzy matcher can consume adjacent lines
 
-When using the `patch` tool to insert a bullet into a multi-line list in this SKILL.md (e.g. the exclude-list docs), the fuzzy matcher can swallow the NEXT bullet line (verified 2026-08-08: adding the `pm_healthcheck_*.py` bullet silently deleted the following `**/._*` bullet). After any list edit, re-read the patched region and restore consumed lines — otherwise the corrupted doc gets committed in the backup itself.
+When using the `patch` tool to insert a bullet into a multi-line list in this SKILL.md (e.g. the exclude-list docs), the fuzzy matcher can swallow the NEXT bullet line (verified 2026-08-08: adding the `pm_healthcheck_*.py` bullet silently deleted the following `**/._*` bullet). After any list edit, re-read the patched region and restore consumed lines — otherwise the corrupted doc gets committed in the backup itself. Same applies to `references/dated-runs-index.md`: concurrent sessions/curator can append between your read and your patch (2026-09-05: patch tool warned the index had been modified by a sibling agent mid-run). Re-read immediately before patching it, and append new bullets at the END of the list — an append can't be consumed by the matcher; a mid-list edit can.
 
 ### Remote leak-check false positives from substring matching
 
