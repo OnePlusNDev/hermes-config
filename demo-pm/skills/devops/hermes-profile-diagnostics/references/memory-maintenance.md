@@ -1188,6 +1188,10 @@ The sync methods (`recall()`, `reflect()`, `consolidate()` shown above) block un
 
 The `banks` property's methods (e.g. `client.banks.list_banks()`) return coroutines, not sync values. If you need to list banks synchronously, fall back to curl or use the `openapi.json` endpoint directly. The `recall()`, `reflect()`, and `list_memories()` convenience methods on the `Hindsight` class ARE properly wrapped.
 
+### Pitfall — `r.usage` is NOT JSON-serializable
+
+`json.dumps(r.usage)` on a reflect result raises `TypeError: Object of type TokenUsage is not JSON serializable` (observed 2026-09-08). The reflect `text` is unaffected — only the usage print crashes and the traceback is noise. Access attributes instead: `r.usage.total_tokens` / `r.usage.input_tokens`, or just `print(r.usage)`.
+
 ### Pitfall — No `consolidate()` Method on `Hindsight` (v0.8.2)
 
 Verified 2026-08-06: `client.consolidate(bank_id=...)` raises `AttributeError: 'Hindsight' object has no attribute 'consolidate'`. The reflect convenience method works, but consolidation must go through the HTTP API:
@@ -1218,3 +1222,4 @@ When running as a cron job:
 4. **Bulk `rm` is blocked by the mass-deletion scanner.** Delete files one at a time, or skip unless the files are actually stale. Cleaning up config backups from 1 day ago triggers the scanner for no benefit. **Even a single `rm -f /tmp/...` can trip a "delete in root path" pending-approval block in cron mode (observed 2026-08-03).** Temp files under /tmp are harmless — leave them rather than attempt cleanup in cron runs.
 5. **No memories >30 days old is a valid outcome.** If MEMORY.md timestamps are all recent and the timeseries endpoint shows no old buckets, respond with `[SILENT]` — there's genuinely nothing to clean. Don't force an action just because the cron job fired.
 6. **`hermes sessions prune` runs inside the cron session's state.db — NOT other profiles.** If the cron profile owns the DB being pruned, use the CLI. If you need to clean another profile's sessions, use `hermes --profile <other> sessions prune` in a `terminal()` call, or target the SQLite DB directly.
+7. **Daemon can flap MID-RUN — a healthy `/health` response does not guarantee the next call succeeds.** Observed 2026-09-08: first `curl :9178/health` returned `{"status":"healthy"}`, then seconds later `/v1/default/banks` returned empty and a verbose curl showed `Connection refused` — the daemon died between the two calls. Do NOT waste time second-guessing the API path when a previously-working endpoint suddenly returns empty. Verify with `lsof -i :<port>` / `ps aux | grep hindsight-api`; if nothing listens, restart via the launcher script (`bash ~/.hermes/profiles/<profile>/scripts/start_hindsight_daemon.sh`, terminal background=true) and re-poll health until healthy (~5-25s). Treat each health probe as a snapshot, not a lease — re-check after any long gap or failed call.

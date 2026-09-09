@@ -34,3 +34,8 @@ all_issues=gh('https://api.github.com/repos/demo-oneplusn/demo-workflow/issues?s
 ## 其他备忘
 - `~/.hermes/profiles/demo-pm/RULES.md` 当前为**空文件**（0 行）——步骤 (1) 读取后无铁律可执行，属正常；不要因空而跳过读取，内容可能随时被写入。
 - `cron/jobs.json` 结构：`{'jobs': [...], 'updated_at': ...}`，jobs 为 list。分诊 job = `demo-pm-task-polling`（id `1a8d81813395`，schedule `0,30 * * * *`），历史输出在 `cron/output/1a8d81813395/`；勿与 `020650fcf9e2`（memory-cleanup）、`db397164dfb6`（config-backup）输出目录混淆。
+
+## 2026-09-09 cron 数据点：urllib SSL handshake 超时 → curl -u Basic Auth 兜底成功
+- `crosscheck.py`（urllib）**连续 3 次** `SSL handshake timed out`，而同一时刻 `curl https://api.github.com/rate_limit` 返回 200、`curl -u "OnePlusNPM:$TOK"` 访问权威 list 端点立即 200。
+- 教训：交叉验证遇 urllib SSL 握手超时**不要反复重试 python**，直接切 curl Basic Auth 兜底：`curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github.v3+json" ".../issues?state=open&assignee=OnePlusNPM&per_page=50" -o /tmp/pm_mine.json -w "%{http_code}\n"`，再用 read_file / python3 解析 JSON 文件（cron 下避免管道链）。
+- 本轮结果：权威 list 端点 0 个 assign 给 PM（`[]`）；全量健康检查 4 个 open issue #2/#4/#5/#7 全部 assign 给 `OnePlusNBoss`，无游离 → full_triage.py 的 `No issues to triage` 为真阴性 → `[SILENT]` 正确。
