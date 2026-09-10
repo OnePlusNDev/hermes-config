@@ -66,7 +66,7 @@ remote ref (this run: preflight saw 02a146c2, script started on de474c3d, same
 4M+1A diff — no re-run needed). Attempt Method A only when you specifically
 need a local worktree.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-07; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-09; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
@@ -1280,4 +1280,4 @@ for f in leaks:
 - `scripts/gh-api-standalone-subtree-backup.py` — Use when clone fails AND repo is large (590+ blobs): no-clone filesystem-walk + recursive subtree construction (avoids flat-tree 422 that the standalone script hits on large repos). Verified 2026-08-26.
 - `scripts/gh-api-incremental-push-subtree.py` — Incremental gh API push when a local clone exists AND the repo is large (589+ blobs): recursive subtree tree construction that avoids the flat-tree HTTP 422 "input too large" failure (verified 2026-08-10)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
-- **Dated run notes (20260706 → present): full per-run summaries in `references/dated-runs-index.md` — append new runs there, NOT to this SKILL.md list (SKILL.md sits at the 100K char ceiling).** Individual transcripts: `references/demo-pm-backup-workflow-YYYYMMDD.md`. Latest: `demo-pm-backup-workflow-20260907.md` — clean Method B run (main 2942cbbefa 4M+0A + follow-up 50c80167 run-note commit; first ref PATCH 422 → idempotent re-run; jobs.json SHA drift between diff passes = concurrent writer tell).
+- **Dated run notes (20260706 → present): full per-run summaries in `references/dated-runs-index.md` — append new runs there, NOT to this SKILL.md list (SKILL.md sits at the 100K char ceiling).** Individual transcripts: `references/demo-pm-backup-workflow-YYYYMMDD.md`. Latest: `demo-pm-backup-workflow-20260909.md` — clean Method B run (main 883b04a35a12 4M+0A: cron/jobs.json, ARCHIVE.md, hermes-profile-diagnostics/references/memory-maintenance.md, pm-triage-cron/references/2026-09-03-session-script-plus-list-endpoint-crosscheck.md + follow-up 1fe53ad11573 run-note commit; first ref PATCH 422 → idempotent re-run after remote HEAD advanced b84f2e3da4→b6f829eb74 mid-run; config.yaml all 15 api_key empty; demo-pm 603→604 blobs, siblings intact).
