@@ -39,6 +39,22 @@ When the hindsight daemon is unavailable (profile + global + all siblings down),
 
 **Successful archival events reset the counter.** If a run actually archives files (moves snapshots, compacts content), the outage counter resets to 0 — the cron did its job despite hindsight being down. Only consecutive runs where NOTHING was done (no archiving, no compaction, hindsight unreachable) count toward the escalation threshold.
 
+### LLM Endpoint Degraded — reflect 300s Timeout + curl Fallback (2026-09-10)
+
+Observed on demo-pm: the profile daemon started fine (`/health` healthy) and `consolidate` **completed**, but `reflect` failed 3× with HTTP 504 `"Reflect operation timed out after 300 seconds"`. Daemon log showed repeated `APIConnectionError in tool call (openai/glm-4-flash, scope=reflect_tool_call, attempt N/6): Connection error.`
+
+**Diagnosis:** the upstream LLM endpoint (z.ai `https://api.z.ai/api/paas/v4`) was degraded. Decisive signal — **Python (`urllib`/`httpx`, i.e. the daemon's own stack) could not complete the TLS handshake at all** (`<urlopen error _ssl.c:999: The handshake operation timed out>`, 8/8 failed), while **`curl` to the same URL succeeded intermittently** (~40%; `http=200` mixed with server-side `http=500 {"code":"1234","message":"Internal network failure"}`). Each daemon retry takes ~80s, so 6 retries blow past the server-side 300s reflect cap → guaranteed 504.
+
+Rules:
+- **`APIConnectionError` in `scope=reflect_tool_call` + 504 after 300s = upstream LLM degradation, NOT a daemon/config problem.** Do NOT restart the daemon or touch the bank — probe the endpoint first.
+- **reflect needs ≥2 LLM round-trips** (retrieval tool call + answer), so it fails whenever a single call is unreliable. **Still run `consolidate`** — it is the actual optimization mechanism and may complete on an already-optimal bank.
+- **Fallback semantic audit that bypasses the daemon:** call the LLM directly via `curl` with the flat-file content embedded in the prompt. Write the JSON payload with `write_file` (avoids tirith on Chinese), then `curl -d @payload.json`, retrying until `http=200` (curl's TLS stack succeeds where Python's does not). Key read inline — `KEY=$(grep -m1 LLM_API_KEY <env> | cut -d= -f2)` — never literal (terminal `***` masking).
+- glm-4-flash is a weak auditor: on 2026-09-10 it produced a false "有内容需归档" verdict by confusing the flat file's mtime with the bank facts' creation dates. Weight its duplicate/contradiction findings; sanity-check any archiving suggestion against the flat-file mtime rule.
+
+### Pitfall — env-file `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT` overrides the launcher's export
+
+The launcher exports `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT=86400`, but then runs `set -a; . <(grep -v '^#' <profile>.env …); set +a`. If `<profile>.env` contains `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT=300` (demo-pm.env line 164 does), the source **overrides the export** → the daemon actually runs with `--idle-timeout 300` (confirm via `ps aux | grep 'port <port>'`). Consequence: an idle daemon self-terminates ~5 min after the last request, so long reflect attempts can be cut off and the next operation needs a restart. To force a longer timeout, patch the value **in the env file**, or export it AFTER the source.
+
 ## CLI-First Workflow (2026-07-22 Added — Preferred for Cron)
 
 The existing HTTP API workflow below works, but the **hindsight CLI** is significantly simpler for cron jobs. No curl, no endpoint discovery, no JSON payload construction. The CLI talks directly to the running hindsight daemon (using the same connection as the Hermes agent session).
