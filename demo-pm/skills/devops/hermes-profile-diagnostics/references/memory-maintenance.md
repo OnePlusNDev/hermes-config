@@ -9,6 +9,12 @@ When the user says "archive old memories and optimize with hindsight," follow th
 
 ```
 1. Check file ages        → If all <30d → no file archive needed
+   ⚠️ Boundary rule — trust the calendar window, not the sub-day integer. The cron
+   fires ~15-20 min BEFORE the exact 30-day instant (file mtime 08-12 21:17, run at
+   09-11 21:0x) so `$(( (now - mtime) / 86400 ))` reports **29d** even though
+   08-12 → 09-11 is 30 calendar days. Do NOT skip the archive on that 29 reading:
+   when ARCHIVE.md's `保留策略` names today as the next archive date, the
+   documented calendar window wins. Verified 2026-09-11 (archived at 29.99d).
 2. Check char limits      → If file exceeds limit → compact (step 2b)
 2b. Compact if over-limit → MEMORY.md >2200ch or USER.md >1375ch → trim/restructure
 3. Check hindsight daemon → Is it healthy? Which bank?
@@ -49,6 +55,9 @@ Rules:
 - **`APIConnectionError` in `scope=reflect_tool_call` + 504 after 300s = upstream LLM degradation, NOT a daemon/config problem.** Do NOT restart the daemon or touch the bank — probe the endpoint first.
 - **reflect needs ≥2 LLM round-trips** (retrieval tool call + answer), so it fails whenever a single call is unreliable. **Still run `consolidate`** — it is the actual optimization mechanism and may complete on an already-optimal bank.
 - **Fallback semantic audit that bypasses the daemon:** call the LLM directly via `curl` with the flat-file content embedded in the prompt. Write the JSON payload with `write_file` (avoids tirith on Chinese), then `curl -d @payload.json`, retrying until `http=200` (curl's TLS stack succeeds where Python's does not). Key read inline — `KEY=$(grep -m1 LLM_API_KEY <env> | cut -d= -f2)` — never literal (terminal `***` masking).
+- **Disambiguation second reflect — the reliable fix for the false "needs archiving" verdict (verified 2026-09-11).** The conclusion-oriented primary query returned the bare one-liner `存在需要归档的过期事实。` — glm-4-flash reads the 48 config facts' creation date (2026-07-07) as staleness. **Do NOT act on it.** Run a *targeted second reflect* that strips the age framing and asks only about superseded contradictions and exact duplicates, e.g.:
+  `以下 48 条事实是长期有效的运维配置规则（飞书 App ID、网关端口、Issue 处理流程、LLM 模型端点）。创建时间较早并不代表过期。请判断：其中是否存在(a)被后续信息取代的矛盾条目，(b)完全重复的冗余条目？只列出确实有问题的条目并说明理由；如果都没有，直接回答「无矛盾、无冗余」。`
+  → returned `无矛盾、无冗余。` on the first attempt (7.0K tokens). Query phrasing is the whole fix — no daemon restart, no budget change, no transport switch. (Costs one extra ~7K-token reflect; worth it vs. wrongly archiving live config.)
 - glm-4-flash is a weak auditor: on 2026-09-10 it produced a false "有内容需归档" verdict by confusing the flat file's mtime with the bank facts' creation dates. Weight its duplicate/contradiction findings; sanity-check any archiving suggestion against the flat-file mtime rule.
 
 ### Pitfall — env-file `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT` overrides the launcher's export
@@ -591,6 +600,7 @@ memories/
 - Only keep **one snapshot per compaction event** — don't accumulate daily .bak files.
 - The ARCHIVE.md log is the browsable record; snapshot files are for forensic reference.
 - Date-stamp snapshot filenames: `MEMORY-YYYYMMDD.snapshot.md`
+- **Filename date ≠ content date.** The filename carries the **archive date** (the day the snapshot was taken); the ARCHIVE.md table's `原始日期` column carries the **content's own header date** (`最后更新`). E.g. `MEMORY-20260911.snapshot.md` taken 2026-09-11 holds content whose header reads `最后更新: 2026-08-12`. Keep the two straight when writing the archive rows. After snapshotting, refresh only the header date in the live file (content was already compact/active) and re-verify with `md5` that snapshot == source.
 - After archiving, delete the `.bak` files to keep the root directory clean.
 
 Built-in memory can live in **two possible locations** depending on profile configuration:

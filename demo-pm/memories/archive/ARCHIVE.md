@@ -1,6 +1,6 @@
 # ARCHIVE.md — demo-pm 记忆归档
 
-> 记忆清理时间: 2026-09-10
+> 记忆清理时间: 2026-09-11
 > 清理工具: Hindsight v0.8.2（profile daemon :9178，HF_HUB_OFFLINE=1 启动）
 
 ---
@@ -13,6 +13,8 @@
 | `USER-20260710.snapshot.md` | 2026-07-10 | 1,335 B | 旧版 USER.md.bak |
 | `MEMORY-20260812.snapshot.md` | 2026-07-12 | 1,578 B | 达到 30 天归档窗口的 MEMORY.md |
 | `USER-20260812.snapshot.md` | 2026-07-12 | 1,215 B | 达到 30 天归档窗口的 USER.md |
+| `MEMORY-20260911.snapshot.md` | 2026-08-12 | 1,625 B | 达到 30 天归档窗口的 MEMORY.md |
+| `USER-20260911.snapshot.md` | 2026-08-12 | 1,262 B | 达到 30 天归档窗口的 USER.md |
 
 ## 整理摘要
 
@@ -20,12 +22,12 @@
 - **USER.md**: 1,398 → 1,215 字符（-13%），精简表述；2026-08-12 达 30 天窗口，内容仍为活跃协作协议，刷新头部日期后保留
 - **Hindsight 优化**: 触发 `demo-pm-memory` 银行 reflect（include_facts=True）确认 48 facts 无过期/冗余/矛盾；consolidation completed（op dc86574b，deduplicated=false）
 - **30+天旧记忆**: ✅ 无（bank 内 48 facts 均为活跃持久配置；本次文件归档为 30 天窗口例行快照）
-- **最近一次清理（2026-09-10）**: 文件均 29d 未达阈值（无需归档）；consolidation completed（op c9dd3c82）；daemon reflect 因 z.ai 上游端点故障不可用（非 daemon 问题），语义审计改由直连 z.ai 完成：无重复/无矛盾，唯一失效项为已标注的 secret 10014
+- **最近一次清理（2026-09-11）**: MEMORY.md / USER.md 达 30 天窗口（08-12 → 09-11），生成快照 `MEMORY-20260911` / `USER-20260911` 并刷新头部日期；字符数低于上限（1625/2200、1262/1375），内容为活跃持久配置，无需压缩；Hindsight reflect 首轮报「存在过期事实」，经二次定向 reflect 澄清为创建时间错觉（48 facts 创建于 2026-07-07 但长期有效），确认无矛盾/无冗余；consolidation completed（op 5a48d012）
 
 ## 保留策略
 
 - 镜像文件 (`.bak`) 归档后删除，原始内容已浓缩至当前文件
-- 下次清理: 2026-09-11（MEMORY.md / USER.md 届时达 30 天归档窗口，需生成新快照）
+- 下次清理: 2026-10-11（MEMORY.md / USER.md 届时达 30 天归档窗口，需生成新快照）
 
 ---
 
@@ -55,3 +57,4 @@
 | 2026-09-08 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天内存文件需归档（MEMORY.md 26d / USER.md 26d 均新鲜，字符数低于上限：1625/1262 B；默认 profile memories 目录已无 .md 文件，非 demo-pm 范围，未动）；Hindsight daemon :9178 成功启动（launcher 脚本，~20s 后 healthy，PG 热启动）；bank reflect（hindsight_client，include_facts=True，结论式中文 query）确认 48 facts（~83d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，无需归档；consolidation completed（op 945409fc，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
 | 2026-09-09 | Hindsight reflect + consolidation（清理 cron） | ✅ 无 30+天内存文件需归档（MEMORY.md 27d / USER.md 27d 均新鲜，字符数低于上限：1245/584 chars；默认 profile memories 目录已无 .md 文件，非 demo-pm 范围，未动）；Hindsight daemon :9178 成功启动（launcher 脚本，~5s 后 healthy）；bank reflect（hindsight_client，include_facts=True，结论式中文 query，6.8K tokens）确认 48 facts（~84d 旧但均为活跃持久配置 Feishu/LLM/Gateway/Issue 规则）无过期/冗余/矛盾，无需归档；consolidation completed（op 02423abb，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |
 | 2026-09-10 | Hindsight consolidation（清理 cron） | ✅ 无 30+天文件级记忆需归档（MEMORY.md 28d / USER.md 28d 均未达 30 天阈值，字符数低于上限：1625/1262 B，归档窗口约 09-11 开启；默认 profile memories 目录无 .md 文件，非 demo-pm 范围）；Hindsight daemon :9178 成功启动（launcher 脚本 + HF_HUB_OFFLINE=1，LLM 连接校验重试后 ~4min healthy）；⚠️ reflect 三次尝试均因 z.ai（glm-4-flash）端点 APIConnectionError / HTTP 500「Internal network failure」达 300s 上限失败（上游故障，非 daemon 问题；直连探测 z.ai chat/completions 成功率约 40%）；consolidation completed（op c9dd3c82-2d2f-4c63-9a68-48420d99ab1c，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；语义审计改由直连 z.ai chat/completions 完成（curl，第 2 次成功，glm-4-flash，1308 tokens）：无重复、无矛盾，唯一失效项为 MEMORY.md 中已标注的「4 profile secret 10014 invalid」；session 保留策略不变 |
+| 2026-09-11 | 文件归档 + Hindsight reflect + consolidation（清理 cron） | ✅ MEMORY.md / USER.md 达 30 天窗口（08-12 → 09-11），已生成快照 `MEMORY-20260911.snapshot.md`（1,625 B）、`USER-20260911.snapshot.md`（1,262 B）并刷新头部日期；字符数低于上限（1625/2200、1262/1375），内容均为活跃持久配置，无需压缩；默认 profile memories 目录无 .md 文件，非 demo-pm 范围，未动；Hindsight daemon :9178 成功启动（launcher 脚本，~15s 后 healthy）；bank reflect（hindsight_client，include_facts=True，6.8K tokens）首轮报「存在需归档的过期事实」，经二次定向 reflect 澄清为创建时间错觉（48 facts 创建于 2026-07-07 但均为长期有效配置），确认「无矛盾、无冗余」；consolidation completed（op 5a48d012-d50c-4f72-ab07-f4c0bc8e7271，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |

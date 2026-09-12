@@ -58,15 +58,18 @@ files carry tokens → re-run preflight until diff + scan are clean → run back
 
 ⚠️ A local clone that EXISTS is not enough for Method A — it must be CURRENT. `git status` only compares against the local `origin/main` ref, which can itself be stale. Verify `git rev-parse HEAD` against `gh api repos/<owner>/<repo>/git/refs/heads/main --jq '.object.sha'`; if the clone is behind, a Method A push would diverge — use Method B instead (verified 2026-08-29: clone at ed4bcb8, remote at c928b535).
 
-Practice note (2026-09-05): runs 09-01 → 09-05 all went STRAIGHT to Method B
-standalone-subtree with NO clone attempt — the repo is 590+ blobs and
-git/libcurl transport has repeatedly timed out in cron mode, while the script
-never needs a worktree and absorbs concurrent HEAD advances by re-reading the
-remote ref (this run: preflight saw 02a146c2, script started on de474c3d, same
-4M+1A diff — no re-run needed). Attempt Method A only when you specifically
-need a local worktree.
+Practice note (extended through 2026-09-11): runs 09-01 → 09-11 all went
+STRAIGHT to Method B standalone-subtree with NO clone attempt — the repo is
+625+ blobs and git/libcurl transport has repeatedly timed out in cron mode,
+while the script never needs a worktree and absorbs concurrent HEAD advances by
+re-reading the remote ref. From 09-06 onward the ref-PATCH HTTP 422 "Update is
+not a fast forward" recurs on MOST runs (a concurrent sibling-profile backup
+advances `main` during the ~1–2 min blob phase). Budget exactly ONE plain
+re-run: blob SHAs are idempotent, so the re-run just re-parents the identical
+commit on the fresh HEAD. Do NOT rebase, do NOT attempt tree surgery, and do
+NOT treat it as a partial failure — the first run's blobs are already uploaded.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-09; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-11; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
@@ -1026,9 +1029,18 @@ grep -E 'pm_healthcheck|tmp_.*\.py|triage_(issues|check|fetch|v5)\.py|cron_triag
 
 This is the reliable form of the tree-leak check; single-path exact checks (`select(.path=="demo-pm/...")`) still work fine in `--jq`. For the top-level directory distribution (sibling-profile integrity), an awk one-liner on the dumped paths file is simpler than the jq `group_by` form and avoids jq escaping entirely: `awk -F/ '{print $1}' /tmp/remote_paths.txt | sort | uniq -c` (verified 2026-08-18).
 
-### Patching this skill's own bullet lists — fuzzy matcher can consume adjacent lines
+### Patching this skill's own SKILL.md — the fuzzy matcher can corrupt adjacent lines (swallow OR duplicate)
 
-When using the `patch` tool to insert a bullet into a multi-line list in this SKILL.md (e.g. the exclude-list docs), the fuzzy matcher can swallow the NEXT bullet line (verified 2026-08-08: adding the `pm_healthcheck_*.py` bullet silently deleted the following `**/._*` bullet). After any list edit, re-read the patched region and restore consumed lines — otherwise the corrupted doc gets committed in the backup itself. Same applies to `references/dated-runs-index.md`: concurrent sessions/curator can append between your read and your patch (2026-09-05: patch tool warned the index had been modified by a sibling agent mid-run). Re-read immediately before patching it, and append new bullets at the END of the list — an append can't be consumed by the matcher; a mid-list edit can.
+When using the `patch` tool to edit this SKILL.md, the fuzzy matcher can corrupt the region in TWO opposite ways — check for BOTH after every edit:
+
+1. **Swallows a following line** (verified 2026-08-08): adding the `pm_healthcheck_*.py` bullet silently deleted the following `**/._*` bullet.
+2. **DUPLICATES the boundary line instead of removing it** (verified 2026-09-11): replacing a 7-line block whose LAST line was ``Dated run notes: … (latest: 2026-09-09 …)`` left BOTH the new `… 2026-09-11 …` line AND the stale `… 2026-09-09 …` line in place. The following table row survived, so the damage was a stale duplicate rather than a deletion — the kind of thing a skim misses.
+
+Mitigations:
+- End the `old_string` one line PAST the region being rewritten, and repeat that anchor line verbatim in `new_string` — this pins the boundary so the next line can't be swallowed or duplicated.
+- Verify by reading the returned `diff` (or re-reading the region), and confirm the OLD text is actually gone: `grep -c '<stale text>' SKILL.md` must be 0.
+- Do NOT try to probe whether a line survived with an identity patch (`old_string == new_string`) — the tool rejects it with "old_string and new_string are identical" BEFORE searching, so it returns no signal either way.
+- Same applies to `references/dated-runs-index.md`: concurrent sessions/curator can append between your read and your patch (2026-09-05: patch tool warned the index had been modified by a sibling agent mid-run). Re-read immediately before patching it, and append new bullets at the END of the list — an append can't be consumed by the matcher; a mid-list edit can.
 
 ### Remote leak-check false positives from substring matching
 
@@ -1280,4 +1292,4 @@ for f in leaks:
 - `scripts/gh-api-standalone-subtree-backup.py` — Use when clone fails AND repo is large (590+ blobs): no-clone filesystem-walk + recursive subtree construction (avoids flat-tree 422 that the standalone script hits on large repos). Verified 2026-08-26.
 - `scripts/gh-api-incremental-push-subtree.py` — Incremental gh API push when a local clone exists AND the repo is large (589+ blobs): recursive subtree tree construction that avoids the flat-tree HTTP 422 "input too large" failure (verified 2026-08-10)
 - `references/backup-report-template.md` (available in `autonomous-ai-agents/hermes-agent/`) — Backup report format
-- **Dated run notes (20260706 → present): full per-run summaries in `references/dated-runs-index.md` — append new runs there, NOT to this SKILL.md list (SKILL.md sits at the 100K char ceiling).** Individual transcripts: `references/demo-pm-backup-workflow-YYYYMMDD.md`. Latest: `demo-pm-backup-workflow-20260910.md` — clean Method B run (main 952f040a52d9 4M+0A+0D: cron/jobs.json, ARCHIVE.md, backup SKILL.md, pm-triage-cron/SKILL.md + follow-up c40df19cc20b run-note commit 1M+1A; remote HEAD stable at 1fe53ad11573 through the MAIN commit — no 422 there; follow-up ref PATCH then hit 422 and the plain re-run absorbed the concurrent advance 952f040a52d9→3af3afa18abf; config.yaml all 15 api_key empty; demo-pm 605→606 blobs, siblings intact (demo-dev 5, demo-tester 8, tester-01 5, .gitignore 1)).
+- **Dated run notes (20260706 → present): full per-run summaries in `references/dated-runs-index.md` — append new runs there, NOT to this SKILL.md list (SKILL.md sits at the 100K char ceiling).** Individual transcripts: `references/demo-pm-backup-workflow-YYYYMMDD.md`. Latest: `demo-pm-backup-workflow-20260911.md` — clean Method B run (main 1cb42187ea8b 7M+0A+0D: channel_directory.json, cron/jobs.json, ARCHIVE.md, demo-pm-github-api/SKILL.md, backup SKILL.md, hermes-profile-diagnostics/references/memory-maintenance.md, pm-triage-cron/SKILL.md + follow-up ff288da3e72e 1M+1A; first ref PATCH hit 422 non-fast-forward c40df19cc20b→163c7f57eca5, absorbed by plain re-run; pre-flight found active gh user OnePlusNTester with push=false → `gh auth switch --user OnePlusNDev` required; config.yaml all 15 api_key empty; demo-pm 605→607 blobs, siblings intact).
