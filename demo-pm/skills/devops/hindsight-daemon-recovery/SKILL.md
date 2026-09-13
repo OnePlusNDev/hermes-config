@@ -79,6 +79,8 @@ Process-substitution sourcing reads the real API key from the file at runtime �
 
 **Ready-made launcher (demo-pm):** the same script is saved at `~/.hermes/profiles/demo-pm/scripts/start_hindsight_daemon.sh` — reuse it instead of recreating: run with `terminal(background=true)` → `bash ~/.hermes/profiles/demo-pm/scripts/start_hindsight_daemon.sh`, then poll `curl -s http://127.0.0.1:9178/health` until healthy. Re-verified 2026-08-06 (healthy in ~10s). Note: a sibling subagent may rewrite this file — read it before relying on it if the content looks different.
 
+⚠️ The `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT=86400` export in that launcher is **overridden** by the profile env file (demo-pm.env sets `300`), and re-exporting it *after* the `. env` source does **not** help — verified 2026-09-12: the daemon still ran `--idle-timeout 300`. It's harmless for a cleanup run (reflect + consolidate finish in seconds, well inside the 5-min window). To actually change it, patch the value in the env file. See `hermes-profile-diagnostics/references/memory-maintenance.md` → idle-timeout pitfall.
+
 ### Step 1b — Verify AFTER the banner, on the PROFILE's port
 
 **⚠️ "Daemon started successfully!" is NOT proof the daemon survived.** The wrapper can print the banner and exit while the daemon dies shortly after (wrong port, crash). Never trust the banner — verify the listener and health on the profile's own port:

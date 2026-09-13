@@ -263,6 +263,7 @@ When neither `git clone` nor `gh api` are available, write a Python script via `
 - `context_length_cache.yaml` — context length preferences
 - `cron/jobs.json` — scheduled cron job configurations
 - `memories/MEMORY.md`, `memories/USER.md` — persistent memory
+- `memories/archive/` (e.g. `ARCHIVE.md`, `MEMORY-YYYYMMDD.snapshot.md`, `USER-YYYYMMDD.snapshot.md`) — memory archive + dated snapshots; these ARE intended content and get backed up. Distinct from the excluded `memory_backup_*.json` runtime dumps (config-like .md archive vs machine-written .json snapshot).
 - `skills/DESCRIPTION.md` — skill category descriptions
 - Custom skill SKILL.md, references/, templates/, scripts/ files
 
@@ -295,6 +296,18 @@ When neither `git clone` nor `gh api` are available, write a Python script via `
 - `.local/` — local state at profile root (gh device-id, other CLI credentials)
 
 ## Pitfalls
+
+### Post-push leak-scan false positives on doc filenames (verify, don't panic)
+
+The post-push sensitive-path grep matches substrings anywhere in a path, so it
+flags DOCUMENTATION whose filename merely contains a sensitive term — that is not a
+leak. Seen twice: `healthcheck` in a skill doc (2026-08-27), and
+`demo-pm/skills/devops/hermes-profile-backup/references/tirith-cron-workarounds.md`
+(2026-09-12; matched the `tirith` pattern that is meant for the `bin/tirith` binary).
+Rule: before reporting a leak, check WHETHER the hit is a `*.md` doc / `references/`
+file. A real leak lives at a binary/state path (`bin/tirith`, `home/`, `.env`,
+`auth.json`, `auth.lock`, `state.db*`, `processes.json`, `.local/`) — never a markdown
+reference. Report it as a verified false positive, not a leak.
 
 ### rsync DST must be an absolute path — a `VAR=` prefix in a temp file makes it relative
 
