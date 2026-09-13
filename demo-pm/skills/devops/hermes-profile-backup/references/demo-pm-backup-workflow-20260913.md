@@ -1,9 +1,10 @@
 # demo-pm backup run — 2026-09-13
 
 ## Result
-**Method B (standalone subtree, no clone)** — success, first attempt (no 422).
-Commit: `67d204819bc34e738d6b60f33a4633d58aef144b`
-URL: https://github.com/OnePlusNDev/hermes-config/commit/67d204819bc34e738d6b60f33a4633d58aef144b
+**Method B (standalone subtree, no clone)** — success.
+Main commit: `67d204819bc34e738d6b60f33a4633d58aef144b` (first attempt, no 422)
+Follow-up commit (this run note + index + SKILL.md pointer): `22aed9986090bb142a216bd637348c4bb307ad99`
+URL: https://github.com/OnePlusNDev/hermes-config/commit/22aed9986090bb142a216bd637348c4bb307ad99
 
 ## Pre-flight
 - `gh api user` → `OnePlusNDev` (repo owner; `permissions.push` = **true**, `admin` = true) — no account switch needed
@@ -28,10 +29,14 @@ A  demo-pm/skills/devops/pm-triage-cron/references/2026-09-13-silent-noop-siblin
 ## Execution notes
 - Remote HEAD was `a71121b57290` at start; ref PATCH succeeded on the **first** run — remote HEAD
   was stable through the blob phase this time (breaks a 09-06→09-12 streak of HTTP 422
-  non-fast-forward races from a concurrent sibling-profile backup). No re-run needed.
-- 7 blobs uploaded, all idempotent SHAs; `demo-pm` subtree `a2a9eec0`, top tree `da46ecf5`.
-- Local SKILL.md/edit churn noted at diff time was unrelated to this run's script (no exclude
-  gaps found this run; no EXCLUDE_* changes required).
+  non-fast-forward races from a concurrent sibling-profile backup).
+- The **follow-up** commit (run note + index + SKILL.md pointer) DID hit one HTTP 422
+  non-fast-forward: HEAD advanced `67d204819bc3` → `12d16935388a` during its blob phase.
+  Plain re-run absorbed it (idempotent 3 blobs, auto re-parent) → `22aed9986090`. Consistent
+  with the documented 09-06→09-12 pattern; budget exactly one re-run, no tree surgery.
+- 7 blobs uploaded in the main commit (`demo-pm` subtree `a2a9eec0`, top tree `da46ecf5`);
+  3 blobs in the follow-up (`demo-pm` subtree `64cad557`, top tree `0afb5554`).
+- No exclude gaps found this run; no EXCLUDE_* changes required.
 
 ## Post-push remote verification
 - Remote `demo-pm/config.yaml`: 17021 bytes, `sk-` matches = **0**; `api_key` lines = 15, all empty (**0** non-empty)
