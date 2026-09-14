@@ -34,3 +34,12 @@ PM 定时分诊轮询（profile `demo-pm` / GitHub `OnePlusNPM`）。`RULES.md` 
 - 复现「解析脚本撞名」：`/tmp/pm_parse_all.py` 又被兄弟轮次覆盖告警，改唯一名 `/tmp/pm_parse_pm_0913_final_z9.py` 后消失。
 - `RULES.md` 仍为 0 字节空文件。
 - 备注：SKILL.md 已达 100,000 字符上限，新基线只能写入 references/（本次如此处理）。
+
+## 2026-09-13 第三轮复跑（零摩擦，路径已稳定）
+- 脚本 `/tmp/pm_fetch_0913_d1.sh`：`KEY="GITHUB_TOKEN"` 变量键名 + `cut` 提 token，
+  一次抓 mine+all → `token_len=40` / `HTTP_MINE=200` / `HTTP_ALL=200`；
+  mine=5 字节（`od -c` 确认 `[ \n \n ] \n`），all=33096 字节。
+- 全量 open = 5 条，assignee 全部 `OnePlusNBoss`：#2/#4/#5（`type:feature`+`priority:normal`）、
+  #6（PR，`type:feature`）、#7（验证报告，无标签）。PM 名下 0 条 → `[SILENT]`。
+- 唯一命名用 shell `$$`（PID）最省事：`/tmp/pmx_{mine,all}_$$.json`、解析脚本 `/tmp/pm_parse_pm_0913_d1.py`，无撞名告警。
+- `RULES.md` 仍为 0 字节空文件。

@@ -459,6 +459,28 @@ gh api repos/$OWNER/hermes-config --jq '.permissions.push'  # true = can push
 
 Also: a collaborator account can LOSE write access between runs (OnePlusNPM had push access in 2026-07-27, read-only by 2026-08-05). Check `gh api repos/$OWNER/$REPO --jq '.permissions.push'` before choosing the account — don't assume collaborator access persists.
 
+### Piping the script's output reorders stderr ahead of stdout — a FATAL looks like it fired FIRST
+
+`python3 script.py 2>&1 | tail -N` block-buffers **stdout** (piped) but leaves
+**stderr** unbuffered. So a ref-PATCH `FATAL ref update: ... (HTTP 422)` written
+to stderr is flushed and appears BEFORE all the `=== Step N ===` stdout lines.
+The tail then reads "FATAL 422, then Step 1, Step 2, ... Step 7" — which looks
+like the script failed and silently re-ran itself. It did not. Verified
+2026-09-13: the follow-up commit's piped output led with a FATAL 422 while the
+log actually ended in a clean Step 7 + success URL, costing a needless re-run.
+
+Always capture to a file with unbuffered stdout, then read the file and the
+exit code:
+
+```bash
+python3 -u /tmp/gh-api-standalone-subtree-backup.py > /tmp/backup_run.log 2>&1
+echo "exit=$?"; cat /tmp/backup_run.log
+```
+
+Judge success from `exit=0` + the log's final `Remote HEAD now:` / `Done:` line
+— never from interleaved `2>&1 | tail` output. (`-u` is the key flag; without it
+a clean run's stdout can still land after a stray stderr line.)
+
 ### `timeout` command not available on macOS
 
 The `timeout` command (from GNU coreutils) is **not** available on macOS by default. When the SKILL.md shows `timeout 60 git push`, replace it with the terminal's built-in timeout parameter instead:
