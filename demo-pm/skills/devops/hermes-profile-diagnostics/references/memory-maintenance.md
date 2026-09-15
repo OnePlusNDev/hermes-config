@@ -136,7 +136,13 @@ Observed 2026-08-02 with glm-4-flash on the demo-pm daemon: the CLI and plain HT
 - **HTTP `POST /reflect` with `mode: full`** returned a generic refusal: *"I don't have direct access to review the contents of the memory bank... I cannot identify any outdated..."* — the LLM was NOT fed the bank facts.
 - **✅ `hindsight_client.reflect(bank_id=..., query=..., budget='low', include_facts=True)`** returned the full analysis (e.g. "The configuration facts from 2026-06-14 to 06-17 ... are still valid to keep").
 
-**Retry pattern for truncated tool-call reflect (glm-4-flash).** Observed 2026-08-11: even `hindsight_client.reflect(..., include_facts=True)` returned a truncated tool-call on the FIRST attempt — `text` was `search_observations\n{"query": "redundant or duplicate information"}` instead of an analysis. Do NOT restart the daemon or switch transport — the fix is **query phrasing**: retry with a query that explicitly demands a direct conclusion, e.g. `'给出当前记忆健康度评估：是否存在需要归档的过期事实（30天以上）、重复信息或矛盾信息？请直接回答结论。'`. This returned a clean one-line answer on the second attempt (6.8K input tokens). **Verified 2026-08-14: use this exact conclusion-oriented phrasing as the PRIMARY query (not just the retry fallback) — it returned a clean one-line conclusion on the FIRST attempt (~6.8K input tokens) with no tool-call truncation. Re-verified 2026-08-30, 2026-09-07, and 2026-09-12: same query returned a clean one-line conclusion on first attempt (no truncation). On 2026-09-12 it returned 「无需要归档的过期事实、重复信息或矛盾信息。」 with **no** false "creation time" verdict — confirming the 09-11 misreport was a one-off phrasing artifact, not recurring drift. The disambiguation second reflect remains the documented fallback if it ever recurs.** Rules learned:
+**Retry pattern for truncated tool-call reflect (glm-4-flash).** Observed 2026-08-11: even `hindsight_client.reflect(..., include_facts=True)` returned a truncated tool-call on the FIRST attempt — `text` was `search_observations\n{"query": "redundant or duplicate information"}` instead of an analysis. Do NOT restart the daemon or switch transport — the fix is **query phrasing**: retry with a query that explicitly demands a direct conclusion, e.g. `'给出当前记忆健康度评估：是否存在需要归档的过期事实（30天以上）、重复信息或矛盾信息？请直接回答结论。'`. This returned a clean one-line answer on the second attempt (6.8K input tokens). **Verified 2026-08-14: use this exact conclusion-oriented phrasing as the PRIMARY query (not just the retry fallback) — it returned a clean one-line conclusion on the FIRST attempt (~6.8K input tokens) with no tool-call truncation. Re-verified 2026-08-30, 2026-09-07, and 2026-09-12: same query returned a clean one-line conclusion on first attempt (no truncation). On 2026-09-12 it returned 「无需要归档的过期事实、重复信息或矛盾信息。」 with **no** false "creation time" verdict — so the 09-11 misreport did not appear that day.
+
+**⚠️ Correction (2026-09-14) — the false positive RECURS; it is NOT a one-off.** On 2026-09-14 the same primary query again returned the bare affirmation 「存在需要归档的过期事实（30天以上）、重复信息或矛盾信息。」 on the first attempt, and the targeted disambiguation reflect immediately returned 「无矛盾、无冗余。」. Treat the primary query as reliable *most* days but with an intermittent false-positive branch: **whenever the primary answer is a bare affirmation (a restatement of the question's own options) rather than an analysis, run the disambiguation reflect — do not act on it and do not "confirm" it as drift.** The disambiguation reflect is a standing second step, not a rare rescue.
+
+**Token count is the cheap, mechanical tell for a degenerate reflect (2026-09-14).** A healthy full-context reflect that actually fed the 48 facts into the prompt costs **~6.8–7.0K input tokens** (observed repeatedly). The 2026-09-14 false positive cost only **2.2K input tokens** — the model answered *without* reading the bank, i.e. it echoed the question instead of analyzing. Rule: after every reflect, read `r.usage.input_tokens`; if it is far below the established baseline for the bank (≈7K here), the conclusion is untrustworthy **regardless of its wording**, and the disambiguation reflect (which costs the expected ~7K) is required. This check is faster and more objective than judging the phrasing — a sub-baseline token count *always* accompanied the echo-style non-answer.
+
+**Verified 2026-08-14: use this exact conclusion-oriented phrasing as the PRIMARY query (not just the retry fallback) — it returned a clean one-line conclusion on the FIRST attempt (~6.8K input tokens) with no tool-call truncation. Re-verified 2026-08-30, 2026-09-07, 2026-09-12, and 2026-09-14 (clean on the second, disambiguation pass).** Rules learned:
 - Ask the LLM to 「直接回答结论」 (answer directly with a conclusion) — open-ended multi-part English queries invite the `search_observations` tool call, and the CLI/client captures the tool-call text as the final answer.
 - Keep the query single-intent and conclusion-oriented; verify `text` is not a bare tool-call name before trusting it.
 - The existing "restart daemon, retry with --budget low" advice applies to daemon crashes (connection refused), NOT to truncated tool-call responses — different failure, different fix.
@@ -251,7 +257,19 @@ for f in ~/.hermes/memories/*.md ~/.hermes/profiles/<profile>/memories/*.md; do
 done
 
 # Clean up old sessions via CLI (more reliable than raw sqlite3)
-hermes sessions prune --older-than 30
+# ⚠️ Do NOT hardcode 30. The retention window is a PER-PROFILE CONFIG VALUE — read it first:
+grep -A6 '^sessions:' ~/.hermes/profiles/<profile>/config.yaml
+#   e.g. demo-pm: `auto_prune: false`, `retention_days: 90`, `vacuum_after_prune: true`
+# Pruning at 30 days when the profile's policy is 90 would delete sessions the user
+# deliberately retained. Verify against the CONFIGURED window, not the cron's phrasing.
+# Verified 2026-09-14 (demo-pm): 2732 sessions >30d but **0** >90d → the correct
+# outcome is "no prune; session retention policy unchanged" (what the daily log records).
+
+# Read-only check against the configured window (safe in cron):
+sqlite3 -readonly ~/.hermes/profiles/<profile>/state.db \
+  "SELECT COUNT(*) FROM sessions WHERE started_at < strftime('%s','now','-90 days');"
+
+hermes sessions prune --older-than <retention_days from config>
 # NOTE: --older-than takes an INT (days), NOT a '30d' suffix (that errors: invalid int value)
 # No --dry-run flag exists in current versions — inspect via SQL first, then prune with --yes
 ```
@@ -517,8 +535,12 @@ curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/operations?limit=5"
 ## Full Bank Stats
 
 ```bash
+# ⚠️ stats is a **GET**. Sending POST returns HTTP 405 {"detail":"Method Not Allowed"} —
+# don't wrap it in -X POST just because consolidate takes a POST body. (Verified 2026-09-14.)
 curl -s "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/stats"
 ```
+
+CLI equivalent: `hindsight bank stats <bank_id> -o json` — set `HINDSIGHT_API_URL=http://127.0.0.1:<port>` first, or the CLI silently targets the global :8888.
 
 Key fields:
 - `total_nodes` — total memory facts

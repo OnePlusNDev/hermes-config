@@ -20,3 +20,9 @@ description: demo-pm profile 调用 GitHub API 的正确认证方式与分诊轮
 - gh CLI keyring 中 active 账号是 OnePlusNDev（非 OnePlusNPM），`gh api` 默认以 Dev 身份操作，不要直接用。
 - cron 模式下 execute_code 被禁用、管道到解释器（curl | python3）会触发安全审批拦截；正确做法：curl 输出到文件 → read_file 或单独 python3 处理。
 - 查询 assignee 为自己：`/repos/demo-oneplusn/demo-workflow/issues?state=open&assignee=OnePlusNPM`。
+- **cron 轮次收尾不要批量 `rm` 临时文件（2026-09-14 实证）：** `rm -f a.sh b.sh c.py d.py`（一次 4 个非构建文件）触发 tirith `mass_file_deletion` [CRITICAL] → `status: pending_approval`；cron 无人审批，清理动作静默悬空（`exit_code: -1`）。临时文件名本就带轮次后缀、互不覆盖，**留在 /tmp 即可**，别为了整洁去 rm。
+- **判定「无待办」要两步（2026-09-14 实证）：** `assignee=OnePlusNPM` 查询返回 5 字节 `[\n\n]` 时，先 `head -c 300 <json>` 确认是真空数组（不是被截断的空响应体），再去掉 `assignee` 参数做全量 open crosscheck；只有交叉核对确认没有挂在 PM 名下的 issue，才回 `[SILENT]`。只见空结果就静默，可能在 filter 失效时漏掉真正待分诊的任务。
+- **写盘后先 `read_file` 回读脚本再 `bash` 执行**：坏脚本症状是 `grep: repetition-operator operand invalid` / `unexpected EOF while looking for matching quote`。2026-09-14 一轮用变量式 key 写法（`KEY="GITHUB_TOKEN"` + `grep "^${KEY}="`）写盘完好，`token_len=40` / `HTTP=200` 一次通过。
+- **crosscheck 计数含 PR（2026-09-15 实测）：** `/issues?state=open` 返回的数组里混有 PR（条目带 `pull_request` 键）。解析时先 `if "pull_request" in it: continue` 再打印，否则会出现 `total_open: 5` 却只列出 4 条 issue 的困惑（差额就是 PR，不是脚本丢数据）。判定「无待办」以 `PM_assigned` 列表为空为准。
+- `~/.hermes/profiles/demo-pm/RULES.md` 可能是 0 字节空文件（2026-09-14 实测 `total_lines: 0`）；读到空文件不代表故障，继续按任务描述里的协作铁律执行轮次即可。
+- 更多本轮细节见 `pm-triage-cron` 的 `references/2026-09-14-cron-empty-assignee-and-mass-deletion-guard.md`。

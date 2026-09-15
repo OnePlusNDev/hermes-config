@@ -25,7 +25,7 @@ curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
 
 **禁用清单（实测踩过，勿再试）：** `execute_code`（cron 默认拦，非故障；可信可开 `approvals.cron_mode: approve`，否则用 write_file+terminal）、`read_file` 读 `.env`（Access Denied）、`curl | python3`（tirith 拦截）、urllib 直连（TLS 握手超时）、`export`+`$(...)`+管道内联命令（`unexpected EOF`）。
 
-**⚠️ 2026-09-10 新坑：并行/兄弟 cron 轮次会复用同一批 `/tmp/pm_*.{sh,py,json}` 路径**（write_file 会警告 "modified by sibling subagent"）。若另一轮在你运行中途覆写脚本或 JSON，分诊可能静默读到过期数据。修法：临时文件名带时间戳/随机后缀，例如 `/tmp/pm_fetch_$(date +%H%M%S).sh`，并且每次 fetch 后确认 `BYTES`/`total_open` 与预期一致再继续。
+**⚠️ 兄弟轮次抢 `/tmp/pm_*` 文件：** 弹 `modified by sibling subagent` 时，文件名唯一不管用——**回读脚本确认内容**再跑，被覆写就改名重写。空结果须跑无 `assignee` 全量 crosscheck 才 `[SILENT]`。详见 `references/sibling-collision-and-empty-result.md`。
 
 **⚠️ 2026-09-10 新坑：`write_file` 会把脚本里字面量 `'^GITHUB_TOKEN='`（含引号）脱敏成 `'^GITHUB_TOKEN=***`，写盘后 `grep` 直接报 `repetition-operator operand invalid`（HTTP 404）。修法：把 key 拆成变量，别写字面量——**
 

@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 4041
+        "completed": 4089
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.279443+08:00",
-      "next_run_at": "2026-09-14T20:30:00+08:00",
-      "last_run_at": "2026-09-14T20:00:40.131374+08:00",
+      "next_run_at": "2026-09-15T20:30:00+08:00",
+      "last_run_at": "2026-09-15T20:00:38.031774+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -58,15 +58,15 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 84
+        "completed": 85
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.468781+08:00",
-      "next_run_at": "2026-09-15T20:00:00+08:00",
-      "last_run_at": "2026-09-13T20:14:12.554954+08:00",
+      "next_run_at": "2026-09-16T20:00:00+08:00",
+      "last_run_at": "2026-09-14T20:11:14.145656+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -96,15 +96,15 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 84
+        "completed": 85
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.660220+08:00",
-      "next_run_at": "2026-09-14T21:00:00+08:00",
-      "last_run_at": "2026-09-13T21:01:41.970899+08:00",
+      "next_run_at": "2026-09-15T21:00:00+08:00",
+      "last_run_at": "2026-09-14T21:04:09.242607+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -115,5 +115,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-09-14T20:00:40.131978+08:00"
+  "updated_at": "2026-09-15T20:00:38.032494+08:00"
 }
