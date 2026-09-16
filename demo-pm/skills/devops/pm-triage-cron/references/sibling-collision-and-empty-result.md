@@ -67,3 +67,29 @@ MINE= []
 ## 6. 解析脚本过滤要点
 
 `/issues` 端点**混装 issue 和 PR**，解析时必须 `if "pull_request" in it: continue`，否则会把 PR 计入 open 数并可能误判待办。
+
+## 7. 2026-09-16 复现：crosscheck 会混入 PR，且「输出契约」被反复违反
+
+同一仓库稍晚一轮（19:00）全量 open crosscheck：`BYTES=33096`、`total_items=5` —— **4 issue + 1 PR**：
+
+```
+#7  [issue] assignees=['OnePlusNBoss'] labels=[]                         [验证报告] Issue 2 独立验证
+#6  [PR]    —                                                            feat: 新增 subtract(a, b) 减法函数并附测试
+#5  [issue] assignees=['OnePlusNBoss'] labels=['type:feature',...]       [测试] 全链路含验证：新增 subtract(a,b)
+#4  [issue] assignees=['OnePlusNBoss'] labels=['type:feature',...]       [测试] PM→Dev 路径：新增 multiply(a,b)
+#2  [issue] assignees=['OnePlusNBoss'] labels=['type:feature',...]       [测试] 验证 PM 分诊流程：新增 add(a,b)
+MINE= []
+```
+
+与第 4 节的差异：**这回 `total_items` 里混进了 PR `#6`**，正是第 6 节警告的实况——解析必须 `if "pull_request" in it: continue`，否则 open 计数虚高、且 PR 无 assignee 会污染 `MINE` 判定。`MINE=[]` → `[SILENT]`。
+
+**同一轮踩到的另一个坑**：把 `grep "^GITHUB_TOKEN=" .env` 字面量直接写进脚本，实测被改写成 `grep "^GITHUB_TOKEN=*** .env`（脱敏），`token_len` 取不到。改两段式即恢复：
+
+```bash
+KEY="GITHUB_TOKEN"
+TOK=$(grep "^${KEY}=" .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+```
+
+写完脚本**先 `read_file` 回读**，确认 `token_len=40` 再 `bash` 执行（同第 1 节）。
+
+**输出契约（本轮最大教训）**：本轮历史输出显示，13:00–18:01 多轮把「无待办」写成中英文长篇核查报告，违反 cron prompt 的「没有待分诊任务则静默退出」；17:31、18:31 两轮才改为纯 `[SILENT]`。正确姿势：**内部做完三件套校验 + crosscheck，回复只留 `[SILENT]` 这一处、别无他物**。

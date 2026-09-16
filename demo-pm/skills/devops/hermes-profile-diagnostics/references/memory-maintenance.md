@@ -142,6 +142,21 @@ Observed 2026-08-02 with glm-4-flash on the demo-pm daemon: the CLI and plain HT
 
 **Token count is the cheap, mechanical tell for a degenerate reflect (2026-09-14).** A healthy full-context reflect that actually fed the 48 facts into the prompt costs **~6.8–7.0K input tokens** (observed repeatedly). The 2026-09-14 false positive cost only **2.2K input tokens** — the model answered *without* reading the bank, i.e. it echoed the question instead of analyzing. Rule: after every reflect, read `r.usage.input_tokens`; if it is far below the established baseline for the bank (≈7K here), the conclusion is untrustworthy **regardless of its wording**, and the disambiguation reflect (which costs the expected ~7K) is required. This check is faster and more objective than judging the phrasing — a sub-baseline token count *always* accompanied the echo-style non-answer.
 
+**⚠️ Correction (2026-09-15) — on a sub-baseline reflect, go straight to HTTP API `budget: "high"`. Do NOT run the disambiguation reflect first.** On 2026-09-15 both `hindsight_client` reflect calls degraded: the primary `budget='low'` call returned the refusal `I don't have information` at **5,323 input tokens**, and the targeted disambiguation reflect came back even smaller (**2,231 tokens**) and **hallucinated entire facts** — it reported conflicts/duplicates between items that do not exist in the bank (`飞书 App ID 为 1234567890`, `网关端口为 8080`, plus references to nonexistent entries 10 and 15). A declining token count across successive attempts is the tell that the model never received the facts. The fix that worked on the first try was the **HTTP API** endpoint with `budget: "high"`:
+
+```bash
+# write payload with write_file (Chinese → tirith), then:
+curl -s -m 300 -X POST "http://127.0.0.1:<port>/v1/default/banks/<bank_id>/reflect" \
+  -H "Content-Type: application/json" -d @/tmp/reflect_http.json
+# → {"text":"...无需要归档...","usage":{"input_tokens":6827,...}}  ← back at the ~6.8K baseline
+```
+
+Rules:
+- Token count is the gate: **≥ ~6.8K input tokens on this bank = facts were fed = trustworthy**; 2–5K = degenerate, ignore the text entirely.
+- A hallucinated disambiguation answer is worse than the original false positive — it invents plausible-looking bank content, so never act on it (do not "archive" items that were never listed in the bank).
+- Escalation order for a degenerate reflect: (1) `budget='high'` via **HTTP API** → (2) direct LLM `curl` with flat-file content embedded (see the 2026-09-10 section) → only then treat the run as blocked. Restarting the daemon and switching transports do **not** help this failure mode.
+- `hindsight_client.reflect(..., budget='low', include_facts=True)` is no longer the default of record: **prefer HTTP `budget: "high"`** as the primary reflect for the demo-pm bank (verified clean 2026-09-15, 6,827 tokens / 18s).
+
 **Verified 2026-08-14: use this exact conclusion-oriented phrasing as the PRIMARY query (not just the retry fallback) — it returned a clean one-line conclusion on the FIRST attempt (~6.8K input tokens) with no tool-call truncation. Re-verified 2026-08-30, 2026-09-07, 2026-09-12, and 2026-09-14 (clean on the second, disambiguation pass).** Rules learned:
 - Ask the LLM to 「直接回答结论」 (answer directly with a conclusion) — open-ended multi-part English queries invite the `search_observations` tool call, and the CLI/client captures the tool-call text as the final answer.
 - Keep the query single-intent and conclusion-oriented; verify `text` is not a bare tool-call name before trusting it.

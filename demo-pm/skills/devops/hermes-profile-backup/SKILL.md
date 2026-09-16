@@ -46,6 +46,8 @@ candidates). Verified 2026-08-27: caught 3 exclude gaps pre-upload — `tmp_tria
 dir, `gh_health_*.sh`, `healthcheck_*.py` (temp/root diagnostics that source
 `.env`).
 
+Post-push probe: `scripts/post-push-verify.py`.
+
 Workflow: run preflight → patch EXCLUDE sets + SKILL.md exclude lists when new
 files carry tokens → re-run preflight until diff + scan are clean → run backup.
 
