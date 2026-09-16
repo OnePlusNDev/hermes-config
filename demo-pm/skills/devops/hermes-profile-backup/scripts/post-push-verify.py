@@ -59,8 +59,8 @@ def check(label, ok, detail):
     print("  [%s] %s: %s" % (mark, label, detail))
 
 
-def gh(endpoint, raw=False):
-    r = subprocess.run(["gh", "api", endpoint, "--jq", "."],
+def gh(endpoint, raw=False, jq="."):
+    r = subprocess.run(["gh", "api", endpoint, "--jq", jq],
                        capture_output=True, text=True)
     if r.returncode != 0:
         print("GH API FAIL on %s: %s" % (endpoint, r.stderr.strip()),
@@ -95,7 +95,11 @@ cfg_path = "%s/config.yaml" % PROFILE
 if cfg_path not in blobs:
     check("config.yaml present", False, "not found in remote tree")
 else:
-    raw = gh("/repos/%s/%s/contents/%s" % (OWNER, REPO, cfg_path), raw=True).strip()
+    # NOTE: must request `.content` specifically -- plain `--jq .` returns the whole
+    # contents-API JSON envelope (verified 2026-09-16: b64decoding that envelope
+    # raised "Incorrect padding" and reported a FALSE config.yaml FAIL).
+    raw = gh("/repos/%s/%s/contents/%s" % (OWNER, REPO, cfg_path),
+             raw=True, jq=".content").strip()
     try:
         data = base64.b64decode(raw).decode("utf-8", "replace")
     except Exception as exc:  # noqa: BLE001
