@@ -23,6 +23,8 @@ curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
 然后 write_file 一个 `parse.py`：**把 fetch 输出的绝对路径写死成常量**，勿 `glob('/tmp/pm_issues_*.json')[-1]` 取尾——字典序会选中兄弟轮的 `pm_issues_x7.json`，静默读到别人的空结果误判「无待办」。fetch 脚本 `echo "SAVED=<path>"`，解析脚本写死该路径并用唯一文件名防覆盖。`COUNT:0` 不可信：先 `head -c 400` 验响应是真 `[ ]`，再跑无 `assignee` crosscheck 才回 `[SILENT]`。
 0 条 → 去掉 `assignee` 参数做全量 open crosscheck → 仍无 PM 名下 → 回 `[SILENT]`。
 
+**脚本：** `scripts/pm_fetch.sh`、`scripts/pm_parse.py`（用法见文件头）。
+
 **禁用清单（实测踩过，勿再试）：** `execute_code`（cron 默认拦，非故障；可信可开 `approvals.cron_mode: approve`，否则用 write_file+terminal）、`read_file` 读 `.env`（Access Denied）、`curl | python3`（tirith 拦截）、urllib 直连（TLS 握手超时）、`export`+`$(...)`+管道内联命令（`unexpected EOF`）。
 
 **⚠️ 兄弟轮次抢 `/tmp/pm_*` 文件：** 弹 `modified by sibling subagent` 时，文件名唯一不管用——**回读脚本确认内容**再跑，被覆写就改名重写。空结果须跑无 `assignee` 全量 crosscheck 才 `[SILENT]`。详见 `references/sibling-collision-and-empty-result.md`。
