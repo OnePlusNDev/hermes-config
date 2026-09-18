@@ -58,7 +58,7 @@ EXCLUDE_NAMES = {
     "triage_v5.py", "triage_fetch.py", "query_issues.py", "get_token.sh",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
-    ".bundled_manifest", ".curator_state",
+    ".bundled_manifest", ".curator_state", ".curator_suppressed",
     "response_store.db", "feishu_seen_message_ids.json",
     # NOTE: reference files with encoded tokens should be pre-scanned and
     # redacted before backup (see SKILL.md: push protection pitfalls).
@@ -71,6 +71,9 @@ EXCLUDE_DIRS = {
     "hindsight-maintenance-logs",
     "lsp",
     ".hub", ".curator_backups", ".curator_state",
+    # Curator-managed archive of stale bundled skills (created 2026-09-18). Same
+    # family as .curator_backups -> excluded (see preflight-backup-scan.py note).
+    ".archive",
     "__pycache__",
 }
 EXCLUDE_PREFIX = {"config.yaml.bak.", ".tmp_", "tmp_", "memory_backup_", "._",

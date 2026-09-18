@@ -57,7 +57,7 @@ EXCLUDE_NAMES = {
     "get_token.sh",
     "gateway.lock", "gateway.pid", "gateway_state.json",
     ".usage.json", ".usage.json.lock",
-    ".bundled_manifest", ".curator_state",
+    ".bundled_manifest", ".curator_state", ".curator_suppressed",
     "response_store.db", "feishu_seen_message_ids.json",
 }
 EXCLUDE_DIRS = {
@@ -66,6 +66,9 @@ EXCLUDE_DIRS = {
     "hooks", "skins", "workspace", ".local", "home", "bin",
     "hindsight-maintenance-logs",
     "lsp", ".hub", ".curator_backups", ".curator_state",
+    # Curator-managed archive of stale bundled skills (created 2026-09-18). Same
+    # family as .curator_backups -> excluded (see preflight-backup-scan.py note).
+    ".archive",
     "tmp_triage",
     "__pycache__",
 }

@@ -101,8 +101,16 @@ else:
     raw = gh("/repos/%s/%s/contents/%s" % (OWNER, REPO, cfg_path),
              raw=True, jq=".content").strip()
     try:
-        data = base64.b64decode(raw).decode("utf-8", "replace")
+        # Keep the raw bytes as well as the decoded str. `data` is a str, so
+        # len(data) counts CHARACTERS, not bytes -- and config.yaml carries CJK
+        # comments, so the two genuinely differ (16835 chars vs 17021 bytes,
+        # re-confirmed 2026-09-17). This line used to print the char count under
+        # the label "bytes", which made two consecutive run notes (09-16, 09-17)
+        # need a hand-written "that number is a char count" caveat. Report both.
+        blob_bytes = base64.b64decode(raw)
+        data = blob_bytes.decode("utf-8", "replace")
     except Exception as exc:  # noqa: BLE001
+        blob_bytes = b""
         data = ""
         check("config.yaml decodes", False, str(exc))
     if data:
@@ -115,7 +123,8 @@ else:
         nonempty = [l for l in ak if l.strip() != "api_key: ''"]
         check("all api_key empty", not nonempty,
               "%d api_key line(s), %d non-empty" % (len(ak), len(nonempty)))
-        print("  config.yaml bytes: %d" % len(data))
+        print("  config.yaml chars: %d   bytes: %d"
+              % (len(data), len(blob_bytes)))
 
 print("\n--- Leak checks ---")
 sens = [p for p in blobs if any(s in p for s in SENSITIVE)]
