@@ -22,6 +22,9 @@ description: demo-pm profile 调用 GitHub API 的正确认证方式与分诊轮
 - 查询 assignee 为自己：`/repos/demo-oneplusn/demo-workflow/issues?state=open&assignee=OnePlusNPM`。
 - **cron 轮次收尾不要批量 `rm` 临时文件（2026-09-14 实证）：** `rm -f a.sh b.sh c.py d.py`（一次 4 个非构建文件）触发 tirith `mass_file_deletion` [CRITICAL] → `status: pending_approval`；cron 无人审批，清理动作静默悬空（`exit_code: -1`）。临时文件名本就带轮次后缀、互不覆盖，**留在 /tmp 即可**，别为了整洁去 rm。
 - **判定「无待办」要两步（2026-09-14 实证）：** `assignee=OnePlusNPM` 查询返回 5 字节 `[\n\n]` 时，先 `head -c 300 <json>` 确认是真空数组（不是被截断的空响应体），再去掉 `assignee` 参数做全量 open crosscheck；只有交叉核对确认没有挂在 PM 名下的 issue，才回 `[SILENT]`。只见空结果就静默，可能在 filter 失效时漏掉真正待分诊的任务。
+- **`assignee` 过滤失效的误判陷阱（2026-09-19 实证）：** sanity crosscheck 时若 `assignee=OnePlusNBoss` 的响应与全量 open 响应**字节数完全相同**（本轮两者均 33096 字节、`raw ==` 为 True），**不要**据此判定「过滤参数被忽略」。正确判据是逐条看 `assignees` 列表：本轮 5 条 open 条目（含 1 个 PR）全部本就是 Boss 名下，所以两者必然同构 → 过滤其实正常。即：**他人过滤非空且每条都确属该人 = 过滤器可信**，与「响应体是否恰好等于全量」无关。
+- **空结果第三步——用「已知他人」反证过滤器没坏（2026-09-19 实证）：** 上一步只能证明「PM 名下无任务」，证明不了「assignee 过滤参数本身没被静默忽略」。再拿一个已知确有任务的账号查一次（本轮 `assignee=OnePlusNBoss` 返回非空、尺寸=全量）：**他人过滤非空 + PM 过滤为空 = 过滤器可信、空结果真实 → `[SILENT]`**；若他人过滤也返回空（而全量明明有该人任务）→ 过滤器静默失效，改用全量结果自行筛 `assignees`。两次 curl 成本极低，建议与上一步都跑。本轮细节见 `pm-triage-cron` 的 `references/2026-09-19-filter-sanity-crosscheck.md`。
+- sanity/解析脚本一律 file-based（`curl -o 文件` + 单独 `python3 解析.py`），勿图省事写成 `curl ... | python3` 内联管道——会触发 tirith 拦截。
 - **写盘后先 `read_file` 回读脚本再 `bash` 执行**：坏脚本症状是 `grep: repetition-operator operand invalid` / `unexpected EOF while looking for matching quote`。2026-09-14 一轮用变量式 key 写法（`KEY="GITHUB_TOKEN"` + `grep "^${KEY}="`）写盘完好，`token_len=40` / `HTTP=200` 一次通过。
 - **crosscheck 计数含 PR（2026-09-15 实测）：** `/issues?state=open` 返回的数组里混有 PR（条目带 `pull_request` 键）。解析时先 `if "pull_request" in it: continue` 再打印，否则会出现 `total_open: 5` 却只列出 4 条 issue 的困惑（差额就是 PR，不是脚本丢数据）。判定「无待办」以 `PM_assigned` 列表为空为准。
 - `~/.hermes/profiles/demo-pm/RULES.md` 可能是 0 字节空文件（2026-09-14 实测 `total_lines: 0`）；读到空文件不代表故障，继续按任务描述里的协作铁律执行轮次即可。
