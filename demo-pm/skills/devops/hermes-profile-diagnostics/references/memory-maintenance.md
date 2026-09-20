@@ -1276,6 +1276,10 @@ Then poll `GET /v1/default/banks/<bank_id>/operations/<operation_id>` until `sta
 
 **Pitfall — `last_consolidated_at` does NOT update on no-op consolidations.** When the bank is already optimal, POST /consolidate returns an op that completes immediately (deduplicated=false) but the `last_consolidated_at` field in stats stays frozen at the last time REAL consolidation work ran (observed 2026-08-30: completed op 7bf02ae5, stats still showed `last_consolidated_at: 2026-07-07`). Do not read a stale timestamp as "consolidation isn't working" — the correct health signals are `pending_operations: 0` / `failed_operations: 0` plus the op's completed status.
 
+**Pitfall — `operations_by_status.completed` can lag a run; trust the op's own status, not the counter.** Verified 2026-09-19 (demo-pm): stats read `operations_by_status: {"completed": 49}` **both before and after** a consolidation op that returned `status: "completed"` — the counter did not increment (prior days showed the expected `n → n+1`, e.g. 47→48, 48→49). The authoritative signals are `GET /v1/default/banks/<bank>/operations/<op_id>` → `status: "completed"`, plus `pending_operations: 0` / `failed_operations: 0`. Do NOT re-run consolidation or record a failure just because the counter didn't move.
+
+**Re-verified 2026-09-19: the HTTP API `budget: "high"` primary reflect returned a clean conclusion 「无需要归档的过期事实、重复信息或矛盾信息。」 on the FIRST attempt — 6,827 input tokens / 18s, no disambiguation reflect needed.** The budget=high-first rule from the 09-15 degradation episode continues to hold; continue applying both gates (措辞 then token) before trusting any reflect conclusion.
+
 ## Cron Mode Pitfalls
 
 When running as a cron job:

@@ -29,4 +29,5 @@ description: demo-pm profile 调用 GitHub API 的正确认证方式与分诊轮
 - **crosscheck 计数含 PR（2026-09-15 实测）：** `/issues?state=open` 返回的数组里混有 PR（条目带 `pull_request` 键）。解析时先 `if "pull_request" in it: continue` 再打印，否则会出现 `total_open: 5` 却只列出 4 条 issue 的困惑（差额就是 PR，不是脚本丢数据）。判定「无待办」以 `PM_assigned` 列表为空为准。
 - `~/.hermes/profiles/demo-pm/RULES.md` 可能是 0 字节空文件（2026-09-14 实测 `total_lines: 0`）；读到空文件不代表故障，继续按任务描述里的协作铁律执行轮次即可。
 - **`/tmp` 有同名轮次的兄弟 agent 会互相覆盖脚本（2026-09-17 实测）：** `write_file` 到 `/tmp/pm_fetch_0917.sh` 返回 `_warning: modified by sibling subagent ... but this agent never read it`。临时脚本名加上轮次+时分后缀（如 `pm_fetch_0917_1800_b.sh`）即可避开；收到该 warning 时换名重写，不要盲目覆盖。
+- **解析脚本别把整份 raw JSON 打进 stdout（2026-09-20 实证）：** 全量 open 响应 33KB，`print(open(p).read())` 一次性把 65KB 灌进上下文（超长被截断、浪费 token）。验证「是真空数组」只需 `print(open(p).read()[:200])`；结构信息用 `len()` / `sorted(...)` 摘要即可。
 - 更多本轮细节见 `pm-triage-cron` 的 `references/2026-09-14-cron-empty-assignee-and-mass-deletion-guard.md`。

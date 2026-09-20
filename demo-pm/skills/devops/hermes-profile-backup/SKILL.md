@@ -31,6 +31,7 @@ If any match is found:
 2. The `.env` file contains the actual key — never back up `.env`
 3. Check auth files: `auth.json` and `auth.lock` are credential stores — exclude them
 4. Common false positives: `api_key: ''` (empty string) and `api_key: auto` are NOT secrets — skip those
+5. A `key_env` grep hit is often just a doc COMMENT, not an active field — verify before acting (demo-pm's only hit is a comment). Full pattern set, demo-pm steady state (15 empty `api_key`, 0 `sk-`) and the real-key migration recipe: `references/plaintext-key-scan-notes.md`
 
 ## Preflight diff + token scan (run before ANY upload)
 
