@@ -943,6 +943,8 @@ curl -s --max-time 300 -X POST "http://127.0.0.1:<port>/v1/default/banks/<bank_i
 
 The principle: `write_file` creates the payload outside the shell command pipeline, and `-d @file` reads it from disk. Tirith scans the shell command string — the file content on disk is not part of the command.
 
+**Pitfall — use a RUN-UNIQUE temp payload filename; `/tmp/reflect_http.json` is shared with sibling cron jobs.** Verified 2026-09-20: `write_file /tmp/reflect_http.json` returned a warning that the file *"was modified by sibling subagent \<id\>"* — another profile's memory cron (running in the same tick) had just written its own reflect payload to the same conventional path, and this write silently overwrote it (the sibling then curls the file and sends the WRONG query). Two clean fixes: (a) name the payload with the profile + date, e.g. `/tmp/reflect_<profile>_<YYYYMMDD>.json`; (b) read the existing file first if the warning appears and only proceed when the content is your own query. Do not skip the check — a clobbered payload produces a reflect answer to someone else's question, which looks like a normal result.
+
 ## Flat-File Memory Optimization via Hindsight
 
 When memories live in flat files (`MEMORY.md`, `USER.md`) and the hindsight daemon is available but not the active `memory.provider` (i.e. memories are NOT stored in hindsight's internal bank), you can still use hindsight's LLM-powered analysis to optimize them. Two workflows exist — pick the simplest.

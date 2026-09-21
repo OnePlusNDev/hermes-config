@@ -35,9 +35,8 @@ If any match is found:
 
 ## Preflight diff + token scan (run before ANY upload)
 
-> ⚠️ This SKILL.md sits at the 100,000-char cap (a patch that adds ~3 KB is rejected
-> outright). New pitfalls, recipes and evidence belong in `references/<topic>.md` with a
-> one-line pointer here — inline only if you first move something out.
+> ⚠️ At the 100,000-char cap — new pitfalls go in `references/<topic>.md` + a pointer.
+> `skill_view` here returns a TRUNCATED blob → load via `read_file` + `offset`/`limit`.
 
 Before running any backup method, compute the M/A/D diff vs the remote tree and
 scan ONLY the upload candidates (changed + new files) for token patterns. This
