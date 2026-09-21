@@ -87,7 +87,7 @@ re-run: blob SHAs are idempotent, so the re-run just re-parents the identical
 commit on the fresh HEAD. Do NOT rebase, do NOT attempt tree surgery, and do
 NOT treat it as a partial failure — the first run's blobs are already uploaded.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-20; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-21; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
