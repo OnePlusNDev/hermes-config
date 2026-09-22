@@ -76,16 +76,13 @@ the 0/0/0 preflight was what confirmed the pair was actually in sync.)
 
 ⚠️ A local clone that EXISTS is not enough for Method A — it must be CURRENT. `git status` only compares against the local `origin/main` ref, which can itself be stale. Verify `git rev-parse HEAD` against `gh api repos/<owner>/<repo>/git/refs/heads/main --jq '.object.sha'`; if the clone is behind, a Method A push would diverge — use Method B instead (verified 2026-08-29: clone at ed4bcb8, remote at c928b535).
 
-Practice note (extended through 2026-09-11): runs 09-01 → 09-11 all went
-STRAIGHT to Method B standalone-subtree with NO clone attempt — the repo is
-625+ blobs and git/libcurl transport has repeatedly timed out in cron mode,
-while the script never needs a worktree and absorbs concurrent HEAD advances by
-re-reading the remote ref. From 09-06 onward the ref-PATCH HTTP 422 "Update is
-not a fast forward" recurs on MOST runs (a concurrent sibling-profile backup
-advances `main` during the ~1–2 min blob phase). Budget exactly ONE plain
-re-run: blob SHAs are idempotent, so the re-run just re-parents the identical
-commit on the fresh HEAD. Do NOT rebase, do NOT attempt tree surgery, and do
-NOT treat it as a partial failure — the first run's blobs are already uploaded.
+Method B practice notes — straight-to-Method-B rationale (625+ blobs, git transport
+times out in cron mode) and the **budget-exactly-ONE-plain-re-run** rule for the
+ref-PATCH 422 race: `references/method-b-practice-notes.md`. Daily run-note starter +
+index-append rules (⚠️ index bullets share an identical tail, so a `patch` anchor on
+"the last line" is NOT unique — anchor on a distinctive fragment, verify with `grep -c`):
+`templates/run-note-template.md`. SKILL.md is at its 100,000-char cap and further
+`patch`/`edit` calls are refused until slimmed: `references/skill-md-at-cap.md`.
 
 Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-21; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
