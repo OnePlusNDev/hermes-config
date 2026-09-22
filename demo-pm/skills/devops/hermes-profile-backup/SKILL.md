@@ -84,7 +84,7 @@ index-append rules (⚠️ index bullets share an identical tail, so a `patch` a
 `templates/run-note-template.md`. SKILL.md is at its 100,000-char cap and further
 `patch`/`edit` calls are refused until slimmed: `references/skill-md-at-cap.md`.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-21; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-22; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
