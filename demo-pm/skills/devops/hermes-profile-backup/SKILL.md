@@ -83,10 +83,11 @@ times out in cron mode) and the **budget-exactly-ONE-plain-re-run** rule for the
 ref-PATCH 422 race: `references/method-b-practice-notes.md`. Daily run-note starter +
 index-append rules (⚠️ index bullets share an identical tail, so a `patch` anchor on
 "the last line" is NOT unique — anchor on a distinctive fragment, verify with `grep -c`):
-`templates/run-note-template.md`. SKILL.md is at its 100,000-char cap and further
-`patch`/`edit` calls are refused until slimmed: `references/skill-md-at-cap.md`.
+`templates/run-note-template.md`. SKILL.md sits just under its 100,000-char cap
+(~1.3 KB headroom after the 2026-09-23 Method-A extraction) — re-slim before the
+`latest:` bump whenever the cap bites: `references/skill-md-at-cap.md`.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-22; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-23; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
@@ -95,97 +96,27 @@ Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-
 cd /tmp
 gh repo clone <owner>/<repo> /tmp/backup
 rsync -a --delete \
-  --exclude '.env' \
-  --exclude 'auth.json' \
-  --exclude 'auth.lock' \
-  --exclude 'state.db*' \
-  --exclude 'logs/' \
-  --exclude 'cache/' \
-  --exclude '__pycache__/' \
-  --exclude '*.pyc' \
-  --exclude 'sessions/' \
-  --exclude 'desktop/' \
-  --exclude 'sandboxes/' \
-  --exclude '*.bak*' \
-  --exclude '.hermes_history' \
-  --exclude 'interrupt_debug.log' \
-  --exclude 'gateway.*' \
-  --exclude 'gateway.lock' \
-  --exclude 'gateway.pid' \
-  --exclude 'gateway_state.json' \
-  --exclude 'skills/.usage.json*' \
-  --exclude 'skills/.hub/' \
-  --exclude 'skills/.curator_backups/' \
-  --exclude 'skills/.curator_state' \
-  --exclude 'skills/.bundled_manifest' \
-  --exclude 'cron/output/' \
-  --exclude 'cron/.jobs.lock' \
-  --exclude 'cron/.tick.lock' \
-  --exclude 'cron/ticker_heartbeat' \
-  --exclude 'cron/ticker_last_success' \
-  --exclude 'models_dev_cache.json' \
-  --exclude 'ollama_cloud_models_cache.json' \
-  --exclude 'provider_models_cache.json' \
-  --exclude 'home/' \
-  --exclude 'lsp/' \
-  --exclude '.local/' \
-  --exclude '.skills_prompt_snapshot.json' \
-  --exclude '.update_check' \
-  --exclude 'bin/tirith' \
-  --exclude 'processes.json' \
-  --exclude 'hindsight-maintenance-logs/' \
-  --exclude 'audio_cache/' \
-  --exclude 'image_cache/' \
-  --exclude 'pairing/' \
-  --exclude 'plans/' \
-  --exclude 'hooks/' \
-  --exclude 'skins/' \
-  --exclude 'workspace/' \
-  --exclude 'triage_issues.py' \
-  --exclude 'cron_triage.py' \
-  --exclude 'triage_check.py' \
-  --exclude 'triage_fetch.py' \
-  --exclude 'triage_v5.py' \
-  --exclude 'query_issues.py' \
-  --exclude 'triage_verify.py' \
-  --exclude 'get_token.sh' \
-  --exclude 'pm_triage_*.py' \
-  --exclude '.tmp_*' \
-  --exclude 'tmp_*.py' \
-  --exclude 'pm_health*' \
-  --exclude 'gh_health*' \
-  --exclude 'healthcheck_*.py' \
-  --exclude '/health_*' \
-  --exclude 'tmp_triage/' \
-  --exclude '/tmp/' \
-  --exclude '/tmp_pm/' \
-  --exclude '._*' \
-  --exclude 'memory_backup_*.json' \
-  --exclude 'feishu_seen_message_ids.json' \
-  --exclude 'response_store.db' \
+  <FULL --exclude LIST — see references/method-a-rsync-excludes.md> \
   ~/.hermes/profiles/<profile>/ /tmp/backup/<profile>/
 cd /tmp/backup
 
-# 🔒 PRE-COMMIT PUSH-PROTECTION SCAN — scan ALL modified/new files for token patterns
-# Run scripts/method-a-precommit-scan.sh (extracted from this section 2026-08-29
-# to slim SKILL.md). The local profile's skill reference docs may contain full
-# unredacted tokens that rsync imported — scan and redact BEFORE staging.
+# 🔒 PRE-COMMIT PUSH-PROTECTION SCAN — run scripts/method-a-precommit-scan.sh
+# over ALL modified/new files (profile reference docs may carry unredacted tokens)
 echo "=== Scan complete ==="
 
-# First-time setup: create repo-level .gitignore with **/ prefix for subdirectory patterns
-# Content lives in templates/gitignore-template.txt (copy it, keep in sync with the
-# rsync excludes above and the exclude-docs bullets below)
-if [ ! -f .gitignore ]; then
-  cp ~/.hermes/profiles/demo-pm/skills/devops/hermes-profile-backup/templates/gitignore-template.txt .gitignore
-  git add .gitignore
-  echo "Created .gitignore"
-fi
-# Always check for leaked files before committing
-find . -name '*.json' -not -path '*/node_modules/*' | head -10
+# First-time setup: repo-level .gitignore with **/ prefix for subdirectory patterns
+[ -f .gitignore ] || { cp ~/.hermes/profiles/demo-pm/skills/devops/hermes-profile-backup/templates/gitignore-template.txt .gitignore && git add .gitignore; }
+find . -name '*.json' -not -path '*/node_modules/*' | head -10   # leak check
 find . -name '*.lock' | head -10
 git add -A && git commit -m "backup: <profile> $(date +%Y-%m-%d)"
 git push
 ```
+
+**The canonical `--exclude` list lives in `references/method-a-rsync-excludes.md`**
+(extracted 2026-09-23 to keep SKILL.md under its 100,000-char cap). The same list is
+mirrored in `templates/gitignore-template.txt` and in the `EXCLUDE_*` sets of both
+`scripts/` probes — **change one ⇒ change all four.** Sanity number: local files after
+excludes = **407**, and that must equal the remote `demo-pm` blob count.
 
 See also: `autonomous-ai-agents/hermes-agent/references/hermes-profile-rsync-github-backup.md`
 

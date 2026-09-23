@@ -1,9 +1,18 @@
 # SKILL.md size cap — headroom is thin, keep it that way
 
+**Status 2026-09-23: SKILL.md had crept back to 100,665 chars (limit 100,000) → slimmed
+the same run to 98,729 chars** by performing the "highest-value extraction" flagged
+below: the ~90-line **Method A rsync `--exclude` list** moved to
+`references/method-a-rsync-excludes.md`, replaced in SKILL.md by a 2-line placeholder plus
+a pointer paragraph. Headroom after the slim is ~1.3 KB. The `latest:` pointer bump for
+`2026-09-23` then succeeded.
+**Do the extraction BEFORE the follow-up commit** — see the ordering warning at the bottom.
+
 **Status 2026-09-21: SKILL.md was 100,142 chars (limit 100,000) → patched back
 under the cap the same run** by extracting the Method B practice-note paragraph
 to `references/method-b-practice-notes.md` and replacing it with a 3-line pointer.
-Headroom after the slim is only a few hundred chars.
+Headroom after the slim was only a few hundred chars — and it was gone again within
+two days (see the 09-23 status above). Budget for re-slimming on a recurring basis.
 
 ## Symptom (when it does bite)
 

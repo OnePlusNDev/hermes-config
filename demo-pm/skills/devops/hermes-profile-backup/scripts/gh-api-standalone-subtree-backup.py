@@ -35,6 +35,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -44,6 +45,8 @@ REPO = "hermes-config"
 BRANCH = "main"
 PROFILE_DIR = Path(os.path.expanduser("~/.hermes/profiles/demo-pm"))
 PROFILE = "demo-pm"
+# Private scratch dir for `gh api --input` payloads (see gh_api comment).
+_PAYLOAD_DIR = tempfile.mkdtemp(prefix="hermes-backup-payload-")
 # ────────────────────────────────────────────────────────────────────
 
 EXCLUDE_NAMES = {
@@ -135,7 +138,15 @@ def gh_api(method, endpoint, payload=None, retries=3):
     cmd = ["gh", "api", endpoint, "--method", method, "--jq", "."]
     payload_file = None
     if payload is not None:
-        payload_file = f"/tmp/gh_payload_{int(time.time()*1000)}_{os.getpid()}.json"
+        # Private per-process dir. Sibling profiles' cron jobs blanket-clean the
+        # SHARED /tmp/gh_payload_*.json namespace (demo-tester literally runs
+        # `rm -f /tmp/gh_payload_*.json` to reap "200+ files from sibling
+        # sessions"), which deleted THIS run's payload files mid-upload on
+        # 2026-09-23 -> "FATAL uploading ...: open /tmp/gh_payload_*.json:
+        # no such file or directory". mkdtemp + a non-matching name keeps our
+        # payloads invisible to that clean-up.
+        payload_file = os.path.join(_PAYLOAD_DIR,
+                                    f"payload_{int(time.time()*1000)}.json")
         with open(payload_file, "w") as f:
             json.dump(payload, f)
         cmd.extend(["--input", payload_file])
