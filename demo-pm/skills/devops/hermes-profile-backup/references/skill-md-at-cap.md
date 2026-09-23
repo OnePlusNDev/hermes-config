@@ -60,3 +60,22 @@ before any surgery. Do not patch a 100 KB file you haven't fully read.
   so a `patch` anchor on "the last line" is NOT unique. Anchor on that run's
   distinctive fragment (e.g. `demo-pm 401 blobs (== local count)`) and verify with
   `grep -c '<YYYYMMDD>.md' references/dated-runs-index.md` == 1.
+
+## ⚠️ Ordering: surgery done AFTER the follow-up commit breaks the NEXT morning's 0/0/0
+
+Verified 2026-09-22. The 09-21 run slimmed SKILL.md and created its three extracted
+support files (`method-b-practice-notes.md`, `skill-md-at-cap.md`,
+`run-note-template.md`) — but that surgery happened **after** the 09-21 follow-up
+commit had already been pushed. The next morning's preflight therefore reported
+`Modified: 3, New: 3, Deleted: 0`, and the 09-21 closing assertion failed.
+
+**This is NOT a failed push.** The 0/0/0 check only proves sync for edits that
+existed at push time; it cannot cover surgery performed later in the same session.
+So when a preflight shows a small residual M/A block that is *entirely skill-doc
+edits made the previous evening* (a slew of `references/*.md` + `SKILL.md`, no
+sensitive paths, token scan CLEAN), treat it as carry-over: push it as today's
+main commit, say so in the run note, and move on. Do **not** go hunting for a lost
+commit or try to re-push the previous evening's work.
+
+Ordering rule: do the SKILL.md/reference surgery **before** the follow-up commit
+in the same session, or knowingly accept that the next run carries the residual.

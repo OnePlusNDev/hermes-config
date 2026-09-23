@@ -63,9 +63,11 @@ and expect `Modified: 0, New: 0, Deleted: 0` / `NO CHANGES - nothing to do`. Thi
 is the cheapest proof that the remote tree now equals the local desired state, and
 it is the only check that catches a follow-up commit whose ref PATCH silently
 failed — the backup script's own log still prints `Done:` and exit 0 in that case,
-so a failed follow-up can masquerade as a fully successful run. (2026-09-14: the
-main commit 422'd and needed a re-run, the follow-up 4b071bfa went first-try, and
-the 0/0/0 preflight was what confirmed the pair was actually in sync.)
+so a failed follow-up can masquerade as a fully successful run. Conversely, a
+next-morning residual M/A that is *only* skill-doc edits made after the previous
+session's push is ordering, not a lost commit — push it as today's main commit
+(`references/skill-md-at-cap.md`). (2026-09-14: main 422'd, follow-up 4b071bfa
+first-try, 0/0/0 confirmed sync.)
 
 ## Method Selection
 

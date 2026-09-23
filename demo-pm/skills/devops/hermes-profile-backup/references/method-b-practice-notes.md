@@ -34,3 +34,20 @@ Note (2026-09-21): the remote ref can advance between the **preflight** and the
 just means the diff counts you saw in preflight may be recomputed against a newer
 HEAD). Run `scripts/post-push-verify.py` *after* the commit, not after the
 preflight, for the authoritative numbers.
+
+## Invoking the Method B script (cron, macOS)
+
+Do **not** prefix the invocation with the shell's `timeout` command — macOS ships
+no GNU `timeout` binary, so `timeout 570 python3 gh-api-standalone-subtree-backup.py`
+dies instantly with `timeout: command not found` (hit 2026-09-22). Use the
+`terminal` tool's own timeout parameter instead (`terminal(..., timeout=600)`), or
+`gtimeout` if coreutils is installed. Plain invocation pattern:
+
+```bash
+cd /tmp && REPO_OWNER=OnePlusNDev python3 \
+  ~/.hermes/profiles/demo-pm/skills/devops/hermes-profile-backup/scripts/gh-api-standalone-subtree-backup.py
+```
+
+Running it from `/tmp` with the script path under `~/.hermes` is fine in cron mode
+(no tirith hit); a clean 6-blob + subtree + commit pass finishes well inside 600 s.
+Pipe through `| tail -70` — the script's useful output is the Step 1–7 log.
