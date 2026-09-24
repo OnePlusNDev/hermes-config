@@ -80,11 +80,15 @@ first-try, 0/0/0 confirmed sync.)
 
 Method B practice notes — straight-to-Method-B rationale (625+ blobs, git transport
 times out in cron mode) and the **budget-exactly-ONE-plain-re-run** rule for the
-ref-PATCH 422 race: `references/method-b-practice-notes.md`. Daily run-note starter +
+ref-PATCH 422 race, **plus the shared-`/tmp` payload namespace collision** (a sibling
+profile's cron sweeping `rm -f /tmp/gh_payload_*.json` deleted our in-flight payloads →
+`FATAL ... open /tmp/gh_payload_*.json: no such file or directory`; fixed by writing
+payloads into `tempfile.mkdtemp`): `references/method-b-practice-notes.md`. Daily run-note starter +
 index-append rules (⚠️ index bullets share an identical tail, so a `patch` anchor on
 "the last line" is NOT unique — anchor on a distinctive fragment, verify with `grep -c`):
 `templates/run-note-template.md`. SKILL.md sits just under its 100,000-char cap
-(~1.3 KB headroom after the 2026-09-23 Method-A extraction) — re-slim before the
+(~0.9 KB headroom after the 2026-09-23 Method-A extraction — re-measure with
+`wc -c < SKILL.md` before trusting this) — re-slim before the
 `latest:` bump whenever the cap bites: `references/skill-md-at-cap.md`.
 
 Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-23; full per-run index in `references/dated-runs-index.md`).
