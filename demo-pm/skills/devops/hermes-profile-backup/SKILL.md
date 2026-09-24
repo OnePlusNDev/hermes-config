@@ -91,7 +91,7 @@ index-append rules (⚠️ index bullets share an identical tail, so a `patch` a
 `wc -c < SKILL.md` before trusting this) — re-slim before the
 `latest:` bump whenever the cap bites: `references/skill-md-at-cap.md`.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-23; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (latest: 2026-09-24; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
