@@ -72,5 +72,6 @@ one (17,021 bytes; 16,835 chars — the usual CJK-comment discrepancy).
 
 ## Follow-up commit (this session)
 Run note + index bullet + SKILL.md `latest:` pointer `2026-09-24` → `2026-09-25`, pushed with the
-same standalone-subtree script. Afterwards the preflight is expected to report
-`Modified: 0, New: 0, Deleted: 0`.
+same standalone-subtree script (`0772c0c338cf`), plus a small third commit adding a **Recurrence log**
+to `references/curator-archive-churn-triage.md` (the capped SKILL.md at 99,137/100,000 chars is not
+the place for it). Afterwards the preflight reports `Modified: 0, New: 0, Deleted: 0`.

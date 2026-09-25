@@ -65,6 +65,19 @@ Evidence trail:
    bundled content is not user config. Also record: "do NOT hand-restore the archived
    copies."
 
+## Recurrence log
+
+- **2026-09-18** — 1st event: curator archived 36 bundled skills / 232 files; excludes
+  (`.archive`, `.curator_suppressed`) had to be ADDED to all 3 scripts + SKILL.md x2 + gitignore.
+- **2026-09-25** — 2nd event: curator's 2026-09-24T23:12:25Z pass archived 29 more bundled
+  skills / 187 files (archive 36 → 65 skills; agent-created count unchanged 9 → 9). Because
+  the 09-18 excludes were already in place, **no patching was needed** — the preflight simply
+  reported `3 M / 0 A / 187 D`, all under `demo-pm/skills/`, every deleted path verified to have
+  an `.archive/<name>/...` twin (187/187) and to classify as bundled via `.bundled_manifest`.
+  Main commit `ef84bc3a8d85`, `demo-pm` blobs 410 → 223, then closing `0/0/0` after the
+  follow-up. Takeaway: this recurs on the curator's time-based staleness schedule; once the
+  excludes exist, the run is routine — just re-verify the twins, classify, and disclose.
+
 ## General rule this codifies
 
 **Dot-dirs created by the curator are runtime state, not configuration.** The family:
