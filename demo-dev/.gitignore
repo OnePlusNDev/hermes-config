@@ -9,6 +9,11 @@ channel_directory.json
 # Secrets store
 auth.json
 gh_auth.sh
+gh_dev_env.sh
+gh_env.sh
+tmp_dbg_env.sh
+tmp_gettoken.sh
+tmp_token_check.sh
 
 # Runtime / cache artifacts
 *.db
