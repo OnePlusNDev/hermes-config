@@ -30,6 +30,7 @@ already uploaded.
 | 2026-09-21 | no | remote advanced twice *between preflight and blob phase* (cf2cef12 → c82057b2 → 07eea1c3) via concurrent sibling backups, then stable through commit time |
 | 2026-09-22 | no | remote stable at cdefeb1d36b0 through the blob phase |
 | 2026-09-23 | **yes** | remote advanced `9c55330dae07` → `a37580dda96f` between blob phase and ref PATCH; absorbed by the budgeted single plain re-run (attempt 3 clean). Same run also hit a NEW failure mode — see "Shared /tmp payload namespace" below. |
+| 2026-09-24 | no | **first-try, no aborts at all** — the 09-23 `mkdtemp` payload fix held (no shared-`/tmp` deletion). Remote advanced `6c156eb1e2c4` → `46c22a23e2e5` (sibling demo-dev backup, 12:00:45Z) **before** the script's own Step 2, then stayed stable through commit time. Also: gh active account was owner-active throughout (09-23's `OnePlusNTester` flip did NOT recur, and the pre-push re-check held) — a data point that the flip is intermittent, not systematic. Follow-up commit likewise absorbed a fresh remote advance (`e51452458970`) on its Step 2. Closing preflight `Modified: 0, New: 0, Deleted: 0`. |
 
 Note (2026-09-21): the remote ref can advance between the **preflight** and the
 **backup script's own Step 2** (the script re-reads it, so this is harmless — it
