@@ -252,7 +252,7 @@ When neither `git clone` nor `gh api` are available, write a Python script via `
 
 ### Curator dot-dirs = huge A/D churn in preflight
 
-A 200-A/200-D preflight is the curator archiving bundled skills, not an exclude gap. Classify against `.bundled_manifest`, patch `.archive` + `.curator_suppressed` everywhere, disclose the blob drop: `references/curator-archive-churn-triage.md`.
+A 200-A/200-D preflight is the curator archiving bundled skills, not an exclude gap. Classify against `.bundled_manifest`, patch `.archive` + `.curator_suppressed` everywhere, disclose the blob drop, and gate on `scripts/verify-curator-archive-churn.py <preflight.log>` (exit 0 = all D are archive twins of bundled skills): `references/curator-archive-churn-triage.md`.
 
 ### Post-push leak-scan false positives on doc filenames (verify, don't panic)
 

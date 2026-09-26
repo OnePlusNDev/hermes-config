@@ -61,6 +61,14 @@ one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 Run note + index bullet + SKILL.md `latest:` pointer `<prev>` → `<today>`, pushed with the
 same standalone-subtree script. Afterwards the preflight is expected to report
 `Modified: 0, New: 0, Deleted: 0`.
+
+**Fold ALL doc edits into this commit** — including any reference-file additions or
+triage-recipe edits (e.g. a new `references/*.md`, or an update to
+`references/curator-archive-churn-triage.md`). An edit made *after* the follow-up push
+breaks the `0/0/0` closing assertion and costs an extra commit to re-sync. Verified
+2026-09-25: an after-the-fact `curator-archive-churn-triage.md` edit required a 3rd
+commit (`5f8e78cf1073`); the clean pattern is to draft every doc change, then push the
+follow-up once.
 ```
 
 ---

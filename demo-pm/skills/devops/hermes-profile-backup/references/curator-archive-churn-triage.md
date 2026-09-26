@@ -45,9 +45,16 @@ Evidence trail:
      duplicates buys nothing in a config-backup repo.
    - **Agent-created → INCLUDE.** The `.archive/` copy would then be the only surviving
      copy of user-authored content; let it be uploaded (paths move, content is kept).
-4. **Verify the deletions are confined:**
-   `grep '^  D  ' preflight.txt | grep -v 'demo-pm/skills/' | wc -l` must be `0`.
-   Any `D` outside `skills/` means the run is doing something else — stop and investigate.
+4. **Verify the deletions are confined AND are all archive twins of bundled skills:**
+   run `python3 scripts/verify-curator-archive-churn.py <preflight.log>` and require
+   **exit 0**. It does all three checks in one pass — confinement to
+   `<profile>/skills/`, an `.archive/<name>/...` twin per deleted path, and
+   `bundled` classification against `.bundled_manifest` (resolved via the archived
+   SKILL.md `name:`, so dir-name != manifest-name cases still classify). The bare
+   confinement check it subsumes is `grep '^  D  ' preflight.txt | grep -v
+   'demo-pm/skills/' | wc -l` must be `0`. Any `D` outside `skills/`, any path with
+   no twin, or any non-bundled/unresolved skill means the run is doing something
+   else — stop and investigate.
 5. **Patch the excludes, all in one pass** (they must stay in sync):
    - `scripts/preflight-backup-scan.py`, `scripts/gh-api-standalone-subtree-backup.py`,
      `scripts/gh-api-standalone-backup.py`: `EXCLUDE_DIRS += ".archive"` and
