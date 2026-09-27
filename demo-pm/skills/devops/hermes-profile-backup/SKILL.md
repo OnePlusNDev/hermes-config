@@ -387,6 +387,8 @@ git push origin main
 
 Run the check immediately before `git push`, not just at the start of the run. The repo-local credential helper (Approach B) is still worth setting for stale-cache cases, but `gh auth switch` is the reliable fix when the active account itself is wrong.
 
+**A switch can be undone within a minute — by an account you have never seen.** Verified 2026-09-26 (Method B): the owner switch was confirmed at pre-flight (`push=true`), yet the FIRST blob POST still returned **HTTP 404** because the keyring race re-flipped the active account ~1 min later — to a keyring account not in any previously recorded set. Treat every blob-404 as a flip: re-check `gh api user`, `gh auth switch --user $REPO_OWNER`, then plain re-run the script (blob SHAs are idempotent, so the re-run costs nothing). Never diagnose it as a missing repo or a rate limit. Detail: `references/method-b-practice-notes.md`.
+
 **The flip happens even with `GITHUB_TOKEN` UNSET — the pre-push check is mandatory every run.** Verified 2026-08-25: pre-flight showed active = OnePlusNDev (owner, push=true), `GITHUB_TOKEN` not set in the cron environment, yet right before push the active account had flipped to OnePlusNPM. The flip is a keyring race between co-running profiles/cron/gateway sessions sharing the keyring, NOT an env-var override — do not skip the pre-push check just because `GITHUB_TOKEN` is unset. The combined check+switch+push one-liner (with `unset GITHUB_TOKEN` inside the branch) worked cleanly in cron mode and avoids an extra round trip:
 
 ```bash
