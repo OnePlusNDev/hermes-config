@@ -15,6 +15,24 @@ tmp_dbg_env.sh
 tmp_gettoken.sh
 tmp_token_check.sh
 
+# Scratch / helper scripts (dot-prefixed + tmp_/gh_ helpers — secret-free, not backed up)
+.gh*
+.poll*
+.diag*
+.cron_env.sh
+tmp_*
+gh*.sh
+gh*.py
+gh_*
+poll_*
+check_*
+list_issues.py
+fetch_issues.sh
+repo_status.sh
+run_gh.sh
+ghq.py
+ghx.sh
+
 # Runtime / cache artifacts
 *.db
 *.db-shm
