@@ -33,6 +33,11 @@ Diff: **<n> M, <n> A, <n> D**.
 M  demo-pm/<path>
 A  demo-pm/<path>
 ```
+Characterize each `M` against the **pre-push** remote HEAD with
+`scripts/characterize-diff-vs-prev-head.py <PRE_PUSH_HEAD>` (or `--commit=<sha>`) and state per
+file whether it is routine runtime churn or benign carry-over lag — see
+`references/run-note-diff-characterization.md`. Do NOT diff against the current remote: right
+after a push it equals local and everything reads `IDENTICAL`.
 `config.yaml` is deliberately NOT in the diff: the remote blob already equalled the local
 one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 

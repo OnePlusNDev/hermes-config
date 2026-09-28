@@ -1,5 +1,18 @@
 # SKILL.md size cap — headroom is thin, keep it that way
 
+**Status 2026-09-27: 99,898 chars → 99,966** after adding a **68-char inline append** to the
+existing "Post-push probe:" line pointing at the new
+`scripts/characterize-diff-vs-prev-head.py`. An append this small clears the cap where a fresh
+~300-char pointer line would be refused (the tool validates the *resulting* size) — so while at
+cap, **extend an existing pointer line rather than adding a new one**. Headroom is now only
+**~34 chars**: the next run that needs to grow the SKILL.md *body* must slim first (see "To fix").
+Also added that run: `references/run-note-diff-characterization.md`. Both new support files are
+pointed at a **second** time from `references/method-b-practice-notes.md` and
+`templates/run-note-template.md` — belt-and-braces discoverability, in *addition to* (never
+instead of) the SKILL.md line, so a future slim cannot orphan them. That is deliberately NOT
+the "stuff the pointer into a reference file" workaround rejected below: the SKILL.md pointer
+still exists.
+
 **Status 2026-09-23: SKILL.md had crept back to 100,665 chars (limit 100,000) → slimmed
 the same run to 98,729 chars** by performing the "highest-value extraction" flagged
 below: the ~90-line **Method A rsync `--exclude` list** moved to
@@ -53,6 +66,12 @@ Free ~1 KB, then bump the pointer. Candidates for extraction, cheapest first:
   with a pointer. **Highest-value extraction.**
 - Redundant lines *inside* that list: `--exclude 'gateway.*'` already covers the
   following `gateway.lock`, `gateway.pid`, `gateway_state.json` lines.
+- **Duplicated push-protection tables (found 2026-09-27 while reading SKILL.md end-to-end).**
+  The "Concrete patterns that trigger this:" table appears **twice** (~lines 512–523 and again
+  ~583–592, byte-identical rows), and the surrounding "graceful fallback on blob upload push
+  protection" prose restates the same redaction rules a third time (~lines 551–592). Collapsing
+  to a single occurrence is ~1.5 KB recovered with no information loss — the cheapest slim
+  candidate after the Method A extraction above.
 - The dated-run **narrative paragraphs** (e.g. the "Practice note (extended
   through 2026-09-11)" block) — largely superseded by `references/dated-runs-index.md`.
 

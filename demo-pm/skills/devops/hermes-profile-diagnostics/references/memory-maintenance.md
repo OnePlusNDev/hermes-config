@@ -638,6 +638,10 @@ memories/
 **追加行时用唯一锚点（op_id）做 old_string，不要用整行。** 清理日志表的相邻行结构高度相似（只差日期、op_id、字符数），用整行做 old_string 会 fuzzy-match 到大量历史行（2026-08-31 实际发生：12 matches，patch 报错）。正确做法：old_string 只取上一行末尾的唯一片段，例如 `consolidation completed（op 7bf02ae5，deduplicated=false）；bank stats 48 nodes / 1228 links / 0 pending / 0 failed；session 保留策略不变 |`，new_string = 该片段 + 换行 + 新行。用该行独有的 op_id（如 `7bf02ae5`）确认锚点唯一。
 
 **并发 sibling 追加时唯一锚点依然可靠。** 2026-09-06 实测：patch 工具提示 "was modified by sibling subagent ... but this agent never read it"（同轮有 sibling cron 并发写同一 ARCHIVE.md），但 append 仍落在正确位置——因为 old_string 用的是上一行独有的 op_id 尾片段而非整行。收到该警告后只需用 grep 复查新行以单个 `|` 开头且紧跟在预期前驱行之后，无需重做 append。**Re-verified 2026-09-25**：同样收到该 sibling 警告，append 仍正确落位末行；`grep -c "| <当日日期> |"` 返回 1（无重复行）、`wc -l` 符合预期。即：见到该警告时**只做 grep 复查，不要重写整行、不要重新 append**（重做才会产生重复行）。
+
+**第二个良性警告：分页读取后的写回提醒（2026-09-27 实测）。** 先 `read_file` 读 ARCHIVE.md 前 70 行、再读 71–75 行（分页视图），随后 patch 追加返回 `_warning: "...was last read with offset/limit pagination (partial view). Re-read the whole file before overwriting it."`。用 patch 做**追加**（old_string 取上一行的唯一尾片段）时该警告同样无害——patch 只替换匹配片段，并不重写整个文件。处理方式与 sibling 警告一致：`grep -c "^| <当日日期> |"` 应为 1、`grep -n "^||"` 应无输出，确认后即结束；**不要**为了消除该警告去整读 38KB 的 ARCHIVE.md。
+
+**统一规则：ARCHIVE.md 的两类警告（sibling 并发修改、分页部分视图）都只触发 grep 复查，绝不重做写入，也绝不整读文件。**
 ```
 
 **Rules:**

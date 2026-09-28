@@ -96,3 +96,15 @@ cd /tmp && REPO_OWNER=OnePlusNDev python3 \
 Running it from `/tmp` with the script path under `~/.hermes` is fine in cron mode
 (no tirith hit); a clean 6-blob + subtree + commit pass finishes well inside 600 s.
 Pipe through `| tail -70` — the script's useful output is the Step 1–7 log.
+
+## Characterizing the M set for the run note
+
+After the push, classify each `M` as routine runtime churn vs benign carry-over
+doc lag with `scripts/characterize-diff-vs-prev-head.py` — pass the **pre-push**
+remote HEAD (the SHA the backup script logged at Step 2, or
+`--commit=<your backup commit sha>`, which derives `parents[0]`).
+
+Diffing against the CURRENT remote is the trap: right after a push the current
+remote tree equals local, so everything reads `IDENTICAL` and you learn nothing.
+Recipe + reading guide + worked example:
+`references/run-note-diff-characterization.md`.
