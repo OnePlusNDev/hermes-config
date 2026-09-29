@@ -13,6 +13,12 @@ instead of) the SKILL.md line, so a future slim cannot orphan them. That is deli
 the "stuff the pointer into a reference file" workaround rejected below: the SKILL.md pointer
 still exists.
 
+**Status 2026-09-28: SKILL.md measured at 99,964 chars** (the 09-27 figure of 99,966 was 2 high —
+`wc -c < SKILL.md` is the authority). The only body edit this run was a **+11-char** disambiguation
+of the `skill_view` truncation warning in SKILL.md — rewriting an *existing* line still clears the
+cap where a *new* line would not; headroom is now ~25 chars, so real body growth still needs a
+slim first.
+
 **Status 2026-09-23: SKILL.md had crept back to 100,665 chars (limit 100,000) → slimmed
 the same run to 98,729 chars** by performing the "highest-value extraction" flagged
 below: the ~90-line **Method A rsync `--exclude` list** moved to
@@ -78,6 +84,25 @@ Free ~1 KB, then bump the pointer. Candidates for extraction, cheapest first:
 ⚠️ `skill_view` returns a TRUNCATED blob for this file (it exceeds the tool's
 response cap), so the file must be read with `read_file` + `offset`/`limit`
 before any surgery. Do not patch a 100 KB file you haven't fully read.
+
+### Which file to `read_file` — the trap (verified 2026-09-28)
+
+Point `read_file` at the **on-disk SKILL.md**
+(`~/.hermes/profiles/<profile>/skills/devops/hermes-profile-backup/SKILL.md`).
+It has real newlines, so `offset`/`limit` slices work.
+
+Do **NOT** point `read_file` at the temp path `skill_view` prints
+(`... Full output saved to: /var/folders/.../hermes-results/call_00_*.txt`).
+That dump is a **single-line JSON envelope** (`{"success": true, ... "content": "---\nname: ..."}`),
+so it reports `total_lines: 0` and every `offset`/`limit` slice returns the same
+unreadable mega-line — a wasted call.
+
+If a raw dump is the only available source, json-extract `.content` into a fresh
+file first (this restores the real newlines), then `read_file` it normally:
+
+```bash
+python3 -c "import json; d=json.load(open('/path/to/dump.txt')); open('/tmp/skill.md','w').write(d['content'])"
+```
 
 ## Support files that exist (so they aren't lost)
 

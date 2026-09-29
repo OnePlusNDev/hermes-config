@@ -36,7 +36,7 @@ If any match is found:
 ## Preflight diff + token scan (run before ANY upload)
 
 > ⚠️ At the 100,000-char cap — new pitfalls go in `references/<topic>.md` + a pointer.
-> `skill_view` here returns a TRUNCATED blob → load via `read_file` + `offset`/`limit`.
+> `skill_view` here returns a TRUNCATED blob → `read_file` the on-disk SKILL.md, not the tmp dump.
 
 Before running any backup method, compute the M/A/D diff vs the remote tree and
 scan ONLY the upload candidates (changed + new files) for token patterns. This
