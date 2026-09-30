@@ -34,6 +34,28 @@ Step 2 of the clean attempt — and also `parents[0]` of your backup commit, whi
 current remote `main` and prints a warning (correct only when no sibling commit
 landed after yours).
 
+## Pick the anchor AFTER the push — a preflight SHA can be stale
+
+The authoritative anchor is `parents[0]` of your backup commit. Prefer
+`--commit=<main_commit_sha>` **after** the backup script returns over any SHA you
+read during preflight, because `main` can advance between preflight and the
+script's Step 2 (it routinely does — sibling profiles back up on their own cron).
+
+Verified 2026-09-29: the preflight HEAD was `8122b94d9407`, but a concurrent
+sibling backup advanced `main` to `cdcabbeb7545` before the script's Step 2 — so
+the script logged `Remote HEAD: cdcabbeb7545` and the commit's parent was
+`cdcabbeb7545`, while the preflight log still said `8122b94d9407`.
+
+Characterizing against the preflight SHA is only *usually* harmless: that day the
+sibling commit did not touch `demo-pm/`, so both anchors yielded the same `5 M`.
+But if the sibling commit HAD touched `demo-pm/`, the M set would be computed
+against the wrong tree and could misclassify or omit a file. **When the preflight
+SHA and the script's Step-2 SHA differ, re-run with `--commit=<main_sha>` and
+cite the `parents[0]` value in the run note.**
+
+Rule of thumb: read the script's `Remote HEAD:` line (Step 2) as it runs; if it
+differs from the preflight value, do not cite the preflight value anywhere.
+
 Expect `ADDED 0` in steady state. A non-zero `ADDED` means the script's
 `EXCLUDE_*` sets have drifted out of sync with the backup script's — that is
 the signal to re-sync them, not a real diff.
@@ -61,3 +83,23 @@ the signal to re-sync them, not a real diff.
 Conclusion written into the note: the last two were written after the 09-26
 follow-up push, so 09-26's `0/0/0` closing assertion legitimately did not hold —
 ordering, not a lost commit.
+
+## 2026-09-29 worked example (5 M, 0 A, 0 D — and the anchor divergence)
+
+| File | Hunks | Verdict |
+|------|-------|---------|
+| `cron/jobs.json` | `completed` +48/+1/+1, `next_run_at`/`last_run_at` → 2026-09-29, `updated_at` today | runtime churn |
+| `memories/archive/ARCHIVE.md` | one new 2026-09-28 hindsight reflect row (bank 48 nodes/1228 links, op `4fb36962`) | runtime churn |
+| `skills/devops/demo-pm-github-api/SKILL.md` | 09-29 filter-sanity lesson (a zero-task account beats `OnePlusNBoss` as a filter-validity probe) | carry-over lag |
+| `skills/devops/hermes-profile-backup/SKILL.md` | the `skill_view`-truncation disambiguation ("read_file the on-disk SKILL.md, not the tmp dump") | carry-over lag |
+| `references/skill-md-at-cap.md` | 09-28 status figure + the "Which file to `read_file`" trap section | carry-over lag |
+
+This is the run that motivated the anchor section above: the preflight HEAD was
+`8122b94d9407`, a concurrent sibling backup advanced `main` to `cdcabbeb7545`
+before the script's Step 2, and the commit's parent was `cdcabbeb7545`. Both
+anchors produced the same 5 M only because the sibling commit stayed outside
+`demo-pm/`.
+
+Note the SKILL.md hunk is `+11` chars and the pointer bump is same-length
+(`2026-09-28` → `2026-09-29`), which is how a `latest:` bump fits under the 100K
+cap when headroom is ~25 chars — see `references/skill-md-at-cap.md`.

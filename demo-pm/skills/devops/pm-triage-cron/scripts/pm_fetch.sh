@@ -3,7 +3,10 @@
 #   用法: bash pm_fetch.sh <轮次后缀>    例如 bash pm_fetch.sh r917
 #   产物: /tmp/pm_issues_<轮次>.json  —— assignee=OnePlusNPM 的 open issue
 #         /tmp/pm_all_<轮次>.json     —— 全量 open（含 PR），用于「无待办」crosscheck
-#         /tmp/pm_boss_<轮次>.json    —— assignee=OnePlusNBoss，用于第 3 步「已知他人」过滤器 sanity check
+#         /tmp/pm_boss_<轮次>.json    —— assignee=OnePlusNBoss（已知有任务，判定力弱）
+#         /tmp/pm_ndev_<轮次>.json    —— assignee=OnePlusNDev（零任务账号）
+# 第 3 步 sanity check 请优先用 pm_ndev（见 pm_parse.py）：本仓库稳态下 Boss 与全量必然同构、
+# 无判定力（2026-09-29 实证，2026-09-30 复核）；零任务账号过滤为空 + 全量非空 = 过滤器有效。
 # 一次取齐三份，直接喂给 pm_parse.py 的三步判定，无需每轮手写补充脚本。
 # 轮次后缀必须唯一，防止兄弟轮次互相覆盖。切勿在脚本里写 GITHUB_TOKEN= 字面量（见 SKILL.md 禁用清单）。
 # 可选第 2 参数 OUT：输出目录。默认 /tmp；建议传私有目录（如 /tmp/pmpm-<轮次>-<时分秒>），
@@ -22,9 +25,13 @@ curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
   "$A&assignee=OnePlusNPM" -o "${OUT}/pm_issues_${SUF}.json" -w "HTTP(assignee)=%{http_code}\n"
 curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
   "$A" -o "${OUT}/pm_all_${SUF}.json" -w "HTTP(all)=%{http_code}\n"
-# 第 3 步 sanity check：已知确有任务的账号，反证 assignee 过滤器没被静默忽略
+# 第 3 步 sanity check：零任务账号过滤应为空，反证 assignee 过滤器没被静默忽略
+# （Boss 也抓一份作对照，但 Boss 与全量同构、无判定力，见 pm_parse.py 用法）
 curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
   "$A&assignee=OnePlusNBoss" -o "${OUT}/pm_boss_${SUF}.json" -w "HTTP(boss)=%{http_code}\n"
+curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
+  "$A&assignee=OnePlusNDev" -o "${OUT}/pm_ndev_${SUF}.json" -w "HTTP(ndev)=%{http_code}\n"
 echo "ISSUES=${OUT}/pm_issues_${SUF}.json"
 echo "ALL=${OUT}/pm_all_${SUF}.json"
 echo "BOSS=${OUT}/pm_boss_${SUF}.json"
+echo "NDEV=${OUT}/pm_ndev_${SUF}.json"

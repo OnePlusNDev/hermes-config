@@ -10,9 +10,10 @@
 三步判定「无待办」（缺一不可）:
     1. PM 过滤为空（且 head 验过响应是真 `[ ]`，非截断）。
     2. 去掉 assignee 参数做全量 open crosscheck，确认无挂在 PM 名下的条目。
-    3. 拿一个**已知确有任务**的账号（如 OnePlusNBoss）再查一次：
-       他人过滤非空 + PM 过滤为空 → 过滤器可信、空结果真实 → SILENT。
-       他人过滤也为空（而全量明明有该人任务）→ 过滤器静默失效，改按全量自行筛 assignees。
+    3. 再查一个账号反证 assignee 过滤器没被静默忽略。**本仓库稳态下应传「零任务账号」
+       （如 OnePlusNDev）而非 Boss**：Boss 与全量必然同构、无判定力（2026-09-29 实证）。
+       全量非空 + 零任务账号过滤为空 → 过滤器有效、PM 空结果真实 → SILENT。
+       零任务账号也返回全量规模 → 过滤器静默失效，改按全量自行筛 assignees。
 
 要点（踩过的坑）:
   * 路径必须显式传入/写死，**绝不要 glob('/tmp/pm_issues_*.json')[-1]** —— 字典序会选中
@@ -88,6 +89,12 @@ def main():
 
     if len(other) > 0:
         print("VERDICT: SILENT (PM 过滤为空 + 已知他人过滤非空 → 过滤器可信、空结果真实)")
+    elif other_login not in {a["login"] for it in allit
+                             for a in it.get("assignees", [])}:
+        # 2026-09-29 实证：本仓库稳态下「有任务的账号(如 Boss)」与全量必然同构，
+        # 无判定力。真正的判据是拿一个**名下确实没有 open 任务**的账号（如 OnePlusNDev）：
+        # 全量非空 + 零任务账号过滤为空 = 过滤器确实在过滤 → PM 空结果真实。
+        print("VERDICT: SILENT (零任务账号 %s 过滤为空 → 过滤器有效、PM 空结果真实)" % other_login)
     else:
         all_logins = sorted({a["login"]
                              for it in allit

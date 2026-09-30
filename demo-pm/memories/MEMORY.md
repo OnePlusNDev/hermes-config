@@ -1,6 +1,6 @@
 # MEMORY.md — demo-pm（项目牧羊人）
 
-> 最后更新: 2026-09-11 | 经 Hindsight v0.8.2 整理 | 30天归档已执行（快照见 archive/）
+> 最后更新: 2026-09-29 | 经 Hindsight v0.8.2 整理 | 30天归档已执行（快照见 archive/）
 
 ---
 
@@ -34,7 +34,7 @@
 
 **全局 API**: :8888（daemon since Jun 19, bank=hermes, 20 facts）。
 **Port 分配**: tester=9177, pm=9178, dev=9179, rev=9180。启动: `HINDSIGHT_API_LLM_API_KEY=<key> hindsight-embed -p <profile> daemon start`
-**Key**: z.ai GLM + `https://api.z.ai/api/paas/v4`
+**LLM**: demo-pm daemon(:9178) 现用 DeepSeek `deepseek-v4-flash` @ `https://api.deepseek.com/v1`（key=profile `.env` 的 DEEPSEEK_API_KEY，2026-09-29 验证 200）。原 z.ai GLM key 同日失效（401），勿再用。
 
 ## 4. LLM/模型
 
