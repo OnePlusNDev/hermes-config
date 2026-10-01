@@ -27,6 +27,8 @@ Diff: **<n> M, <n> A, <n> D**.
   → **no plaintext key found, no `key_env` replacement needed**
 - `.env` (<n> B; <var names>) excluded, never uploaded; no
   `auth.json` / `auth.lock` / `state.db*` in tree
+  (list var **names only**, never values — `grep -oE '^[A-Z_]+=' .env | tr -d '='` — so the note
+  never quotes a secret)
 
 ## Diff (<n> M, <n> A, <n> D)
 ```
@@ -63,8 +65,11 @@ one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 - `scripts/post-push-verify.py` → **ALL CHECKS PASS** on the first execution.
 
 ## Follow-up commit (this session)
-Run note + index bullet + SKILL.md `latest:` pointer `<prev>` → `<today>`, pushed with the
-same standalone-subtree script. Afterwards the preflight is expected to report
+Run note + index bullet + SKILL.md `latest:` pointer `<prev>` → `<today>` +
+`references/method-b-practice-notes.md` "Observed on recent runs" table row, pushed with the
+same standalone-subtree script. (The table row is part of the follow-up, not optional — a skipped
+row leaves the 422-race / account-flip recurrence log stale, which is exactly what happened on
+09-29 and 09-30.) Afterwards the preflight is expected to report
 `Modified: 0, New: 0, Deleted: 0`.
 
 **Fold ALL doc edits into this commit** — including any reference-file additions or
