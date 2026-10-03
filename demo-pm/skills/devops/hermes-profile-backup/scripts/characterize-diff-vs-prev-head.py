@@ -6,6 +6,13 @@ Run this AFTER the push, before writing the run note. The run-note template asks
 for each `M` to be classified as routine runtime churn vs benign carry-over doc
 lag; this script produces the evidence instead of eyeballing blob SHAs.
 
+Timing is NOT load-bearing (verified 2026-10-01): running it BEFORE the push also
+works, as long as you pass the pre-push HEAD SHA explicitly. The script diffs the
+local file against the blob AT THE NAMED SHA, so it is irrelevant whether that SHA
+is still the current remote HEAD -- only the named anchor matters. The pre-push run
+is often more convenient (you already have the SHA the backup script logged at
+Step 2) and yields identical output.
+
 USAGE
   python3 scripts/characterize-diff-vs-prev-head.py <PRE_PUSH_HEAD_SHA>
   python3 scripts/characterize-diff-vs-prev-head.py --commit=<backup_commit_sha>

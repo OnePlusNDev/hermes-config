@@ -81,8 +81,34 @@ A 401/code-1000 in ~1s is a credential fault (revoked/expired/rotated key), NOT 
 
 **⚠️ Do the rewrite with a secret-free Python script, not `patch`/`sed`.** Both `terminal()` and `write_file()` mask credential-looking text: a `-H "Authorization: Bearer $KEY"` fragment gets replaced by `***`, which **eats the closing quote** and yields `unexpected EOF while looking for matching '"'`. Write a script that (a) reads the key from the file, (b) never contains a literal auth scheme — build the header as `'Bear' + 'er '`, (c) rewrites the three env lines via `line.startswith(<name> + '=')`. Verify with `len()` of the rewritten value; never echo the secret.
 
-**⚠️ Recalibrate the reflect token baseline when the model changes.** The ~6.8K `input_tokens` baseline quoted throughout this reference is specific to **glm-4-flash**. After the switch to **deepseek-v4-flash**, the same `budget: "high"` primary reflect on the same 48-fact bank returned **148,986 input / 5,252 output tokens**. **Re-verified 2026-09-30: same model + same query returned 112,767 input / 4,814 output tokens (~25s)** — so the deepseek baseline is **not a fixed number but an order of magnitude (~100K–150K, varying with how much of the bank + documents the retrieval pulls in)**. Do NOT treat 112K as "below the 148,986 baseline / degenerate" — any value in the ~100K+ band with a real itemized analysis (not a one-line restatement) is trustworthy. Recalibrate the exact number only if the model changes again; the within-model gate is "far above the ~2–7K question-echo band".
+**⚠️ Recalibrate the reflect token baseline when the model changes.** The ~6.8K `input_tokens` baseline quoted throughout this reference is specific to **glm-4-flash**. After the switch to **deepseek-v4-flash**, the same `budget: "high"` primary reflect on the same 48-fact bank returned **148,986 input / 5,252 output tokens**. **Re-verified 2026-09-30: same model + same query returned 112,767 input / 4,814 output tokens (~25s)** — so the deepseek baseline is **not a fixed number but a wide band**. **Widened 2026-10-01: the same bank returned 203,785 input / 7,923 output tokens for the primary reflect and 273,239 / 7,303 for the disambiguation reflect (~42s each)** — giving an observed deepseek range of **~112K–273K input tokens**, i.e. ~100K–280K. The spread tracks how much of the bank + documents retrieval pulls in, and it varies day to day. Do NOT treat 112K as "below the 148,986 baseline / degenerate" (nor 273K as "abnormally large"), and do NOT treat any single number as THE baseline: **the gate for deepseek is "far above the ~2–7K question-echo band", not "≥ 149K"**. Any value in the ~100K+ band with a real itemized analysis (not a one-line restatement) has fed the facts. Recalibrate the exact number only if the model changes again; the within-model gate is "far above the ~2–7K question-echo band".
  — deepseek reads the whole bank (world/experience/observation + documents), not the glm-size pruned context. The token gate remains a valid *within-model* degeneracy check; re-establish the baseline on every model change, and keep judging wording (real analysis vs. bare question-echo) on its own merits.
+
+### Creation-age false positive can hide INSIDE a full itemized analysis (2026-10-01)
+
+Observed on demo-pm (deepseek-v4-flash, HTTP `budget: "high"`): the first reflect returned a **genuinely substantive, itemized audit** — 203,785 input / 7,923 output tokens, ~42s, citing specific memory IDs, duplicates, and a role/context reconciliation table — **and it still concluded 「存在 30 天以上需归档的过期事实」 for item (1)**.
+
+This is a **different failure from the bare-affirmation echo** documented above:
+
+| | bare affirmation (09-14/09-17) | creation-age FP inside analysis (10-01) |
+|---|---|---|
+| Tokens | ~2.2K or ≈baseline | 203K (far above any baseline) |
+| Wording gate | catches it (no analysis) | **does NOT catch it** — it *is* an analysis |
+| Tell | restates the question's options | flags long-lived **config** (App IDs, ports, LLM endpoint, rules) as expired, with the *only* stated reason being a **creation timestamp** of 2026-06-14 ~ 07-07 |
+| Often says | nothing else | concedes 「这些属长期策略，逾期不等于过期」 in the body yet keeps 「存在」 in the headline |
+
+Rule: **when a high-token, full-analysis reflect flags facts as expired purely from creation age, do NOT archive and do NOT call the run clean — run the targeted disambiguation reflect that forces the distinction.** Working query (returned 「无内容性过期事实」 with a full per-category table at 273,239 input / 7,303 output tokens, ~42s — NOT degenerate):
+
+```
+针对上一轮审计的过期判定做定向澄清。背景：<bank> 的 48 条事实均创建于 <日期范围>，
+内容都是长期有效的活跃配置（飞书 AppID/端口/LLM key/处理规则/协作铁律），
+创建时间早并不等于内容已过期。请只回答一个判定：是否存在【因内容本身失效】而
+真正需要归档/删除的事实？若有，列出具体条目与理由；若没有，直接回答「无内容性过期事实」。
+```
+
+- **Model-dependent reliability — do not blanket-apply the 09-15 rule.** On deepseek-v4-flash + `budget: "high"` the disambiguation reflect is *reliable* (full table, no hallucination), so use it freely. The 2026-09-15 correction ("skip disambiguation, go straight to HTTP `budget:high`") applies only when the **first** reflect was sub-baseline/degenerate. When the first reflect is a high-token full analysis, go **straight to the disambiguation reflect** — the disambiguation is what disambiguates wording, not tokens.
+- Verdict confirmed 2026-10-01: **0 content-expired facts** in the 48-fact `demo-pm-memory` bank. The flagged items are the standing creation-age illusion (same as 09-11 / 09-17), not a finding.
+- The two-gate probe in `scripts/reflect_quality_check.py` codifies this: it now runs the disambiguation reflect when the primary **either** is sub-baseline **or** makes an affirmative expired-claim — so a 203K-token analysis with the wrong headline no longer slips through on tokens alone.
 
 ### Pitfall — env-file `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT` overrides the launcher's export
 
@@ -446,6 +472,18 @@ curl -s -X POST http://127.0.0.1:<port>/v1/default/banks/<bank_id>/reflect \
   -H "Content-Type: application/json" \
   -d '{"query":"Review all memories for outdated observations older than 30 days.","mode":"full"}'
 ```
+
+**Recommended payload — facts-included, and the evidence-count proof (2026-10-01):** the top-level knob is `budget` (enum `low|mid|high`), and the HTTP equivalent of `include_facts=True` is an `include` object. Pass both so the reflect actually reads the bank AND returns its evidence list:
+
+```json
+{
+  "query": "…结论式中文 query…",
+  "budget": "high",
+  "include": {"facts": {}}
+}
+```
+
+Write it with `write_file` (Chinese → tirith) and post with `-d @payload.json`. The response then carries **`based_on.memories`** — `48` for the 48-fact `demo-pm-memory` bank. **That count is direct proof the facts were fed, which is stronger than the token heuristic**; if `based_on` is null/absent, `include` was not set. The legacy `"mode": "full"` field is superseded by `budget`.
 
 ```python
 # Python via terminal() (cron-safe — avoids pipe-to-interpreter blocks)
