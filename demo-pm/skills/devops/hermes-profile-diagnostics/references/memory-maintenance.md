@@ -975,7 +975,7 @@ When hindsight is the active memory provider, the file `<profile>/memory.db` exi
 
 ## Daemon Restart Latency (variable: ~15s warm PG vs 1-3+ min cold)
 
-After an idle-timeout shutdown, restarting the daemon via `hindsight-embed -p <name> daemon start` takes **1-3+ minutes** only when the embedded PostgreSQL must initialize from scratch. If pg0 PostgreSQL is already running (check `ps aux | grep postgres` — a sibling or global :8888 daemon on the same machine shares `~/.pg0`), the profile daemon becomes healthy in **~15 seconds** (observed 2026-08-08: poll `curl health` every 5s, healthy on 3rd poll). During the startup window (warm or cold):
+After an idle-timeout shutdown, restarting the daemon via `hindsight-embed -p <name> daemon start` takes **1-3+ minutes** only when the embedded PostgreSQL must initialize from scratch. If pg0 PostgreSQL is already running (check `ps aux | grep postgres` — a sibling or global :8888 daemon on the same machine shares `~/.pg0`), the profile daemon becomes healthy in **~15 seconds** (observed 2026-08-08: poll `curl health` every 5s, healthy on 3rd poll). **Re-calibrated 2026-10-03 (demo-pm): a FULL cold start — all daemons down AND zero pg0 postgres processes — reached healthy in ~20s via the launcher script (`HF_HUB_OFFLINE=1`, poll every 10s). Treat 1-3+ min as an upper bound, not the expected wait.** During the startup window (warm or cold):
 - `hindsight-embed daemon status` reports \"Daemon is not running\"
 - `curl http://127.0.0.1:<port>/api/health` returns connection refused
 - `hindsight-embed bank list` times out
