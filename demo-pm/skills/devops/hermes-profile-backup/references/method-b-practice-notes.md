@@ -38,12 +38,21 @@ already uploaded.
 | 2026-09-30 | no | **first-try, 0 aborts** — pre-flight active gh user was **`zhangtbj`** (`push=false`) → `gh auth switch --user OnePlusNDev`; re-checked immediately pre-run and the switch **held** (no mid-run flip). Remote **stable at `6cdc630521ec`** from preflight through commit time (no sibling advance) → 8 blobs + subtree `52cb600c33b4` + top tree `1ad643b365c8` in one clean pass, **no ref-PATCH 422 race**. No network flakiness; the `mkdtemp` payload fix held. |
 | 2026-10-01 | no | **first-try, 0 aborts** — pre-flight active gh user was **`OnePlusNTester`** (`push=false`) → `gh auth switch --user OnePlusNDev`; re-checked immediately pre-run and the switch **held** (no mid-run flip). Remote **stable at `1fcd2063e654`** from preflight through commit time (no sibling advance) → 6 blobs + subtree `06db308902a5` + top tree `fac92ca2ab39` in one clean pass, **no ref-PATCH 422 race**. No network flakiness; the `mkdtemp` payload fix held. |
 | 2026-10-03 | no | **first-try, 0 aborts** — pre-flight active gh user was **`OnePlusNDev`** (owner, `push=true`) — **no switch needed** (`GITHUB_TOKEN` unset), no mid-run flip. Remote **stable at `5b541e866d54`** from preflight through commit time (no sibling advance) → 8 blobs + subtree `874cf6a84a11` + top tree `102a5bd05ee7` in one clean pass, **no ref-PATCH 422 race**. No network flakiness; the `mkdtemp` payload fix held. |
+| 2026-10-03 (2nd, 20:00) | no | **first-try, 0 aborts** — pre-flight active gh user was **`OnePlusNTester`** (`push=false`) → `gh auth switch --user OnePlusNDev`; re-checked immediately pre-run and the switch **held** (no mid-run flip). Remote **stable at `0377a76d082e`** from preflight through commit time (no sibling advance) → 2 blobs + subtree `96e0c79d5df4` + top tree `49d822cb7ed9` in one clean pass, **no ref-PATCH 422 race**. The 2 `D` = genuine local skill removals (apple/apple-notes, software-development/systematic-debugging). No network flakiness; the `mkdtemp` payload fix held. **First same-day repeat run** → run note uses the `YYYYMMDDb` suffix. |
 
 **Maintain this table with one row per run** — the row belongs in the daily follow-up
 commit alongside the run note, the index bullet, and the SKILL.md `latest:` pointer.
 It is the only continuous record of the 422-race / account-flip recurrence, so a
 skipped row makes the pattern look rarer than it is. (09-29 and 09-30 originally
 shipped without rows; backfilled 2026-09-30.)
+
+**Same-day repeat runs** (first hit 2026-10-03, which ran at both 10:36 and 20:00 CST): the
+daily run-note filename is `YYYYMMDD.md`, so a second run on the same date takes a
+`YYYYMMDDb.md` suffix (e.g. `demo-pm-backup-workflow-20261003b.md`) and gets its own table row
+(labelled `2026-10-03 (2nd, HH:MM)`) and its own index bullet. This keeps each run's record
+atomic and the index `grep -c '<file>.md' == 1` verification clean — appending a second section
+to the existing same-date file instead would make that check read 2 and hide a real duplicate
+from a future run. The SKILL.md `latest:` pointer stays at the date and is **not** re-bumped.
 
 Note (2026-09-21): the remote ref can advance between the **preflight** and the
 **backup script's own Step 2** (the script re-reads it, so this is harmless — it
