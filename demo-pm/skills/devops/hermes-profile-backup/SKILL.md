@@ -120,7 +120,7 @@ git push
 (extracted 2026-09-23 to keep SKILL.md under its 100,000-char cap). The same list is
 mirrored in `templates/gitignore-template.txt` and in the `EXCLUDE_*` sets of both
 `scripts/` probes — **change one ⇒ change all four.** Sanity number: local files after
-excludes = **407**, and that must equal the remote `demo-pm` blob count.
+Sanity check: local files after excludes == remote `demo-pm` blob count (re-derive each run; never hardcode).
 
 See also: `autonomous-ai-agents/hermes-agent/references/hermes-profile-rsync-github-backup.md`
 
