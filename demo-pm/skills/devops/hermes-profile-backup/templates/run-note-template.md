@@ -4,6 +4,16 @@ Copy this to `references/demo-pm-backup-workflow-YYYYMMDD.md` and fill in the
 placeholders. Then append an index bullet to `references/dated-runs-index.md`
 (see the unique-anchor warning below).
 
+**Same-day repeat run** (first hit 2026-10-03: the profile backed up at *both*
+10:36 and 20:00 CST): the plain `YYYYMMDD.md` name is already taken, so the
+second run uses a `YYYYMMDDb.md` suffix (e.g. `demo-pm-backup-workflow-20261003b.md`),
+gets its own index bullet and its own `method-b-practice-notes.md` table row
+(labelled `YYYY-MM-DD (2nd, HH:MM)`), and leaves the SKILL.md `latest:` pointer
+at the date (date is unchanged; the suffix carries the run distinction). Do NOT
+append a second *section* to the existing same-date file — that makes the index
+`grep -c '<file>.md' == 1` verification read 2 and hides a real duplicate from a
+future run. Check for a same-date file before writing (`ls references/ | grep <YYYYMMDD>`).
+
 Keep it short: this is the record of one run, not a tutorial. The value is in
 the numbers (SHAs, counts, diff shape) that let a future run notice drift.
 

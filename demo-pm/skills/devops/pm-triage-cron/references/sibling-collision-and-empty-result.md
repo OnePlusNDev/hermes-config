@@ -20,6 +20,8 @@ _warning: /private/tmp/pm_fetch_0915b.sh was modified by sibling subagent
 3. 一致 → `bash` 执行；不一致 → 改名重写（不要硬跑）；
 4. 输出侧也回读：别只信自己脚本 echo 的计数，要看真实响应体。
 
+**2026-10-04 补充：** 把**输出路径**也带上 `$$`（脚本 PID），如 `OUT=/tmp/pm_issues_pm1004_$$.json`，再 `echo "SAVED=$OUT"` 把真实路径打出来、解析脚本写死该路径。兄弟轮次各跑各的 PID，自然落到不同文件名——实测此项能真正避开输出侧覆写（脚本名侧仍会弹同名警告，回读即可）。
+
 ## 2. fetch 数据可信三件套
 
 | 检查 | 期望值 | 含义 |
