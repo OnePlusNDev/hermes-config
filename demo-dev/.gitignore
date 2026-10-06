@@ -20,6 +20,7 @@ tmp_token_check.sh
 .poll*
 .diag*
 .cron_env.sh
+.rules_sha
 tmp_*
 gh*.sh
 gh*.py
