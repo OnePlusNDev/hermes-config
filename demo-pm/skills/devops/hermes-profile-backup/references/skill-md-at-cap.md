@@ -92,8 +92,12 @@ Point `read_file` at the **on-disk SKILL.md**
 It has real newlines, so `offset`/`limit` slices work. Do **NOT** locate that
 path with a recursive search — `find ~/.hermes -iname '*.md' -path '*hermes-profile-backup*'`
 **TIMES OUT (180 s, exit 124)** because the profile tree carries `lsp/` + `node_modules`
-(5000+ files). The path is stable and known, so hardcode it (or use `search_files(target='files')`)
-instead of shelling out to `find` (verified 2026-10-04).
+(5000+ files). The path is stable and known, so hardcode it instead of shelling out to
+`find` (verified 2026-10-04). ⚠️ `search_files(target='files')` is **NOT** a safe substitute
+for a broad listing: a glob like `pattern='*'` over the profile root ALSO times out
+(`limit_reason: search_timeout`, 0 results) on this tree — for a directory listing use plain
+`ls` via terminal (verified 2026-10-05). A narrow filename glob (a specific file name) is
+fine; the failure is broad recursive walks.
 
 Do **NOT** point `read_file` at the temp path `skill_view` prints
 (`... Full output saved to: /var/folders/.../hermes-results/call_00_*.txt`).

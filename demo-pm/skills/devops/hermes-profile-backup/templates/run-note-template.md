@@ -105,6 +105,20 @@ So `patch(mode='replace')` anchored on just the last line's tail is ambiguous �
 it would match earlier bullets too. Anchor on a fragment unique to the *previous*
 run's bullet, e.g. `demo-pm 401 blobs (== local count)` (verified 2026-09-21).
 
+**⚠️ Copy the anchor VERBATIM — never reconstruct it from memory** (verified 2026-10-05):
+the match has no fuzzy rescue, so one mis-typed word silently breaks the append. On 10-05
+the whole ~600-char previous-bullet tail was re-typed from `tail -c` output and one word
+came out wrong (`the other \`M\` …` instead of the file's `the remaining \`M\` …`) → the
+`patch` failed with "Could not find a match". Two fixes, in order of preference:
+1. Use a **SHORT unique fragment** as the anchor (e.g.
+   `the remaining \`M\` is routine runtime churn (cron/jobs.json counters 4899→4947`) rather
+   than a long tail — shorter = less to transcribe wrong.
+2. If you must anchor on the tail, `read_file` the last lines immediately before patching and
+   copy character-for-character; do NOT trust a re-typed `tail -c` echo.
+Note the `patch` tool's "was modified by sibling subagent … but this agent never read it"
+warning is benign (see below) and can coincide with a genuine transcription miss — when the
+patch fails, suspect a copy error before a stale-file theory.
+
 Verify the append landed exactly once — both checks must print `1`:
 
 ```bash
