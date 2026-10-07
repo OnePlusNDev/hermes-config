@@ -119,6 +119,14 @@ Note the `patch` tool's "was modified by sibling subagent … but this agent nev
 warning is benign (see below) and can coincide with a genuine transcription miss — when the
 patch fails, suspect a copy error before a stale-file theory.
 
+**The `method-b-practice-notes.md` table ROWS share an identical tail too**, so the same
+uniqueness problem applies when appending a row — every row ends
+`… No network flakiness; the \`mkdtemp\` payload fix held. |`. Anchor on the PREVIOUS row's
+unique SHA fragment **plus the row terminator**, e.g.
+`+ top tree \`919563bb1650\` in one clean pass, **no ref-PATCH 422 race**. No network flakiness; the \`mkdtemp\` payload fix held. |`
+(verified 2026-10-06), then confirm the new row landed with
+`grep -c '^| <YYYY-MM-DD> |' references/method-b-practice-notes.md` == 1.
+
 Verify the append landed exactly once — both checks must print `1`:
 
 ```bash
