@@ -64,6 +64,21 @@ just means the diff counts you saw in preflight may be recomputed against a newe
 HEAD). Run `scripts/post-push-verify.py` *after* the commit, not after the
 preflight, for the authoritative numbers.
 
+## Known gh keyring accounts — the flipper set is OPEN
+
+`gh auth status` on this machine lists SIX accounts: **`OnePlusNDev`** (owns
+`hermes-config` — the ONLY valid push target), plus `OnePlusNTester`,
+`OnePlusNPM`, `zhangtbj`, `JungleAssistant`, `OnePlusNBoss`. The active account
+flips among them between (and sometimes during) runs — **two flippers were
+brand-new on first appearance** (`zhangtbj` 2026-09-26, `JungleAssistant`
+2026-10-07), so treat the set as open-ended and **never** treat a recognized
+login as safe-to-skip. The only reliable rule: re-check `gh api user`
+immediately pre-run AND immediately pre-push, and `gh auth switch --user
+OnePlusNDev` whenever it differs. A blob POST returning HTTP 404 (not 403) is
+the classic symptom of a mid-run flip. (The roster above is a snapshot —
+re-derive it with `gh auth status` each run; the *lesson*, not the exact list,
+is what's durable.)
+
 ## Shared `/tmp` payload namespace — sibling profiles delete our payload files
 
 **Hit 2026-09-23 on attempt 1** (the first run of the day):
