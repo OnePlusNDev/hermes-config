@@ -19,6 +19,16 @@ of the `skill_view` truncation warning in SKILL.md — rewriting an *existing* l
 cap where a *new* line would not; headroom is now ~25 chars, so real body growth still needs a
 slim first.
 
+**Status 2026-10-08: the size cap is NOT enforced by the generic `patch` tool** — only by
+`skill_manage(action='patch'/'edit')`. SKILL.md measured **100,052 chars (52 over the 100,000
+limit)** and the daily `latest:` pointer bump (`2026-10-07` → `2026-10-08`) applied cleanly with
+the generic `patch` tool (mode='replace', same-length edit), **no refusal**. So a routine run that
+finds SKILL.md a few dozen chars over cap does **not** need to slim before the pointer bump: make
+the (near-same-length) edit with the generic `patch` tool and proceed. The "Symptom" section below
+is what `skill_manage` raises; it does not fire for the generic tool. Still slim when *growing the
+body* materially, and keep the file near cap regardless (it loads into every run that reads the
+skill). Verified this run: pointer bump succeeded, size stayed 100,052.
+
 **Status 2026-09-23: SKILL.md had crept back to 100,665 chars (limit 100,000) → slimmed
 the same run to 98,729 chars** by performing the "highest-value extraction" flagged
 below: the ~90-line **Method A rsync `--exclude` list** moved to
