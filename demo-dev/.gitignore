@@ -44,6 +44,8 @@ models_dev_cache.json
 cache/
 image_cache/
 audio_cache/
+context_length_cache.yaml
+.update_check
 
 # Gateway / session state
 gateway.lock
