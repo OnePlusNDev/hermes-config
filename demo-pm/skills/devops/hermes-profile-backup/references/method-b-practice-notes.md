@@ -10,9 +10,13 @@ re-reading the remote ref.
 
 ## The one-plain-re-run rule for the ref-PATCH 422 race
 
-From 09-06 onward the ref-PATCH HTTP 422 "Update is not a fast forward" recurs on
-MOST runs (a concurrent sibling-profile backup advances `main` during the ~1–2 min
-blob phase).
+The ref-PATCH HTTP 422 "Update is not a fast forward" recurs **intermittently**, not
+uniformly: the early stretch 09-06→09-23 hit it on most runs, but the recent window is a
+minority (2 of the last 9 - 10-06 and 10-09). The cause is always the same: **any**
+concurrent sibling-profile backup advances `main` during the ~1-2 min blob phase - do NOT
+assume one fixed culprit (observed siblings include demo-tester and demo-dev, 2026-10-09,
+which landed HEAD `93d20c3d`->`46ee50cb3b58` at 12:01:26Z). A "clean" run is thus the
+expected case; seeing a 422 is normal, not a signal that something else is wrong.
 
 Budget exactly ONE plain re-run: blob SHAs are idempotent, so the re-run just
 re-parents the identical commit on the fresh HEAD. Do NOT rebase, do NOT attempt
