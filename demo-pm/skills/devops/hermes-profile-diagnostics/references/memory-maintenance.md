@@ -484,7 +484,9 @@ curl -s -X POST http://127.0.0.1:<port>/v1/default/banks/<bank_id>/reflect \
 }
 ```
 
-Write it with `write_file` (Chinese → tirith) and post with `-d @payload.json`. The response then carries **`based_on.memories`** — `48` for the 48-fact `demo-pm-memory` bank. **That count is direct proof the facts were fed, which is stronger than the token heuristic**; if `based_on` is null/absent, `include` was not set. The legacy `"mode": "full"` field is superseded by `budget`.
+Write it with `write_file` (Chinese → tirith) and post with `-d @payload.json`. The response then carries **`based_on.memories`** — a non-null, substantial list of the bank facts retrieval pulled in for this reflect. **That count is direct proof the facts were fed, which is stronger than the token heuristic**; if `based_on` is null/absent, `include` was not set. The legacy `"mode": "full"` field is superseded by `budget`.
+
+**⚠️ The count is NOT pinned to the bank's total fact_count — it is a run-varying retrieval subset.** On the 48-fact `demo-pm-memory` bank it usually reads `48`, but **observed `35` on 2026-10-10** (deepseek-v4-flash, `budget=high`, clean full analysis, 167,968 in / 6,430 out tokens) — still a non-null, substantial count = facts fed. So the gate is **"`based_on.memories` present and in the tens"**, NOT "== 48". Do not flag a reflect as degenerate/broken just because the count is below the bank total; and do not flag it as a bug if it equals the total either. The two authoritative gates remain wording (real analysis vs. bare restatement) and the model band (deepseek ≈ 100K+ input tokens, far above the ~2–7K question-echo band).
 
 ```python
 # Python via terminal() (cron-safe — avoids pipe-to-interpreter blocks)
