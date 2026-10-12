@@ -7,7 +7,7 @@ When running backup as a cron job (approvals set `cron_mode: deny`), the tirith 
 | Operation | Tirith Pattern | Why |
 |-----------|----------------|------|
 | `rsync --delete` | `blast_rsync_delete` | Destructive mirror: wrong src/dst can wipe destination |
-| `rm -rf <dir>` | `recursive delete` or `mass_file_deletion` | Accidental recursive wipe |
+| `rm -rf <dir>` | `recursive delete` (Hermes cron **approval gate** — returns `status: pending_approval` / `approval_pending: true`, the command NEVER runs; same gate family as `execute_code`, NOT tirith) or `mass_file_deletion` | Accidental recursive wipe |
 | `find ... -delete` | `find -delete` | Same as recursive delete |
 | `execute_code()` | execute_code block | Arbitrary local Python in cron mode |
 | 4+ file deletions in 20s | `mass_file_deletion` | Burst pattern resembles ransomware |
@@ -23,6 +23,16 @@ Avoid the need for cleanup entirely by using a unique temp directory:
 gh repo clone <owner>/<repo> /tmp/<work>-$(date +%s)
 ```
 Each cron run gets its own directory — no stale files, no cleanup needed, no tirith hit.
+
+**For a scratch dir you'd otherwise `rm -rf && mkdir`, use `mktemp -d` (verified 2026-10-11).**
+A `rm -rf <dir> && mkdir <dir>` one-liner returns `{"status": "pending_approval",
+"approval_pending": true, "pattern_key": "recursive delete"}` and, with no user present, exits
+`exit_code: -1` without running — the shell aborts mid-command. Replace it with:
+```bash
+d=$(mktemp -d)   # fresh unique dir, no teardown, no approval gate
+```
+This is the exact failure hit on 2026-10-11 (a remote-vs-local diff scratch dir); the `rm -rf`
+half never executed, so the whole command silently did nothing. `mktemp -d` sidesteps it.
 
 ### If you must clean up an existing dir
 

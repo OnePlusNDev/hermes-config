@@ -27,6 +27,22 @@ When the user says "archive old memories and optimize with hindsight," follow th
 
 **Batch the independent reads — a whole clean run fits in ~8 tool calls (verified 2026-09-25).** Steps 1–3 are mutually independent (file ages, char counts, memory-limit grep, `lsof` port scan, sibling `/v1/default/banks`, >90d session count, retention config) → put them in **one** `terminal()` call with several `echo` sections. Steps 5–7 likewise (op-status poll + bank stats + post-run session count) → one call. Only the daemon start (background + health poll loop) and the reflect POST need their own round-trips. Do not spend one call per check — the flow above is a *sequence*, not a call-per-step budget.
 
+**🔴 Batch reads must NOT use `curl | python3` — tirith blocks the pipe (verified 2026-10-11).** A `terminal()` command containing `curl … | python3 -c "…"` trips the Hermes security scanner (`pattern_key: tirith:curl_pipe_shell`, severity HIGH): the call comes back **`status: "pending_approval"`, not executed**. In an interactive session you can re-issue a safer form; in a **cron run there is no user to approve, so the command stalls the whole job.** The reference body elsewhere says "prefer Python via terminal() (cron-safe — avoids pipe-to-interpreter blocks)" but that warning is easy to miss when you're reaching for the convenient one-liner, so treat it as a hard rule here.
+
+Fix — never pipe curl's stdout into an interpreter. Fetch inside a heredoc Python script with `urllib` (this is the exact idiom to reuse for every endpoint check):
+
+```bash
+/Users/oneplusn/.hermes/hermes-agent/venv/bin/python3 - <<'PY'
+import urllib.request, json
+def get(u): return json.loads(urllib.request.urlopen(u, timeout=15).read())
+s = get("http://127.0.0.1:9178/v1/default/banks/demo-pm-memory/stats")
+print("nodes=%s links=%s pending=%s failed=%s" % (
+    s['total_nodes'], s['total_links'], s['pending_operations'], s['failed_operations']))
+PY
+```
+
+(Equally fine: `curl -s <url> -o /tmp/x.json` then parse `/tmp/x.json` with `read_file`/`open()`.) The same block applies to *any* pipe-to-interpreter in this profile — the guard matches the shell pattern `curl … | <interpreter>`, not the specific URL. `python3 -c "…"` alone (no upstream pipe) is fine.
+
 **If no files are >30 days AND files are within char limits AND reflect reports nothing outdated → there is no archive/compaction work to do.** But if hindsight operations were actually performed (daemon started, reflect + consolidate ran, archive log updated), report those findings normally — `[SILENT]` is only for truly idle runs where nothing at all was done.
 
 ### Extended Hindsight Outage — Escalation & Fallback

@@ -1,5 +1,8 @@
 # 兄弟轮次抢文件 + 空结果确证（2026-09-15 实盘记录）
 
+> ⚠️ **动手前先读 `references/maintenance-notes.md`。** 首选直接跑打包脚本 `bash scripts/pm_fetch.sh <唯一后缀> [/tmp/pmpm-<轮次>-<时分秒>]` + `python3 scripts/pm_parse.py ...`：一次取齐四份快照并自带「零任务账号」sanity crosscheck（第 3 步），比本文及 SKILL.md TL;DR 里的手写两段式更全。**手写只取两份快照会漏掉第 3 步 sanity check**（2026-10-12 实测如此）。
+> **另注：`SKILL.md` 已达 100,000 字符补丁上限，无法再加正文——新经验一律写进 `references/`（见 maintenance-notes.md 顶部说明），勿再尝试 patch SKILL.md 添加内容。**
+
 本轮：PM 轮询 `demo-oneplusn/demo-workflow`，结论 **无待分诊任务 → `[SILENT]`**，全程未产生任何 comment 或 assignee 变更。以下为可复用的判据细节。
 
 ## 1. 兄弟 cron 轮次抢 /tmp 文件——警告是误报，但必须回读
