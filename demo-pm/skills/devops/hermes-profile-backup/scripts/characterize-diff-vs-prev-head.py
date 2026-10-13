@@ -195,8 +195,10 @@ def main():
     print(f"local files: {len(local)}   remote(at PREV_HEAD): {len(remote_profile)}")
     print(f"MODIFIED {len(modified)}   ADDED {len(added)}   DELETED {len(deleted)}")
     if added:
-        print("  (ADDED should be 0 in steady state - a non-zero value means the "
-              "local set here disagrees with the backup set; check EXCLUDE sync)")
+        print("  (ADDED is normally 0. Non-zero means either (a) EXCLUDE-set drift "
+              "- re-sync the sets - or (b) a legitimately NEW include-list file, "
+              "most often a monthly memories/archive/*-<date>.snapshot.md rollover, "
+              "which SHOULD be backed up. Check the path before assuming drift.)")
 
     for r in modified:
         print(f"\n--- M {PROFILE}/{r}   hint: {hint_for(r)}")

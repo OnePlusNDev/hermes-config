@@ -56,9 +56,24 @@ cite the `parents[0]` value in the run note.**
 Rule of thumb: read the script's `Remote HEAD:` line (Step 2) as it runs; if it
 differs from the preflight value, do not cite the preflight value anywhere.
 
-Expect `ADDED 0` in steady state. A non-zero `ADDED` means the script's
-`EXCLUDE_*` sets have drifted out of sync with the backup script's — that is
-the signal to re-sync them, not a real diff.
+Expect `ADDED 0` in steady state — but a non-zero `ADDED` has **two** causes, and
+the script's printed hint names only one of them:
+
+1. **Exclude drift** — the script's `EXCLUDE_*` sets have drifted out of sync
+   with the backup script's. Re-sync them; not a real diff.
+2. **A legitimately new local file** — most commonly the monthly 30-day memory
+   archive rollover creating `memories/archive/USER-<YYYYMMDD>.snapshot.md` (with
+   the matching `ARCHIVE.md` row). Those snapshots ARE in the include list, so the
+   `A` is correct and must be backed up — do **not** "fix" an EXCLUDE set to make
+   it vanish.
+
+Distinguish by path: an `A` under `memories/archive/` named `*-<date>.snapshot.md`
+is category 2 (intended content); an `A` under `tmp*/`, a `*_cache.json`, a root
+`health*`/`*.sh` diagnostic, or anything matching a live `EXCLUDE_*` prefix is
+category 1 (drift). Verified 2026-10-12: `ADDED 1
+demo-pm/memories/archive/USER-20261011.snapshot.md` was the 30-day USER.md
+rollover (USER.md's 最后更新 moved 2026-09-11 → 2026-10-11 the same run), **not** an
+exclude mismatch — the script's "check EXCLUDE sync" hint is a false alarm here.
 
 ## Reading the output
 
