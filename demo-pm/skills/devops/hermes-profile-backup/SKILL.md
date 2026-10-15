@@ -7,6 +7,8 @@ description: Back up a Hermes profile configuration to a Git repository or GitHu
 
 Back up a Hermes agent profile's configuration files to a GitHub repository. Three methods are available depending on your network and tooling constraints.
 
+> ⚠️ **Load THIS skill FIRST for the `demo-pm` `hermes-config` backup cron job — it is authoritative.** The bundled `hermes-agent` skill's `references/hermes-profile-*-backup.md` (generic REST/rsync for a differently-named repo) is a DECOY here. Correct path: Method B standalone-subtree + the `scripts/` preflight/backup/post-push-verify trio + the daily run-note follow-up commit.
+
 ## Trigger Conditions
 
 - "Back up my Hermes config"
