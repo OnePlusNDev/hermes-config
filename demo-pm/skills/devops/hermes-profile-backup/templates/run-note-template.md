@@ -162,20 +162,36 @@ the Python append; reserve `patch` for a genuinely short previous bullet.
 (2026-10-15: bullet was 1,637 chars → Python append used, landed once,
 `grep -c '20261015.md'` == 1, 102→103 lines.)
 
-Instead write a `/tmp/append_index.py` that:
+Instead write a **uniquely-named** helper — `/tmp/append_index_<profile>_$(date +%s).py`,
+**not** the generic `/tmp/append_index.py` — that:
 
 1. reads the file,
 2. bails out if the run date is already present
    (`if "<YYYYMMDD>.md" in txt: sys.exit(1)` — guards against a duplicate bullet),
 3. ensures a trailing newline, then appends `BULLET + "\n"`.
 
-Run it via `terminal("python3 /tmp/append_index.py")`. A Python `open(..., "w")`
+Run it via `terminal("python3 /tmp/append_index_<profile>_<epoch>.py")`. A Python `open(..., "w")`
 is **not** a shell redirect, so it does NOT trip `tirith:dotfile_overwrite`
 (only a shell `>>` / heredoc into the `~/.hermes` path does). Verified
 2026-10-13: append landed exactly once (`grep -c '20261013.md'` == 1, file
 100 → 101 lines), no tirith hit, no transcription risk. This is the DEFAULT index-bullet
 route as of 2026-10-15; the `patch` route is now reserved for a genuinely short
 previous bullet (~500 chars or less, per the rule above).
+
+**⚠️ Use a UNIQUE helper filename — never the generic `/tmp/append_index.py`
+(verified 2026-10-16).** Sibling profiles run concurrently on this machine and
+share `/tmp`, so a generic helper name can be clobbered by another profile's run
+in the window between your `write_file` and your `terminal(python3 …)` call. This
+is the same hazard the `mkdtemp` payload fix addresses for blob payloads — see the
+"Shared `/tmp` payload namespace" section of `references/method-b-practice-notes.md`.
+Symptoms seen 2026-10-16: `write_file` to the generic `/tmp/append_index.py`
+returned `was modified by sibling subagent … but this agent never read it`
+(benign there — the append still landed once, `grep -c '20261016.md'` == 1, and
+the file content was ours, 1,179 B). The write→run window is tiny, but a
+`<profile>_$(date +%s)` suffix costs nothing and removes the race entirely. The
+same reasoning applies to any helper script the run writes to `/tmp/`.
+NOTE: a `write_file` "modified by sibling subagent" warning is *not* a reason to
+abandon the write — re-read to confirm the content is yours, then proceed.
 
 The `method-b-practice-notes.md` table row is a **mid-file insert** (the table is
 followed by prose), so it always uses `patch` with the previous row's unique
