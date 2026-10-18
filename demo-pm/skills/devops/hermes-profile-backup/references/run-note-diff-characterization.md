@@ -75,6 +75,21 @@ demo-pm/memories/archive/USER-20261011.snapshot.md` was the 30-day USER.md
 rollover (USER.md's 最后更新 moved 2026-09-11 → 2026-10-11 the same run), **not** an
 exclude mismatch — the script's "check EXCLUDE sync" hint is a false alarm here.
 
+3. **A new doc authored by ANOTHER cron job between runs** — nearly always a
+   `references/*.md` under a *sibling* skill's directory, because each skill's own
+   cron writes its lessons into its own `references/`. Verified 2026-10-17:
+   `A demo-pm/skills/devops/pm-triage-cron/references/cron-run-pitfalls.md`
+   (2,369 B — the `/tmp` fixed-filename sibling collision + `COUNT:0` crosscheck
+   pitfall) appeared in the window between the 10-16 follow-up push and the 10-17
+   preflight. It is intended content: back it up, do **not** add an exclude.
+   The one extra step vs category 2: it lives under a sibling skill, so read the
+   file before upload (`grep -nE 'token|sk-|ghp_|api_key|\.env' <file>`). A triage
+   transcript very often quotes a `grep "^GITHUB_TOKEN=..." .env` recipe — a
+   variable NAME mention is fine (the preflight token scan passes it, since that
+   scan matches full token *values*), a value or a `.env` dump is not.
+   Classify it in the run note as "new reference doc, content inspected", e.g.
+   2026-10-17's note.
+
 ## Reading the output
 
 - `M <path>  hint: runtime churn ...` — `cron/jobs.json` counters/timestamps and
