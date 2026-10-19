@@ -90,6 +90,31 @@ exclude mismatch — the script's "check EXCLUDE sync" hint is a false alarm her
    Classify it in the run note as "new reference doc, content inspected", e.g.
    2026-10-17's note.
 
+## Run it ONCE — write the diff to a file, then slice it
+
+The probe prints a full unified diff per `M` file, so its stdout is routinely
+thousands of lines and gets cut by `| head -60` / `| tail -70`. Do **not** run it
+twice to see the head and then the tail: every execution re-reads the remote
+tree, GETs a blob for each changed file, and (with no argument) derives
+`parents[0]`. A second run doubles the API traffic and wall time for information
+you already had.
+
+Verified 2026-10-18: a clean 5-M run cost two full passes (~5 redundant blob
+GETs) purely because the first output was piped through `tail -70` instead of
+being kept.
+
+Correct shape — dump to your private mkdtemp dir first, then read slices:
+
+```bash
+TMPD=$(mktemp -d /tmp/char-XXXXXX)
+REPO_OWNER=OnePlusNDev python3 -u <skill>/scripts/characterize-diff-vs-prev-head.py \
+  > "$TMPD/char.txt" 2>&1
+grep -n '^--- M ' "$TMPD/char.txt"     # indexes every file's hunk block
+```
+
+Then `read_file`/`sed -n` only the block you need. (`>` into `/tmp` is fine; a
+shell redirect into a `~/.hermes` path trips `tirith:dotfile_overwrite`.)
+
 ## Reading the output
 
 - `M <path>  hint: runtime churn ...` — `cron/jobs.json` counters/timestamps and
