@@ -134,6 +134,33 @@ Rules:
   `network-flakiness-and-verify-tooling.md` §1: same "just re-run" remedy, entirely
   different cause. Read the error string before reaching for the network explanation.
 
+## Sibling advance BETWEEN the main and follow-up commit is harmless
+
+The daily flow is **two** commits: the main backup, then the follow-up (run note + index
+bullet + SKILL.md `latest:` + practice-notes row). A sibling profile can push inside that
+window, so the follow-up's Step 2 legitimately prints a remote HEAD that is **not** our
+main commit. Verified 2026-10-19: main `8f60c15f`, follow-up Step 2 saw `1eeface2`
+(a `demo-dev`/sibling push landed in between).
+
+This is **not** a lost commit and **not** a ref-PATCH 422 race. The script re-reads the
+base top-level tree at Step 2 and only swaps the `demo-pm` entry, so the follow-up is a
+normal fast-forward **on top of** the sibling's commit and the sibling's files are
+preserved by construction (post-push verify confirmed `demo-dev 5, demo-tester 8,
+tester-01 5` intact).
+
+Do **not** re-run the main backup, and do **not** try to "reset" the ref. Verify instead:
+
+1. our main commit still exists — `gh api repos/$OWNER/$REPO/git/commits/<main-sha>`;
+2. the follow-up commit's parent == the sibling HEAD the script printed at Step 2;
+3. closing preflight reports `Modified: 0, New: 0, Deleted: 0`;
+4. `post-push-verify.py` shows `demo-pm` blobs == local file count and siblings intact.
+
+A same-day lesson on the other probe: running `characterize-diff-vs-prev-head.py` twice
+(once for the tail, once for the head) still happens even though
+`run-note-diff-characterization.md` documents the rule — a pitfall buried in a reference
+file does not get read mid-run. SKILL.md now carries the "run ONCE → file → slice" rule
+inline at the probe pointer for that reason.
+
 ## Invoking the Method B script (cron, macOS)
 
 Do **not** prefix the invocation with the shell's `timeout` command — macOS ships

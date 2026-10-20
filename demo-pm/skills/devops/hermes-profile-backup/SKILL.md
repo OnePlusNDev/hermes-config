@@ -52,7 +52,7 @@ candidates). Verified 2026-08-27: caught 3 exclude gaps pre-upload — `tmp_tria
 dir, `gh_health_*.sh`, `healthcheck_*.py` (temp/root diagnostics that source
 `.env`).
 
-Post-push probe: `scripts/post-push-verify.py`; pre-push M-set diff: `scripts/characterize-diff-vs-prev-head.py`.
+Post-push probe: `scripts/post-push-verify.py`; pre-push M-set diff: `scripts/characterize-diff-vs-prev-head.py` — **run it ONCE, redirect to a file, then slice** (`references/run-note-diff-characterization.md`).
 Flaky-network retry rules + verify-probe gotchas (`--jq .content`, chars vs bytes):
 `references/network-flakiness-and-verify-tooling.md`.
 

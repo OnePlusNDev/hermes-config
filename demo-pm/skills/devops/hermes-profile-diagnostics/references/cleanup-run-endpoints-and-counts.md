@@ -30,6 +30,29 @@ old = cur.execute("select count(*) from sessions where started_at < ?",
 (`auto_prune: false`, `retention_days: 90`) — **not** `config.json` (that file is the Hindsight config).
 With `auto_prune: false`, record the counts in ARCHIVE.md and do not prune.
 
+### Counting without execute_code
+
+In cron mode `execute_code` is refused unless the profile has `approvals.cron_mode: approve`
+(2026-10-19: "BLOCKED: execute_code runs arbitrary local Python … Cron jobs run without a user
+present to approve it"). Don't route around it with `python3 -c` heredocs either — one `sqlite3`
+call does the whole job:
+
+```bash
+sqlite3 <profile>/state.db "select count(*) as total,
+  sum(started_at < strftime('%s','now') - 90*86400) as old90,
+  sum(started_at < strftime('%s','now') - 30*86400) as old30 from sessions;"
+```
+
+2026-10-19: `5928|1482|4482` (total / >90 d / >30 d).
+
+### Appending the ARCHIVE.md row
+
+The row is a single very long Chinese line with backticks, quotes and slashes, so a shell
+`echo "…" >>` invite quoting bugs. Reliable pattern: `write_file` the finished row to
+`/tmp/archive_row_<MMDD>.md` (trailing newline included), then
+`cd <profile>/memories/archive && cat /tmp/archive_row_<MMDD>.md >> ARCHIVE.md`.
+ARCHIVE.md ends with a newline, so no blank line is needed before the row.
+
 ## Probe-log quirks
 
 - `process(action='log')` **ignores `offset`**: `offset=0, limit=40` still returns the LAST 40 lines. Only `limit` works — pass `limit=200` to recover the full transcript including the `[primary]` / `[gate] token` / `[verdict]` header lines. Don't re-run the reflect just to recover token numbers.
@@ -44,6 +67,13 @@ With `auto_prune: false`, record the counts in ARCHIVE.md and do not prune.
 | 2026-10-04 | 313,104 / 13,311 |
 | 2026-10-11 | 284,123 / 7,265 |
 | 2026-10-18 | **308,068 / 8,712** |
+| 2026-10-19 | **402,985 / 9,297** |
 
-Observed band is now **~112 K–313 K input**. The gate is "far above the ~2–7 K question-echo band",
+Observed band is now **~112 K–403 K input**. The gate is "far above the ~2–7 K question-echo band",
 never a fixed threshold. A high token count never clears the wording gate on its own.
+
+2026-10-19 also re-confirmed the common header shape: the primary's table row
+「超过 30 天的过期事实 | **无** | 0 条」 still trips the wording gate (no negation inside the
+12-char window before 「过期事实」) even when the same answer additionally lists 「需立即归档/
+标记的易腐状态型事实 4 条」. Disambiguation cost is low relative to primary (163,568 vs 402,985
+input tokens), so always pay it rather than reasoning about the header wording.

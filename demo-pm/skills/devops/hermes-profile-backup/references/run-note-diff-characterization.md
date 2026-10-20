@@ -103,6 +103,11 @@ Verified 2026-10-18: a clean 5-M run cost two full passes (~5 redundant blob
 GETs) purely because the first output was piped through `tail -70` instead of
 being kept.
 
+**Repeat offence 2026-10-19** — same shape (`| tail -45`, then a second run with
+`sed -n '1,40p'`). The rule was already written here, which is the point: a
+pitfall that lives only in a reference file does not get read mid-run. SKILL.md's
+probe pointer now carries the rule inline; keep it there.
+
 Correct shape — dump to your private mkdtemp dir first, then read slices:
 
 ```bash
