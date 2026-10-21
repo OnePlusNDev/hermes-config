@@ -127,6 +127,20 @@ unique SHA fragment **plus the row terminator**, e.g.
 (verified 2026-10-06), then confirm the new row landed with
 `grep -c '^| <YYYY-MM-DD> |' references/method-b-practice-notes.md` == 1.
 
+**⚠️ Anchor on the PREVIOUS ROW, never on the prose that follows the table** (verified
+2026-10-20). The table is followed by a blank line and then
+`**Maintain this table with one row per run** …`. Inserting before that prose puts the new
+row *after* the blank line — outside the table — so it renders as a loose paragraph and the
+`grep -c '^| <date> |'` check still returns 1 and hides the damage. Two rules:
+1. Include the previous row's terminator in the anchor (`… payload fix held. |\n`) and put
+   the new row **immediately after it with no blank line**.
+2. After the insert, verify table structure, not just presence:
+   `awk 'NR==<row-1>' file | tail -c 3` must end in ` |` (or simply
+   `grep -c -B0 '' …` → read the two lines around the row and confirm no blank line).
+Recovery if it slipped: patch the blank-line+row pair back into `row| \n new row` in one
+shot. This edit lands in the follow-up commit, so fixing it after the push costs a 3rd
+commit — get it right the first time.
+
 Verify the append landed exactly once — both checks must print `1`:
 
 ```bash

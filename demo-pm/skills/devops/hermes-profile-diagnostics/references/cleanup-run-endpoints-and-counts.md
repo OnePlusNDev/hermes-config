@@ -68,12 +68,22 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-11 | 284,123 / 7,265 |
 | 2026-10-18 | **308,068 / 8,712** |
 | 2026-10-19 | **402,985 / 9,297** |
+| 2026-10-20 | **95,622 / 6,495** (disambig 407,383 / 5,803 — new input high) |
 
-Observed band is now **~112 K–403 K input**. The gate is "far above the ~2–7 K question-echo band",
-never a fixed threshold. A high token count never clears the wording gate on its own.
+Observed band is now **~96 K–407 K input** across both passes. The primary can dip to ~96 K
+(2026-10-20) even with a full 48-fact bank — do NOT treat a sub-112 K primary as "facts were
+never fed" as long as it clears the 50 K baseline; judge it on the wording gate. The gate is
+"far above the ~2–7 K question-echo band", never a fixed threshold. A high token count never
+clears the wording gate on its own.
 
 2026-10-19 also re-confirmed the common header shape: the primary's table row
 「超过 30 天的过期事实 | **无** | 0 条」 still trips the wording gate (no negation inside the
 12-char window before 「过期事实」) even when the same answer additionally lists 「需立即归档/
 标记的易腐状态型事实 4 条」. Disambiguation cost is low relative to primary (163,568 vs 402,985
 input tokens), so always pay it rather than reasoning about the header wording.
+
+2026-10-20 confirmed a second wording shape: the header 「## 1. 过期事实（30 天以上）」 followed by
+「无法从库内数据判定绝对过期」 (an *inability* claim, not a count) also trips the wording gate,
+because no negation sits inside the 12-char window before 「过期事实」. Verdict-bearing text lives in
+the heading, so the gate fires regardless of what the body says — pay the disambiguation pass
+(407,383 input, new high) instead of hand-judging it.
