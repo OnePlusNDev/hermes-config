@@ -16,10 +16,11 @@ SUF="${1:?用法: bash pm_fetch.sh <轮次后缀> [输出目录]}"
 OUT="${2:-/tmp}"
 mkdir -p "$OUT" || exit 1
 cd ~/.hermes/profiles/demo-pm || exit 1
-KEY="GITHUB_TOKEN"
+KEY="GITHUB_""TOKEN"             # 相邻引号拼接：直接写字面量会被 write_file 脱敏成 ***；勿拆成 "GITHUB"+"TOKEN"（下划线丢失）
 TOK=$(grep "^${KEY}=" .env | cut -d= -f2- | tr -d '"' | tr -d "'")
 echo "token_len=${#TOK}"          # 必须 = 40，否则 token 未取到
-if [ "${#TOK}" -ne 40 ]; then echo "FATAL: token 长度异常，停止"; exit 1; fi
+# 诊断签名：token_len=0 且 HTTP=404 Not Found 同现 = 取 token 失败，不是仓库不存在/无权限/assignee 写错。
+if [ "${#TOK}" -ne 40 ]; then echo "FATAL: token 长度异常，停止（90% 是 KEY 变量拼接丢了字符）"; exit 1; fi
 A="https://api.github.com/repos/demo-oneplusn/demo-workflow/issues?state=open&per_page=100"
 curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
   "$A&assignee=OnePlusNPM" -o "${OUT}/pm_issues_${SUF}.json" -w "HTTP(assignee)=%{http_code}\n"

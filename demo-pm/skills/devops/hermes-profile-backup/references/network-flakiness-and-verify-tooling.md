@@ -55,7 +55,29 @@ check the `--jq` filter BEFORE believing the leak claim. Confirm by hand —
 compare byte-for-byte against the local file. A real leak and a decode bug look
 identical from the probe's exit code.
 
-## 4. Size numbers: characters vs bytes
+## 4a. Attributing a ref-PATCH 422: list recent commits, and get the endpoint right
+
+After `FATAL ref update: ... (HTTP 422 Update is not a fast forward)`, the plain
+re-run fix is documented — but the **run note / practice-notes row** also needs the
+cause. List the last few commits and name the sibling run that advanced HEAD:
+
+```bash
+gh api "repos/$OWNER/$REPO/commits?per_page=4" \
+  --jq '.[] | "\(.sha[0:12]) \(.commit.author.date) \(.commit.message | split("\n")[0])"'
+```
+
+Endpoint gotcha (hit 2026-10-21): **`/git/commits?per_page=4` returns HTTP 404
+`{"message":"Not Found"}`** — the list endpoint is `/commits`, not `/git/commits`
+(`/git/commits/<sha>`, singular with an explicit SHA, IS valid). A 404 here looks
+like a missing repo or an auth/account problem; it is neither, just the wrong path.
+
+Verified 2026-10-21: preflight saw HEAD `68d5da9921bc`, the first commit `e69fffb3c243`
+was rejected 422, and `/commits` showed `e2edf5ebcbf3 backup: demo-dev profile config
+(2026-10-21)` at 12:00:55Z — i.e. a sibling profile's cron landed ~2 min before our
+ref PATCH. That is the fastest and only authoritative way to say *which* run beat us
+(and it confirms the loss is a race, not a bad tree).
+
+## 5. Size numbers: characters vs bytes
 
 Run notes have quoted remote `config.yaml` as `16835` since ~09-15. That is a
 **character** count from `len(str)`, not bytes — the file holds CJK comments.

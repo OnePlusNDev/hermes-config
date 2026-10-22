@@ -69,6 +69,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-18 | **308,068 / 8,712** |
 | 2026-10-19 | **402,985 / 9,297** |
 | 2026-10-20 | **95,622 / 6,495** (disambig 407,383 / 5,803 — new input high) |
+| 2026-10-21 | **108,978 / 7,133** (disambig 396,679 / **9,900** — highest output yet) |
 
 Observed band is now **~96 K–407 K input** across both passes. The primary can dip to ~96 K
 (2026-10-20) even with a full 48-fact bank — do NOT treat a sub-112 K primary as "facts were
@@ -85,5 +86,53 @@ input tokens), so always pay it rather than reasoning about the header wording.
 2026-10-20 confirmed a second wording shape: the header 「## 1. 过期事实（30 天以上）」 followed by
 「无法从库内数据判定绝对过期」 (an *inability* claim, not a count) also trips the wording gate,
 because no negation sits inside the 12-char window before 「过期事实」. Verdict-bearing text lives in
-the heading, so the gate fires regardless of what the body says — pay the disambiguation pass
+in the heading, so the gate fires regardless of what the body says — pay the disambiguation pass
 (407,383 input, new high) instead of hand-judging it.
+
+2026-10-21 confirmed a third wording shape, this one combining both tells: heading
+「一、过期事实（>30 天）：**无**」 plus a body sentence 「若当前日期已过 2026-07-17 则上述全部事实需
+整体重验」 and an 「应优先归档」 recommendation. The primary's own token count (108,978) cleared the
+50 K baseline comfortably while the wording was still affirmative — further proof that **the token
+gate can never substitute for the wording gate**; a well-formed, fully-itemized analysis can still
+carry a conditional/creation-age false positive.
+
+## CLI quirks (verified 2026-10-21)
+
+- The `hindsight` CLI reads its API URL from `~/.hindsight/…` config → defaults to **:8888**, not your
+  profile daemon. Prefix every call: `HINDSIGHT_API_URL=http://127.0.0.1:9178 hindsight …`. Without it:
+  `hindsight audit list … demo-pm-memory` → `✗ API endpoint not found (404)` (it hit :8888).
+- `bank stats` / `audit list` take a **positional** BANK_ID — `hindsight bank stats demo-pm-memory`,
+  `hindsight audit list --limit 6 demo-pm-memory`. `--bank-id` fails with `unexpected argument`.
+- `audit list` returned `{"items": [], "total": 0}` on a healthy bank with 80→81 completed operations,
+  so **it is not a source of reflect token counts**. The only cheap source is
+  `process(action='log', limit=<total_lines>)` on the probe's background session — the
+  `[primary] input_tokens=…` / `[disambig] input_tokens=…` lines sit at the TOP and vanish under a
+  small `limit`, so pass a limit ≥ the reported `total_lines` (~140 for a two-pass run, ~12 KB).
+- `hindsight-embed -p <profile> daemon status` correctly reports the profile daemon; use it before
+  touching ports, and cross-check with `lsof` (see SKILL.md pitfalls).
+
+## Appending the row — never chain `rm`
+
+`cat /tmp/archive_row_<MMDD>.md >> ARCHIVE.md` works. Adding `&& rm -f /tmp/archive_row_<MMDD>.md`
+makes tirith return `pending_approval` ("delete in root path") and the cron run **stalls with no
+approver** — the append never happens. Do the append alone, verify with a second call
+(`python3 -c` line count on `ARCHIVE.md`, confirming no blank lines at the tail), and leave the temp
+file in `/tmp`.
+
+## The `secret 10014 invalid` item cannot be closed from demo-pm
+
+Twenty-plus cleanup runs have logged it as 「未闭环」. The loop's root cause: `demo-pm/.env` holds only
+`GITHUB_USERNAME/EMAIL/TOKEN`, `GATEWAY_PORT`, `AGENT_NAME/ROLE`, `DEEPSEEK_API_KEY`, `TERMINAL_ENV` —
+**no Feishu app id/secret** — so the `tenant_access_token/internal` probe cannot run from this profile
+(and `config.yaml` only carries `platforms.feishu.allow_bots`, no creds). Grepping
+`logs/gateway.error.log` for `10014` is also a false-positive trap: it matches tool-call ids, not Feishu
+errors. Resolution needs the Feishu console or the profile that owns the credential. Record it in the
+ARCHIVE row and do not re-attempt from here.
+
+## Launcher idle timeout is 300 s, not 86400
+
+`scripts/start_hindsight_daemon.sh` exports `HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT=86400`, but the spawned
+process actually carries `--idle-timeout 300` (from the profile env file):
+`ps -Ao pid,etime,command | grep 'port 9178'` → `hindsight-api --daemon --idle-timeout 300 --port 9178`.
+So :9178 can exit after ~5 min idle — expect every daily run to start from "offline". Do reflect +
+consolidation in one session instead of assuming the daemon will still be up on a later call.

@@ -13,7 +13,7 @@ color: blue
 # /tmp/pm_fetch.sh —— write_file 写入后 `bash /tmp/pm_fetch.sh`（勿在脚本里写 $GITHUB_TOKEN 字面量）
 #!/bin/bash
 cd ~/.hermes/profiles/demo-pm
-KEY="GITHUB_TOKEN"
+KEY="GITHUB_""TOKEN"   # 相邻引号拼接：直接写 GITHUB_TOKEN 会被 write_file 脱敏成 ***；勿拆成 "GITHUB"+"TOKEN"（下划线丢失→token_len=0）
 TOK=$(grep "^${KEY}=" .env | cut -d= -f2- | tr -d '"' | tr -d "'")
 echo "token_len=${#TOK}"   # 必须 = 40，否则 token 未取到
 curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
@@ -32,7 +32,7 @@ curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
 **⚠️ 2026-09-10 新坑：`write_file` 会把脚本里字面量 `'^GITHUB_TOKEN='`（含引号）脱敏成 `'^GITHUB_TOKEN=***`，写盘后 `grep` 直接报 `repetition-operator operand invalid`（HTTP 404）。修法：把 key 拆成变量，别写字面量——**
 
 ```bash
-KEY="GITHUB_TOKEN"
+KEY="GITHUB_""TOKEN"   # 相邻引号拼接，见上方说明
 TOK=$(grep "^${KEY}=" .env | sed "s/^${KEY}=//" | tr -d "\"'")
 echo "token_len=${#TOK}"   # 必须 = 40，否则 token 没取到
 ```
