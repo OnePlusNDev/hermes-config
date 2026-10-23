@@ -1678,23 +1678,11 @@ gh issue edit 6 --repo demo-oneplusn/demo-workflow --add-assignee OnePlusNDev
 
 **注意点：** 写操作（edit/comment）需要目标账号有 write 权限。如果当前 gh 活跃账号不是 PM 账号，使用 Python subprocess + `GH_TOKEN` 从 `.env` 读取的方法（见「备用方案」）。
 
-### ⚠️ 陷阱：`gh issue list --user` 是无效参数（2026-07-13 新增）
+### ⚠️ 陷阱：`gh issue list --user` 是无效参数
 
-**关键问题：** `gh issue list` 没有 `--user` 标志。在尝试指定 gh 账号时不要使用 `--user`：
+`gh issue list` 无 `--user`（unknown flag）——用 `--assignee`；assignee 过滤与活跃账号无关，token 有 `repo` scope 即可。仅 comment/edit 写操作才需 `gh auth switch --user <TARGET>` 并验证。
 
-```bash
-# ❌ 错误：unknown flag: --user
-gh issue list --repo demo-oneplusn/demo-workflow --assignee OnePlusNPM --user OnePlusNPM
-
-# ✅ 正确：使用 --assignee 指定要查询的 assignee，无需指定用户账号
-gh issue list --repo demo-oneplusn/demo-workflow --assignee OnePlusNPM --state open
-```
-
-**原理：** GitHub API 的 assignee 过滤器独立于发起查询的活跃账号身份，只要当前 token 有 `repo` scope 即可。详见上方「第三步」关于 `@me` vs 显式用户名的说明。
-
-**如果需要以特定账号身份执行查询：**
-- 使用 `gh auth switch --user <TARGET_USER>` 切换活跃账号（2026-07-13 实测第一次尝试即成功，竞态条件为间歇性）
-- 或使用 `gh auth token -u <TARGET_USER>` 提取 token 后通过 `GH_TOKEN` 环境变量传递给子进程
+**📖 读本技能：** SKILL.md 已顶 100k 上限，`skill_view` 只回 preview + **单行 JSON** temp 文件——用 Python `json.load` 取 `content` 落 `.md` 再分页读，只读 TL;DR/映射表/第四步/confusable_text 四节。见 `references/2026-10-23-skill-view-oversize-and-sibling-script-collision.md`。
 
 ### 鉴别「真无任务」vs「假阴性」
 

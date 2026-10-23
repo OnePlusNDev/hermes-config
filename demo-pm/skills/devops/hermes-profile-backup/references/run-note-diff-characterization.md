@@ -163,3 +163,53 @@ anchors produced the same 5 M only because the sibling commit stayed outside
 Note the SKILL.md hunk is `+11` chars and the pointer bump is same-length
 (`2026-09-28` → `2026-09-29`), which is how a `latest:` bump fits under the 100K
 cap when headroom is ~25 chars — see `references/skill-md-at-cap.md`.
+
+## When the probe dies mid-run — mtime + commit-timestamp fallback (2026-10-22)
+
+Verified 2026-10-22: the probe printed the `cron/jobs.json` block fine, then died on
+ARCHIVE.md's blob GET:
+
+```
+RuntimeError: gh api repos/.../git/blobs/2157014b8a28 failed:
+Get "...": net/http: TLS handshake timeout
+```
+
+That is transport flakiness in the *throwaway diagnostic*, NOT a failed backup — the push
+had already succeeded (`Done:` + `exit=0`). Do not loop the probe to "make it finish", and
+do not describe the run as failed. Classify the remaining `M` files from two cheap
+independent signals instead:
+
+1. **Local mtime** — `ls -lT <file> [<file>...]` (macOS `-T` adds seconds).
+2. **Previous run's commit times** —
+   ```bash
+   gh api "repos/$OWNER/$REPO/commits?per_page=6" \
+     --jq '.[] | (.sha[0:12] + "  " + .commit.author.date + "  " + (.commit.message|split("\n")[0]))'
+   ```
+   A demo-pm day leaves TWO commits: `backup: demo-pm <date>` (main) then the follow-up.
+
+Decision rule: mtime **after** the previous run's *follow-up* commit ⇒ carry-over lag (that
+run's `0/0/0` legitimately did not hold). mtime *between* main and follow-up ⇒ look closer.
+mtime today and well before this run's own push ⇒ fresh same-day work, say so.
+
+2026-10-22 numbers: previous main `8d647b38` 12:03:24Z, follow-up `8a2cb72b78dd` 12:05:28Z
+(= 20:05:28 CST). `network-flakiness-and-verify-tooling.md` mtime 20:05:56 — **28 s** after
+the follow-up push ⇒ carry-over lag; same verdict for the two 21:05 diagnostics docs; the
+`pm-triage-cron` files (mtime 17:31 today) were fresh same-day work. All matched the hints
+the probe had already printed before it died.
+
+## Trap: `gh api commits?path=<file>` after the push answers with YOUR OWN commit
+
+`gh api "repos/O/R/commits?path=demo-pm/<file>&per_page=1"` returns the *newest* commit
+touching that path — which, immediately after your push, is today's backup commit. Every
+`M` file then echoes the same today SHA and you learn nothing about when it last changed
+*before* this run. Verified 2026-10-22: four files all answered
+`83e91837ceb3  2026-10-22T12:10:53Z  backup: demo-pm 2026-10-22`.
+
+If you genuinely need per-file remote history, pin it to the pre-push tree:
+
+```bash
+gh api "repos/$OWNER/$REPO/commits?path=demo-pm/<file>&sha=<PRE_PUSH_HEAD>&per_page=1"
+```
+
+Otherwise skip it — the mtime-vs-previous-commit-timestamp route above costs one call
+instead of N.

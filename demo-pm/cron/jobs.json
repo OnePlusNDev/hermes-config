@@ -20,15 +20,15 @@
       "schedule_display": "0,30 * * * *",
       "repeat": {
         "times": null,
-        "completed": 5811
+        "completed": 5858
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.279443+08:00",
-      "next_run_at": "2026-10-22T20:30:00+08:00",
-      "last_run_at": "2026-10-22T20:03:06.778267+08:00",
+      "next_run_at": "2026-10-23T20:30:00+08:00",
+      "last_run_at": "2026-10-23T19:33:15.320723+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -58,15 +58,15 @@
       "schedule_display": "0 20 * * *",
       "repeat": {
         "times": null,
-        "completed": 122
+        "completed": 123
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.468781+08:00",
-      "next_run_at": "2026-10-23T20:00:00+08:00",
-      "last_run_at": "2026-10-21T20:05:46.771779+08:00",
+      "next_run_at": "2026-10-24T20:00:00+08:00",
+      "last_run_at": "2026-10-22T20:22:42.215263+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -96,15 +96,15 @@
       "schedule_display": "0 21 * * *",
       "repeat": {
         "times": null,
-        "completed": 122
+        "completed": 123
       },
       "enabled": true,
       "state": "scheduled",
       "paused_at": null,
       "paused_reason": null,
       "created_at": "2026-06-22T15:51:41.660220+08:00",
-      "next_run_at": "2026-10-22T21:00:00+08:00",
-      "last_run_at": "2026-10-21T21:05:24.232009+08:00",
+      "next_run_at": "2026-10-23T21:00:00+08:00",
+      "last_run_at": "2026-10-22T21:02:58.978791+08:00",
       "last_status": "ok",
       "last_error": null,
       "last_delivery_error": null,
@@ -115,5 +115,5 @@
       "fire_claim": null
     }
   ],
-  "updated_at": "2026-10-22T20:03:06.778849+08:00"
+  "updated_at": "2026-10-23T20:00:37.527027+08:00"
 }

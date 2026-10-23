@@ -13,6 +13,7 @@ findings here instead). Verified on demo-pm, 2026-10-18.
 | Operation status | `GET /v1/default/banks/<bank>/operations/<op_id>` → `status`, `operation_type`, `completed_at`, `error_message`, `retry_count` |
 
 - Consolidation can be `completed` at submit time (2026-10-18: `completed_at` = `created_at` + 56 ms). Still read the op status before writing the ARCHIVE.md row — don't infer success from the POST alone.
+- **`/stats` → `last_consolidated_at` is frozen at `2026-07-07T13:15:49` and never advances** (verified 2026-10-22: a fresh consolidation completed and `operations_by_status.completed` ticked 81 → 82 while this field stayed put). Judge consolidation by the op status plus the `completed` counter — never by `last_consolidated_at`. `total_nodes` / `total_links` are likewise stable at 48 / 1228, so a no-op consolidation is the normal outcome on this bank.
 - Use the bank list as a **pre-flight** check: one call tells you whether `demo-pm-memory` (48 facts) is served by this daemon. If :9178 is down and the siblings show only `demo-dev/active/hermes`, there is no fallback — start the profile daemon via its launcher.
 - Never `curl … | python3` in cron (tirith HIGH `curl_pipe_shell`, stalls with no approver). Fetch with `urllib` inside a heredoc, or `curl -o /tmp/x.json` then parse the file.
 
@@ -70,6 +71,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-19 | **402,985 / 9,297** |
 | 2026-10-20 | **95,622 / 6,495** (disambig 407,383 / 5,803 — new input high) |
 | 2026-10-21 | **108,978 / 7,133** (disambig 396,679 / **9,900** — highest output yet) |
+| 2026-10-22 | **165,015 / 8,978** (disambig 199,659 / 6,047) |
 
 Observed band is now **~96 K–407 K input** across both passes. The primary can dip to ~96 K
 (2026-10-20) even with a full 48-fact bank — do NOT treat a sub-112 K primary as "facts were
@@ -95,6 +97,15 @@ in the heading, so the gate fires regardless of what the body says — pay the d
 50 K baseline comfortably while the wording was still affirmative — further proof that **the token
 gate can never substitute for the wording gate**; a well-formed, fully-itemized analysis can still
 carry a conditional/creation-age false positive.
+
+2026-10-22 confirmed a fourth shape — the **"天龄" hedge**: the header row
+「**过期事实（>30天）** ｜ **按"天龄"计：0 条需要归档**」 carries a `0 条` negation that sits
+OUTSIDE the 12-char pre-window, and the body then adds 「若当前实际日期已晚于 **2026-07-17**，则整库
+（含全部配置类事实）**整体超过 30 天**，应全部标记为待复验」. The gate fires (correctly — that
+conditional would archive the entire bank) and the disambiguation pass returned 「无内容性过期事实」
+with a 9-row per-category table. Lesson generalises: any primary that (a) reconciles "0 by age" with
+(b) a date-conditional "if today is past <date> then everything is expired" is ALWAYS a false
+positive at this bank's fixed 2026-06/07 creation timestamps — do not hand-judge, pay the second pass.
 
 ## CLI quirks (verified 2026-10-21)
 
