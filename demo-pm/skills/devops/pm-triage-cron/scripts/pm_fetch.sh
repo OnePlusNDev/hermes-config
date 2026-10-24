@@ -26,14 +26,17 @@ A="https://api.github.com/repos/demo-oneplusn/demo-workflow/issues?state=open&pe
 # cb=$(date +%s) 破 60 秒 cache-control，避免读到上一轮的陈旧快照。
 # 2026-10-23 实证：即使加了 --http1.1 坏响应仍间歇出现（同一 URL 连打 4 次得 5/33096/33096/5 字节，
 # HTTP 全是 200），所以每路必须打 N 次、取字节数最大的一份作权威快照，单次请求不可信。
+# --max-time 必须保留（2026-10-23 实证）：本机到 api.github.com 会间歇挂起（SSL_ERROR_SYSCALL /
+# Empty reply / 连接超时）。无 --max-time 时整轮会卡到 300s 被 kill。部分路失败不阻塞判定：
+# PM 真 `[ ]` + Search total_count=0 + 全量逐条无 PM 三条齐了即可 [SILENT]。
 fetch_best () {   # $1=label $2=url $3=outfile
   label="$1"; url="$2"; out="$3"
   best=0
   for i in 1 2 3 4; do
     tmp="${out}.t${i}"
-    code=$(curl -sS --http1.1 -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
+    code=$(curl -sS --http1.1 --max-time 20 -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
       "${url}&cb=$(date +%s%N)" -o "$tmp" -w "%{http_code}")
-    sz=$(wc -c < "$tmp" | tr -d ' ')
+    sz=$(wc -c < "$tmp" 2>/dev/null | tr -d ' '); sz=${sz:-0}   # 连接失败时文件不存在/为空，必须兜底，否则 [ -gt ] 报 integer expression expected
     echo "  ${label} try${i} HTTP=${code} bytes=${sz}"
     if [ "$sz" -gt "$best" ]; then best=$sz; cp "$tmp" "$out"; fi
   done
@@ -46,7 +49,7 @@ fetch_best "all"      "${A}"                     "${OUT}/pm_all_${SUF}.json"
 fetch_best "boss"     "${A}&assignee=OnePlusNBoss" "${OUT}/pm_boss_${SUF}.json"
 fetch_best "ndev"     "${A}&assignee=OnePlusNDev"  "${OUT}/pm_ndev_${SUF}.json"
 # 第 4 路：Search API 独立交叉验证（assignee= 参数在本环境曾整体失效，2026-10-22 实证）
-curl -sS --http1.1 -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
+curl -sS --http1.1 --max-time 25 -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
   -G "https://api.github.com/search/issues" \
   --data-urlencode "q=repo:demo-oneplusn/demo-workflow is:open assignee:OnePlusNPM" \
   -o "${OUT}/pm_search_${SUF}.json" -w "HTTP(search)=%{http_code}\n"

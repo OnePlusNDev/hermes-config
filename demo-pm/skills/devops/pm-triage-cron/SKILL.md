@@ -39,7 +39,7 @@ echo "token_len=${#TOK}"   # 必须 = 40，否则 token 没取到
 
 **另：`/tmp` 下的脚本名会被并行 sibling 子代理覆盖/串改，务必用带日期后缀的唯一文件名（如 `/tmp/pmx_fetch_all_20260910.sh`）。**
 
-**2026-09-12 复跑基线（零摩擦，首次即通）：** `full_triage.py` → `No issues to triage. Silent exit.` → `crosscheck.py` → `PM-assigned open issues (list endpoint): 0`；全仓 **4** 个 open issue（#2/#4/#5 带 `[测试]`+`type:feature`，均挂 `OnePlusNBoss`；#7 验证报告）→ `CROSSCHECK_RESULT: NO_PM_TASKS` → `[SILENT]`。注意 **#6（PR）本轮已不在 open 列表**（2026-09-11 基线为 5 个）——夹具会增删，勿把数量变化当异常。`urllib` 两条脚本路径本轮均 HTTP 200 正常；RULES.md 仍为 0 字节空文件。
+**2026-09-12 基线：** PM 名下 0 条，4 个 open issue 全挂 `OnePlusNBoss` → `[SILENT]`。夹具会增删，勿把数量变化当异常。当时 RULES.md 为 **0 字节空文件**——**2026-10-24 已从 demo-tester 恢复（4537 B）**，详见 `references/2026-10-24-rules-md-was-empty-and-restored.md`；以后若再读到 0 字节，直接照该文件恢复，勿当正常稳态。
 
 **2026-09-11 复跑基线：** `full_triage.py` 的 urllib 路径**再次** TLS 握手超时（`_ssl.c:1015`），确认已失效。curl 回退（`grep '^GITHUB_TOKEN'` + `cut` 提 token，`token_len=40`，Basic Auth `-u "OnePlusNPM:$TOK"`，唯一文件名 `/tmp/pmx_*_20260911.*`）**HTTP=200**：mine=5 字节空数组、all=32690 字节。解析用纯解析脚本（零 token 纹理）一次通过。结果：PM 名下 0 条；全仓 5 个 open item（#2/#4/#5/#6/#7）全部在 `OnePlusNBoss` 名下，无游离 issue → `CROSSCHECK_RESULT: NO_PM_TASKS` → `[SILENT]`。附带：本轮 `~/.hermes/profiles/demo-pm/RULES.md` 为 **0 字节空文件**（非缺失），无额外铁律可依，按任务提示执行。
 

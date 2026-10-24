@@ -88,10 +88,11 @@ profile's cron sweeping `rm -f /tmp/gh_payload_*.json` deleted our in-flight pay
 payloads into `tempfile.mkdtemp`): `references/method-b-practice-notes.md`. Daily run-note starter +
 index-append rules (⚠️ index bullets share an identical tail, so a `patch` anchor on
 "the last line" is NOT unique — anchor on a distinctive fragment, verify with `grep -c`):
-`templates/run-note-template.md`. SKILL.md sits just under its 100,000-char cap
-(~0.9 KB headroom after the 2026-09-23 Method-A extraction — re-measure with
-`wc -c < SKILL.md` before trusting this) — re-slim before the
-`latest:` bump whenever the cap bites: `references/skill-md-at-cap.md`.
+`templates/run-note-template.md`. SKILL.md is **AT/OVER its 100,000-char cap**
+(measured 100,543 B on 2026-10-23 — no headroom left; re-measure with
+`wc -c < SKILL.md`): only same-length in-place swaps are safe now, NEW prose
+goes to `references/` + a one-line pointer, and a `latest:` bump only after
+re-slimming — see `references/skill-md-at-cap.md`.
 
 Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (same-day repeat run → `YYYYMMDDb.md`; latest: 2026-10-23; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |

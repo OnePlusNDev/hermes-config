@@ -82,6 +82,13 @@ row leaves the 422-race / account-flip recurrence log stale, which is exactly wh
 09-29 and 09-30.) Afterwards the preflight is expected to report
 `Modified: 0, New: 0, Deleted: 0`.
 
+**Expect `cron/jobs.json` to re-dirty between the two commits** (verified 2026-10-23): a
+cron tick landing between the main commit and the follow-up bumps `completed`/`updated_at`
+again, so the follow-up legitimately carries `jobs.json` a second time (that run: main 260
+local files, follow-up 261 with `jobs.json` back in the M set). That is routine churn, NOT a
+failed main commit — do not re-run the main backup over it, and the closing `0/0/0` preflight
+still holds because the follow-up sweeps it up.
+
 **Fold ALL doc edits into this commit** — including any reference-file additions or
 triage-recipe edits (e.g. a new `references/*.md`, or an update to
 `references/curator-archive-churn-triage.md`). An edit made *after* the follow-up push
@@ -115,6 +122,16 @@ came out wrong (`the other \`M\` …` instead of the file's `the remaining \`M\`
    than a long tail — shorter = less to transcribe wrong.
 2. If you must anchor on the tail, `read_file` the last lines immediately before patching and
    copy character-for-character; do NOT trust a re-typed `tail -c` echo.
+**⚠️ Never anchor on text copied out of a DIFF (verified 2026-10-23).** A previous
+run's diff transcript, a `characterize-diff-vs-prev-head.py` output line, or a
+`git diff` line carries a leading `+`/`-` column and sometimes context-prefix
+whitespace that are NOT in the file. The 10-23 `method-b-practice-notes.md` row
+insert failed with "Could not find a match" because the anchor began
+`+ NEW \`references/token-extraction...\`` — that `+` came from the prior day's
+*diff display*. Rule: `grep -n '^| <prev-date> |'` (or `read_file`) the target
+line and transcribe the bare text, dropping any `+`/`-` marker; `patch` has no
+fuzzy rescue for a stray marker character.
+
 Note the `patch` tool's "was modified by sibling subagent … but this agent never read it"
 warning is benign (see below) and can coincide with a genuine transcription miss — when the
 patch fails, suspect a copy error before a stale-file theory.
