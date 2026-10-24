@@ -70,6 +70,19 @@ It is the only continuous record of the 422-race / account-flip recurrence, so a
 skipped row makes the pattern look rarer than it is. (09-29 and 09-30 originally
 shipped without rows; backfilled 2026-09-30.)
 
+**Step 5 (subtree build) can hang for minutes even when the API is healthy — plain re-run, budget ONE.**
+Verified 2026-10-24: the main push was first-try with 11 blobs, but the *follow-up* run's 4
+blobs all uploaded fine and then Step 5 never returned — `terminal(timeout=300)` killed it
+with the log ending at `=== Step 5: building profile subtree ===` and the remote HEAD still
+at the pre-run SHA (so nothing half-committed). A quick `preflight-backup-scan.py` (GET tree)
+answered in seconds, proving the API was reachable — the hang was in one of the ~40 small
+`POST /git/trees` calls the recursive build fires. The plain re-run completed Step 5 -> commit
+-> ref in one pass, blob SHAs identical (idempotent, so the retry costs nothing but the tree
+POSTs). Rules: (1) treat a Step-5 hang exactly like the 422 race — ONE plain re-run, no
+script edits; (2) a still-unchanged remote HEAD is the proof that nothing was half-committed,
+so never "clean up" a commit that was never created; (3) do NOT write `no network flakiness`
+in the run note until the follow-up commit has also landed green.
+
 **Same-day repeat runs** (first hit 2026-10-03, which ran at both 10:36 and 20:00 CST): the
 daily run-note filename is `YYYYMMDD.md`, so a second run on the same date takes a
 `YYYYMMDDb.md` suffix (e.g. `demo-pm-backup-workflow-20261003b.md`) and gets its own table row

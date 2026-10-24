@@ -78,7 +78,12 @@ one (16835 chars / 17021 bytes — the usual CJK-comment discrepancy).
   → **no ref-PATCH 422 race**; the ref PATCH succeeded on the first attempt.
 - 11 blobs uploaded, subtree `c799586921c1faf475b758be7023f4e602e53e87`, top tree
   `c3bc6d8c7a39698676726fae1ae3c0b69628dce7`, commit + ref in one clean pass.
-- No network flakiness — neither the backup nor the characterization probe hit a transport error.
+- Network: the **main** push and the characterization probe were clean (no transport error).
+  The **follow-up** run hung in Step 5 (subtree build) — 4 blobs uploaded fine, then no
+  return for ~270 s until `terminal(timeout=300)` killed it, remote HEAD still at
+  `3702d9a3853a` (nothing half-committed). Preflight GET answered in seconds, so the API was
+  reachable; one plain re-run finished Step 5 → commit → ref in a single pass with identical
+  blob SHAs. Pitfall + rules now in `references/method-b-practice-notes.md`.
 
 ## Post-push remote verification
 - Remote HEAD `3702d9a3853a`; total blobs **281**, `demo-pm` blobs = **262** (== local file count 262);
@@ -91,7 +96,10 @@ one (16835 chars / 17021 bytes — the usual CJK-comment discrepancy).
 - `scripts/post-push-verify.py` → **ALL CHECKS PASS** on the first execution.
 
 ## Follow-up commit (this session)
-Run note + index bullet + SKILL.md `latest:` pointer `2026-10-23` → `2026-10-24` +
-`references/method-b-practice-notes.md` "Observed on recent runs" table row, pushed with the
-same standalone-subtree script. Afterwards the preflight is expected to report
-`Modified: 0, New: 0, Deleted: 0`.
+Follow-up `58fbb7d145b2da05f54bff403acd2f5838e0c380` — run note + index bullet + SKILL.md
+`latest:` pointer `2026-10-23` → `2026-10-24` + `references/method-b-practice-notes.md`
+"Observed on recent runs" table row, pushed with the same standalone-subtree script (3 M, 1 A)
+after the Step-5 hang described above.
+A third, doc-only commit carries this correction plus the new Step-5 pitfall paragraph, so the
+closing `Modified: 0, New: 0, Deleted: 0` assertion is verified against IT, not against the
+follow-up. `cron/jobs.json` did not re-dirty between the main commit and the follow-up this run.
