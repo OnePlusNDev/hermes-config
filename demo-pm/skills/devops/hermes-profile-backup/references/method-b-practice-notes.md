@@ -105,12 +105,35 @@ preflight, for the authoritative numbers.
 flips among them between (and sometimes during) runs — **two flippers were
 brand-new on first appearance** (`zhangtbj` 2026-09-26, `JungleAssistant`
 2026-10-07), so treat the set as open-ended and **never** treat a recognized
-login as safe-to-skip. The only reliable rule: re-check `gh api user`
-immediately pre-run AND immediately pre-push, and `gh auth switch --user
-OnePlusNDev` whenever it differs. A blob POST returning HTTP 404 (not 403) is
+login as safe-to-skip. A blob POST returning HTTP 404 (not 403) is
 the classic symptom of a mid-run flip. (The roster above is a snapshot —
 re-derive it with `gh auth status` each run; the *lesson*, not the exact list,
 is what's durable.)
+
+### `gh api user` is NOT a sufficient flip detector — read `permissions.push`
+
+Verified 2026-10-24 (first time this signature appeared): `gh api user --jq '.login'`
+returned **`OnePlusNDev`** — the repo owner, i.e. exactly the value the check-twice rule
+tells you is fine — yet the very next call,
+`gh api repos/$OWNER/$REPO --jq '.permissions'`, returned
+`{"admin":false,"push":false,"pull":true,...}`. `gh auth status` then showed
+**`OnePlusNTester`** as the *active* account. So the keyring race can hand `gh api user`
+the owner's identity while the requests are actually authenticated as a read-only sibling.
+
+Why this matters: every previously documented symptom is **late** — a blob `HTTP 404`,
+a `403 denied to <X>`, or a ref-PATCH 422. This one is **pre-flight and cheap**. Rules:
+
+- Treat the preflight as **two reads**: `gh api user --jq '.login'` AND
+  `gh api repos/$OWNER/$REPO --jq '.permissions.push'`. The owner always has
+  `admin=true/push=true`; `push=false` **while `gh api user` names the owner** means a
+  sibling account is active → `gh auth switch --user $REPO_OWNER` (after
+  `unset GITHUB_TOKEN`) and re-read both.
+- Never conclude "no switch needed" from the login alone. On 2026-10-24 the login check
+  said owner and the permission check said read-only; the switch was required and then
+  held for the whole run.
+- A `push=false` preflight is **not** a permissions/repo problem — do not go hunting for
+  collaborator access or repo visibility. Switch accounts first, re-read, and only then
+  investigate.
 
 ## Shared `/tmp` payload namespace — sibling profiles delete our payload files
 

@@ -81,8 +81,9 @@ first-try, 0/0/0 confirmed sync.)
 ⚠️ A local clone that EXISTS is not enough for Method A — it must be CURRENT. `git status` only compares against the local `origin/main` ref, which can itself be stale. Verify `git rev-parse HEAD` against `gh api repos/<owner>/<repo>/git/refs/heads/main --jq '.object.sha'`; if the clone is behind, a Method A push would diverge — use Method B instead (verified 2026-08-29: clone at ed4bcb8, remote at c928b535).
 
 Method B practice notes — straight-to-Method-B rationale (625+ blobs, git transport
-times out in cron mode) and the **budget-exactly-ONE-plain-re-run** rule for the
-ref-PATCH 422 race, **plus the shared-`/tmp` payload namespace collision** (a sibling
+times out in cron mode) and the **budget-exactly-ONE-plain-re-run** rule — for the
+ref-PATCH 422 race *and* for a Step-5 tree-POST hang (same remedy, verified 2026-10-24)
+— **plus the shared-`/tmp` payload namespace collision** (a sibling
 profile's cron sweeping `rm -f /tmp/gh_payload_*.json` deleted our in-flight payloads →
 `FATAL ... open /tmp/gh_payload_*.json: no such file or directory`; fixed by writing
 payloads into `tempfile.mkdtemp`): `references/method-b-practice-notes.md`. Daily run-note starter +
@@ -122,8 +123,8 @@ git push
 **The canonical `--exclude` list lives in `references/method-a-rsync-excludes.md`**
 (extracted 2026-09-23 to keep SKILL.md under its 100,000-char cap). The same list is
 mirrored in `templates/gitignore-template.txt` and in the `EXCLUDE_*` sets of both
-`scripts/` probes — **change one ⇒ change all four.** Sanity number: local files after
-Sanity check: local files after excludes == remote `demo-pm` blob count (re-derive each run; never hardcode).
+`scripts/` probes — **change one ⇒ change all four.** Sanity check: local files after excludes == remote
+`demo-pm` blob count (re-derive each run; never hardcode).
 
 See also: `autonomous-ai-agents/hermes-agent/references/hermes-profile-rsync-github-backup.md`
 
@@ -354,7 +355,7 @@ if [ -n "$TOKEN" ]; then
   git push origin main 2>&1
   # Clean up — remove token from URL afterward
   git remote set-url origin https://github.com/OWNER/REPO.git
-fi```
+fi
 ```
 This is useful as a one-shot diagnostic to confirm the gh token has push access, even when curl can't reach GitHub (see Network connectivity pitfall). **Do not leave the token-embedded URL as the permanent remote** — switch back to plain HTTPS after the push.
 
@@ -378,7 +379,7 @@ git push                                       # → SUCCESS
 
 **Why the repo-local helper wasn't enough:** `gh auth git-credential` answers based on the *currently active* gh account. If the active account has flipped to a non-owner account, the helper dutifully serves that account's token — same 403. The helper only helps when the active account is already correct (stale credential *cache*), not when the active account itself changed.
 
-**Fix — check the active account TWICE (pre-flight AND right before push):**
+**Fix — check TWICE (pre-flight AND pre-push) and read `permissions.push`, not just the login** — `gh api user` can name the owner while a read-only sibling is actually serving the requests (2026-10-24: login said `OnePlusNDev`, `permissions.push=false`, `gh auth status` said `OnePlusNTester`):
 
 ```bash
 ACTIVE=$(gh api user --jq '.login')

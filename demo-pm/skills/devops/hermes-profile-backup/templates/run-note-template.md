@@ -62,6 +62,16 @@ one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 - Remote HEAD was `<sha>` at blob-phase start and **stayed there through commit time** →
   **no ref-PATCH 422 race**; the ref PATCH succeeded on the first attempt.
 - <no network flakiness | N aborted attempts + what fixed it>
+  **Do NOT write "no network flakiness" until the FOLLOW-UP commit has also landed green**
+  (verified 2026-10-24). The claim covers the whole run, and the follow-up is a *second* full
+  push: that day the main push was clean, then the follow-up hung ~270 s in Step 5 (subtree
+  build) and needed one plain re-run (see `references/method-b-practice-notes.md`). Writing the
+  clean claim after the main commit forced a third, doc-only commit purely to correct the
+  record. Order the sentence last: draft the note, push, and only claim cleanliness once the
+  follow-up's `Done:` line is in hand. If the follow-up needed a retry, say so here.
+  (Corollary: a **correction commit is legitimate** when the already-pushed note states
+  something false — a run note that misleads tomorrow's run costs more than one extra commit.
+  This is the one documented exception to "fold ALL doc edits into the follow-up".)
 - <n> blobs uploaded, subtree `<sha>`, top tree `<sha>`, commit + ref in one clean pass.
 
 ## Post-push remote verification

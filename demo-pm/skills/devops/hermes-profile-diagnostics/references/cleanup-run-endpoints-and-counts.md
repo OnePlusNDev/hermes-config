@@ -75,6 +75,15 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 
 - `process(action='log')` **ignores `offset`**: `offset=0, limit=40` still returns the LAST 40 lines. Only `limit` works — pass `limit=200` to recover the full transcript including the `[primary]` / `[gate] token` / `[verdict]` header lines. Don't re-run the reflect just to recover token numbers.
 - `process(action='wait', timeout=240)` is clamped to **180 s**. A two-pass reflect (primary + auto-disambiguation) can exceed that, so follow with a `poll`/`log` rather than assuming failure.
+- `scripts/reflect_quality_check.py` always exits **0** (per its docstring) and prints the verdicts on
+  stdout. A finished two-pass run (2026-10-24) ended with `Unclosed client session` /
+  `Unclosed connector` / `connector: <aiohttp.connector.TCPConnector …>` after the `[verdict]` line —
+  those are aiohttp teardown warnings from the `hindsight_client` async layer, **benign**; the run had
+  already printed `[verdict] disambiguation is authoritative`. Do not treat them as a failed probe.
+- `process(action='wait')` truncates `output` from the TOP when the transcript is long, so the
+  `[primary] input_tokens=…` line can be missing even though the run succeeded — re-read the full
+  transcript with `process(action='log', limit=<total_lines>)` (2026-10-24: 92 lines) before writing
+  token numbers into the ARCHIVE row.
 
 ## Deepseek reflect token band (keep widening)
 
@@ -90,6 +99,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-21 | **108,978 / 7,133** (disambig 396,679 / **9,900** — highest output yet) |
 | 2026-10-22 | **165,015 / 8,978** (disambig 199,659 / 6,047) |
 | 2026-10-23 | **241,749 / 11,595** (no disambig — first pass clean, 69.9 s, `based_on=47`) |
+| 2026-10-24 | **152,826 / 6,638** (disambig **475,495 / 8,011** — new disambig-input high) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -128,7 +138,18 @@ OUTSIDE the 12-char pre-window, and the body then adds 「若当前实际日期�
 conditional would archive the entire bank) and the disambiguation pass returned 「无内容性过期事实」
 with a 9-row per-category table. Lesson generalises: any primary that (a) reconciles "0 by age" with
 (b) a date-conditional "if today is past <date> then everything is expired" is ALWAYS a false
-positive at this bank's fixed 2026-06/07 creation timestamps — do not hand-judge, pay the second pass.
+2026-10-22 at this bank's fixed 2026-06/07 creation timestamps — do not hand-judge, pay the second pass.
+
+2026-10-24 confirmed a fifth shape, the **table-cell negation**: the primary's verdict table read
+「| 过期事实（>30 天） | **无** |」 (negation in the *cell*, i.e. AFTER the keyword), while a later
+section added the now-familiar date-conditional 「如果「今天」已经晚于 2026-07-14，则 2026-06-14 那一批条目会越过
+30 天线」 plus 「按库内最新时间基准判断为「未过期」」. `claims_expired()` only scans the 12 chars BEFORE
+each keyword, so a Chinese 「过期事实：无」 never clears the gate — and that is desirable here: the
+conditional would archive the whole bank. Disambiguation (475,495 input) returned 「无内容性过期事实」
+with a 5-row category table. **Rule reinforced: a "0-by-age + if-today-is-past-<date>-then-everything-
+expires" pair is ALWAYS a false positive; the fix is the second pass, never a wording judgement.**
+Consequence for the gate design: do NOT "improve" `claims_expired()` to look at a post-window — its
+over-triggering is what guarantees the authoritative pass runs at all.
 
 ## CLI quirks (verified 2026-10-21)
 
