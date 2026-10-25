@@ -95,7 +95,7 @@ index-append rules (⚠️ index bullets share an identical tail, so a `patch` a
 goes to `references/` + a one-line pointer, and a `latest:` bump only after
 re-slimming — see `references/skill-md-at-cap.md`.
 
-Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (same-day repeat run → `YYYYMMDDb.md`; latest: 2026-10-24; full per-run index in `references/dated-runs-index.md`).
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (same-day repeat run → `YYYYMMDDb.md`; latest: 2026-10-25; full per-run index in `references/dated-runs-index.md`).
 | **C. Python + Content API** | Neither clone nor `gh api` available; only `urllib` | Python script via `write_file` + `terminal("python3 script.py")` |
 
 ## Method A — rsync + git push (preferred when git works)
