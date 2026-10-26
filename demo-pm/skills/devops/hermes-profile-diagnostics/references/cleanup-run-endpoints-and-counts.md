@@ -100,6 +100,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-22 | **165,015 / 8,978** (disambig 199,659 / 6,047) |
 | 2026-10-23 | **241,749 / 11,595** (no disambig — first pass clean, 69.9 s, `based_on=47`) |
 | 2026-10-24 | **152,826 / 6,638** (disambig **475,495 / 8,011** — new disambig-input high) |
+| 2026-10-25 | **109,123 / 5,832** (disambig 167,123 / 6,440) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -150,6 +151,18 @@ with a 5-row category table. **Rule reinforced: a "0-by-age + if-today-is-past-<
 expires" pair is ALWAYS a false positive; the fix is the second pass, never a wording judgement.**
 Consequence for the gate design: do NOT "improve" `claims_expired()` to look at a post-window — its
 over-triggering is what guarantees the authoritative pass runs at all.
+
+2026-10-25 confirmed the same table-cell shape with a new negation marker and a narrower conditional:
+「**过期事实（>30 天）** | **未发现**——但仅限记忆时间窗内；配置类事实存在"窗口外即过期"的风险」 plus
+「若当前时间已明显晚于 2026-06-17，则端口/key/AppID/daemon 参数全部应立即重验」. Primary 109,123
+input cleared the 50 K token gate; wording gate fired (negation sits after the keyword, in the cell);
+disambiguation (167,123 input) returned 「无内容性过期事实」 with a 6-category table. Same lesson:
+sixth occurrence, never hand-judge — pay the second pass.
+
+2026-10-25 also added two recurring *non-age* findings worth expecting in the row: (a) a delivery-path
+ambiguity («deliver 改 Home 私信» vs «群内只发结果», timestamps cannot arbitrate) and (b) an identity
+mismatch (same bank mixes PM first-person and tester-01 first-person facts). Both are 歧义 not 冲突 —
+log them as suggestions, do not mutate data.
 
 ## CLI quirks (verified 2026-10-21)
 

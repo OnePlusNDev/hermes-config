@@ -88,3 +88,31 @@ figure derived from `decode("utf-8", "replace")` will silently under-report and
 make two identical files look different in size while their blob SHA matches.
 Blob SHA equality is the authoritative identity check — trust it over any
 size arithmetic.
+
+## 6. A mid-script `unexpected EOF` leaves partial-looking output — re-run, never report FAIL
+
+Verified 2026-10-25, on the **closing** probes (after a clean follow-up push), both
+scripts died mid-run with a transport EOF while auth was demonstrably fine:
+
+- `preflight-backup-scan.py` exited **1** having printed only
+  `Local files (after excludes): 264` — the fatal line was
+  `GH API error: Get ".../git/trees/<sha>?recursive=1": unexpected EOF`
+- `post-push-verify.py` exited **1** after its structural checks had already
+  **PASSed** (`demo-pm blobs: 264`, siblings intact), dying on
+  `GH API FAIL .../contents/demo-pm/config.yaml: ... EOF`
+
+At that moment `gh api user` → `OnePlusNDev`, `permissions.push=true`, and a 3×
+`git/refs/heads/main` probe answered 3/3. Plain re-runs of both scripts: preflight
+`Modified: 0, New: 0, Deleted: 0`; verify **ALL CHECKS PASS**.
+
+Rules:
+- `EOF` / `unexpected EOF` / `connection reset` = **transport**, not a verification
+  verdict. A non-zero exit from either probe is not by itself evidence of anything.
+- A **truncated preflight** (only `Local files…` printed) must never be read as
+  "no changes" *or* as a diff failure — it never reached the diff.
+- A **partial verify** that PASSed structure and then EOF'd is not a leak/FAIL:
+  do not push a correction commit and do not start tree surgery. Re-run the probe.
+- Keep the go/no-go probe from §2 (3–5× `git/refs/heads/main`) as the gate; only a
+  repeated `gh` failure means a real outage. `curl` remains the wrong probe.
+- Same remedy as §1 and the Step-5 hang: ONE plain re-run. Probing is cheap; a
+  speculative "recovery" commit is not.
