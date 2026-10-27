@@ -30,6 +30,10 @@ POST /v1/default/banks/<bank>/reflect
   but it prints no token usage — the HTTP call is better for the two-gate probe.
 
 - Consolidation can be `completed` at submit time (2026-10-18: `completed_at` = `created_at` + 56 ms). Still read the op status before writing the ARCHIVE.md row — don't infer success from the POST alone.
+- **`operations_by_status.completed` lags a few seconds behind the op status.** 2026-10-26: op reported
+  `completed` at +385 ms, but `/stats` fetched ~1 s later still read `completed: 85` (the pre-consolidation
+  value); a second read ~4 min later showed `86`. If you record the counter in ARCHIVE.md, re-read `/stats`
+  after the reflect work rather than immediately after the POST, and quote the delta you actually observed.
 - **`/stats` → `last_consolidated_at` is frozen at `2026-07-07T13:15:49` and never advances** (verified 2026-10-22: a fresh consolidation completed and `operations_by_status.completed` ticked 81 → 82 while this field stayed put). Judge consolidation by the op status plus the `completed` counter — never by `last_consolidated_at`. `total_nodes` / `total_links` are likewise stable at 48 / 1228, so a no-op consolidation is the normal outcome on this bank.
 - Use the bank list as a **pre-flight** check: one call tells you whether `demo-pm-memory` (48 facts) is served by this daemon. If :9178 is down and the siblings show only `demo-dev/active/hermes`, there is no fallback — start the profile daemon via its launcher.
 - Never `curl … | python3` in cron (tirith HIGH `curl_pipe_shell`, stalls with no approver). Fetch with `urllib` inside a heredoc, or `curl -o /tmp/x.json` then parse the file.
@@ -73,6 +77,15 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 
 ## Probe-log quirks
 
+- **Best pattern: redirect the probe's stdout to a file and read it with `read_file`.** Launch
+  `… reflect_quality_check.py … > /tmp/reflect_<MMDD>.log 2>&1` with `terminal(background=true,
+  notify_on_complete=true)`, then `read_file('/tmp/reflect_<MMDD>.log')`. Verified 2026-10-26: the whole
+  two-pass transcript (107 lines, `[primary] input_tokens=…` at line 1, `[verdict]` lines, aiohttp teardown
+  warnings) came back intact in one read, with no dependence on `process(action='wait')` clamping or
+  `process(action='log')`'s top-truncation. Use the process log only as a fallback.
+- The probe's own exit code is unreliable for "did it work": the crashed run exited **1** with a
+  `ServerDisconnectedError` traceback (daemon crash), while the successful retry exited **0** — but the
+  script's docstring promises exit 0 always, so judge success by the presence of a `[verdict]` line in the log.
 - `process(action='log')` **ignores `offset`**: `offset=0, limit=40` still returns the LAST 40 lines. Only `limit` works — pass `limit=200` to recover the full transcript including the `[primary]` / `[gate] token` / `[verdict]` header lines. Don't re-run the reflect just to recover token numbers.
 - `process(action='wait', timeout=240)` is clamped to **180 s**. A two-pass reflect (primary + auto-disambiguation) can exceed that, so follow with a `poll`/`log` rather than assuming failure.
 - `scripts/reflect_quality_check.py` always exits **0** (per its docstring) and prints the verdicts on
@@ -101,6 +114,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-23 | **241,749 / 11,595** (no disambig — first pass clean, 69.9 s, `based_on=47`) |
 | 2026-10-24 | **152,826 / 6,638** (disambig **475,495 / 8,011** — new disambig-input high) |
 | 2026-10-25 | **109,123 / 5,832** (disambig 167,123 / 6,440) |
+| 2026-10-26 | **158,635 / 7,214** (disambig 426,048 / 5,915) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -163,6 +177,20 @@ sixth occurrence, never hand-judge — pay the second pass.
 ambiguity («deliver 改 Home 私信» vs «群内只发结果», timestamps cannot arbitrate) and (b) an identity
 mismatch (same bank mixes PM first-person and tester-01 first-person facts). Both are 歧义 not 冲突 —
 log them as suggestions, do not mutate data.
+
+2026-10-26 confirmed a seventh wording shape — the **metadata-distortion claim**: the verdict table read
+「30 天以上过期事实 | **无**」 (correct negation, but after the keyword) and the body then added 「文档级
+`event_date` 被统一标为 2026-06-14，而正文里包含 06-16/06-17 才产生的内容；按文档日期计龄会系统性低估新鲜度，
+建议改为按 `mentioned_at` 计龄」. That is an *instrumentation* caveat, not a count, yet the wording gate
+fires — correctly, because acting on it would archive the whole bank. Primary 158,635 input cleared the
+50 K gate; disambiguation (426,048 input) returned 「无内容性过期事实」 with a 7-row category table. **Seventh
+consecutive occurrence: never hand-judge the primary, always pay the second pass.**
+
+2026-10-26 also re-confirmed the transient first-reflect crash in the *same run*: fresh daemon → consolidation
+completed fine → `Starting agentic reflect` at 21:01:19 → `LinkExpansion` at 21:01:24 → process exit, client
+`aiohttp.client_exceptions.ServerDisconnectedError: Server disconnected`. Restart (healthy in ~25 s) + identical
+request = success. So: **do the consolidation FIRST, then reflect** — a reflect crash after consolidation leaves
+the dedup work already persisted, and only the read-only probe has to be retried.
 
 ## CLI quirks (verified 2026-10-21)
 

@@ -99,6 +99,16 @@ local files, follow-up 261 with `jobs.json` back in the M set). That is routine 
 failed main commit — do not re-run the main backup over it, and the closing `0/0/0` preflight
 still holds because the follow-up sweeps it up.
 
+**Follow-up contents are FOUR items — tick them off BEFORE the follow-up push**
+(verified 2026-10-26, from a self-caught miss): (1) the run note, (2) the
+`dated-runs-index.md` bullet, (3) the SKILL.md `latest:` pointer, (4) the
+`references/method-b-practice-notes.md` "Observed on recent runs" row. The 10-26 run
+shipped 1–3, pushed the follow-up, then noticed the missing row and had to add it as a
+post-run doc edit — which now shows up as tomorrow's benign carry-over lag *and* leaves
+that day's recurrence record absent from the commit it belongs to. Cheapest fix is a
+one-line checklist right before invoking the script, not a memory of "I'll remember the
+row this time".
+
 **Fold ALL doc edits into this commit** — including any reference-file additions or
 triage-recipe edits (e.g. a new `references/*.md`, or an update to
 `references/curator-archive-churn-triage.md`). An edit made *after* the follow-up push
