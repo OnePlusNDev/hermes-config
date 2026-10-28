@@ -115,6 +115,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-24 | **152,826 / 6,638** (disambig **475,495 / 8,011** — new disambig-input high) |
 | 2026-10-25 | **109,123 / 5,832** (disambig 167,123 / 6,440) |
 | 2026-10-26 | **158,635 / 7,214** (disambig 426,048 / 5,915) |
+| 2026-10-27 | **161,682 / 10,170** (disambig 166,107 / 6,698 — both passes far below the recent highs) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -191,6 +192,38 @@ completed fine → `Starting agentic reflect` at 21:01:19 → `LinkExpansion` at
 `aiohttp.client_exceptions.ServerDisconnectedError: Server disconnected`. Restart (healthy in ~25 s) + identical
 request = success. So: **do the consolidation FIRST, then reflect** — a reflect crash after consolidation leaves
 the dedup work already persisted, and only the read-only probe has to be retried.
+
+2026-10-27 confirmed an eighth wording shape — the **"expired-premise / should-be-archived" affirmative**:
+the table cell read 「30 天以上过期事实 | **在本次检索可触及的全部事实中未发现**」 (correct negation, but the
+keyword sits in the row label so the negation lands outside the 12-char pre-window), while the same table
+added 「但存在 2 条**条件性/临时性事实已失去前提，实质上属于应归档对象**」. The gate fires on that second
+「应归档」 — correct, because acting on it would archive the 06-16 secret/Scheduler items. Primary 161,682
+input cleared the 50 K token gate; disambiguation (166,107 input) returned 「无内容性过期事实」 with a
+per-category table, and additionally clarified that **deepseek-v4-pro (tester-01 chat model) and z.ai GLM
+(Hindsight daemon LLM key) are different SCOPES — compatible, not conflicting**; do not let a future run
+"supersede" one with the other by timestamp. Eighth consecutive occurrence: never hand-judge the primary.
+
+2026-10-27 was also the first **single-pass, no-crash** run in several days — fresh launcher start →
+`/health` 200 on the 2nd 10 s poll (~10–20 s, warm pg0) → consolidation (op `completed` +536 ms,
+`completed` 86→87) → clean reflect. So a sub-20 s healthy daemon is a real outcome on this host: poll from
+the first 10 s mark instead of assuming the 4–7 min band. The 2026-10-27 primary also quantified the
+redundancy worth logging in the row: all **18 observations are 1:1 mirrored by raw memories (~2× storage)**,
+plus 4 copies of 「只发结果不发过程」 and 4 of 「绝对自主/禁止请示」, and Issue #9's test criteria split
+into 7 atomic facts. All of it is a merge suggestion — log it, never mutate.
+
+### "Advanced organization" scope check — mental models / directives
+
+When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the
+reflect audit is the whole job **unless the bank has curated layers**. Check both, with the API-URL prefix:
+
+```bash
+HINDSIGHT_API_URL=http://127.0.0.1:9178 hindsight mental-model list demo-pm-memory
+HINDSIGHT_API_URL=http://127.0.0.1:9178 hindsight directive list demo-pm-memory
+```
+
+`No mental models found.` / `No directives found.` (state on demo-pm-memory, 2026-10-27) means there is
+nothing else to regenerate — do not invent a extra step or report a missing capability. If entries ever do
+appear, refresh them AFTER consolidation and in the SAME daemon session (idle timeout 300 s).
 
 ## CLI quirks (verified 2026-10-21)
 

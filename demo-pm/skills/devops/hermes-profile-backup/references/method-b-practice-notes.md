@@ -147,6 +147,31 @@ a `403 denied to <X>`, or a ref-PATCH 422. This one is **pre-flight and cheap**.
   collaborator access or repo visibility. Switch accounts first, re-read, and only then
   investigate.
 
+### The mirror case: `permissions.push=true` on the WRONG account (2026-10-27)
+
+Verified 2026-10-27 — the exact inverse of the 10-24 signature, and the more dangerous
+one because it looks *healthy*: `gh api user --jq '.login'` → **`OnePlusNTester`** while
+`gh api repos/$OWNER/$REPO --jq '.permissions.push'` → **`true`**. (That sibling account
+now holds write access, so the permission probe — the whole remedy of the 10-24 section —
+passes on the wrong identity.) The first blob POST then died
+`FATAL uploading demo-pm/cron/jobs.json: gh: Not Found (HTTP 404)`.
+
+So neither read is sufficient alone; the preflight must assert **both**:
+
+```bash
+ACTIVE=$(gh api user --jq '.login')
+PUSH=$(gh api repos/$REPO_OWNER/hermes-config --jq '.permissions.push')
+# proceed ONLY if ACTIVE == $REPO_OWNER  AND  PUSH == true
+```
+
+- `ACTIVE != REPO_OWNER` → switch, regardless of `push`. Do not reason "it has push, so
+  it's fine" — blob POSTs 404 for a non-owner identity even with write access.
+- `ACTIVE == REPO_OWNER && PUSH == false` → switch (the 10-24 signature).
+- A login-only check would have waved this run through; a permission-only check would
+  have too. Keep both lines in the same shell call as the script invocation, and accept
+  that even that can be undone (see the 10-25 section above) — the real recovery remains
+  "every blob-404 is a flip → switch → one plain re-run".
+
 ## Shared `/tmp` payload namespace — sibling profiles delete our payload files
 
 **Hit 2026-09-23 on attempt 1** (the first run of the day):
@@ -242,3 +267,18 @@ Diffing against the CURRENT remote is the trap: right after a push the current
 remote tree equals local, so everything reads `IDENTICAL` and you learn nothing.
 Recipe + reading guide + worked example:
 `references/run-note-diff-characterization.md`.
+
+**Always pass the SHA — never run it with no argument.** The no-arg default derives
+`parents[0]` of the *current* main, and because every day's run ends with a follow-up
+commit, that parent is yesterday's **main** commit, not yesterday's remote HEAD. Result
+(2026-10-27): the probe reported `MODIFIED 8 / ADDED 1` while preflight against remote
+HEAD reported `6 M / 0 A / 0 D` — the extra three were yesterday's follow-up contents
+(`SKILL.md` `latest:`, `dated-runs-index.md` bullet, and the previous day's run note
+reading as ADDED). Reading that as "exclude drift" or re-running the probe wastes a
+cycle; the signature to recognize is **exactly +1 A (a `demo-pm-backup-workflow-YYYYMMDD.md`)
+and +2 M (SKILL.md + dated-runs-index.md) over the preflight count**.
+
+Prefer `--commit=<your main backup commit sha>` (its `parents[0]` *is* the true pre-push
+HEAD), or pass the SHA the script logged at Step 2. Then state the authoritative diff in
+the run note from the **preflight** numbers and treat the characterize output as the
+per-file explanation only.

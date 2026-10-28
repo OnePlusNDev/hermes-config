@@ -109,6 +109,13 @@ that day's recurrence record absent from the commit it belongs to. Cheapest fix 
 one-line checklist right before invoking the script, not a memory of "I'll remember the
 row this time".
 
+**Expected follow-up diff shape with all four items done: `3 M / 1 A / 0 D`** —
+`A` the run note, `M` `dated-runs-index.md` + `SKILL.md` + `method-b-practice-notes.md`
+(verified 2026-10-27, the first run that shipped all four). `cron/jobs.json` may or may
+not re-dirty between the two commits (it did not on 10-27), so **do not read its absence
+as a failed follow-up** — the gate is the closing preflight reading
+`Modified: 0, New: 0, Deleted: 0`, not the file list.
+
 **Fold ALL doc edits into this commit** — including any reference-file additions or
 triage-recipe edits (e.g. a new `references/*.md`, or an update to
 `references/curator-archive-churn-triage.md`). An edit made *after* the follow-up push
