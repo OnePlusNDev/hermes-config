@@ -61,6 +61,17 @@ one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 ## Execution notes
 - Remote HEAD was `<sha>` at blob-phase start and **stayed there through commit time** →
   **no ref-PATCH 422 race**; the ref PATCH succeeded on the first attempt.
+
+**Sibling landed mid-prep? Re-read before you quote numbers** (verified 2026-10-28). If the auth
+probe and the preflight report different remote HEADs, a sibling profile pushed in between — run
+`scripts/preflight-backup-scan.py` a **second** time before invoking the backup script, so the
+`Modified/New/Deleted` figures you paste below are measured against the same HEAD the script will
+see at Step 2. The diff *content* rarely changes (a sibling touches only its own subtree), but the
+baseline SHA in your note would otherwise be wrong, and the next day's reader sees a phantom
+"lost commit". Record it plainly, e.g. *"first preflight read `7e5dec0b7450`; a sibling
+**demo-dev** backup (`443b060192ac`, 12:01:40Z) landed immediately after; the re-run preflight and
+Step 2 both read `443b060192ac`, stable through commit time"*. Do **not** count this as network
+flakiness or an aborted attempt — nothing failed.
 - <no network flakiness | N aborted attempts + what fixed it>
   **Do NOT write "no network flakiness" until the FOLLOW-UP commit has also landed green**
   (verified 2026-10-24). The claim covers the whole run, and the follow-up is a *second* full

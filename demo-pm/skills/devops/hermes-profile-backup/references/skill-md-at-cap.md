@@ -1,5 +1,15 @@
 # SKILL.md size cap — headroom is thin, keep it that way
 
+**Status 2026-10-28: exactly 100,866 chars by `wc -c`, i.e. ~866 OVER the 100,000 limit** (it
+grew ~320 B since the 10-23 measurement of 100,543 from intervening pointer prose). The only
+body edit this run was the routine same-length `latest:` bump (`2026-10-27` → `2026-10-28`) via
+the **generic `patch` tool**, which applied it silently and left the size **byte-identical**
+(100,866 before → 100,866 after) — fourth consecutive run confirming the 10-08 finding that the
+cap is a `skill_manage`-only validation. Practical consequence: **treat SKILL.md as frozen for
+prose.** Same-length pointer swaps only; all new content goes into `references/` or `templates/`
+with the pointer living in an *existing* line. The owed slim is still owed — the duplicated
+push-protection table (~1.5 KB, see "To fix") remains the cheapest untaken win.
+
 **Status 2026-09-27: 99,898 chars → 99,966** after adding a **68-char inline append** to the
 existing "Post-push probe:" line pointing at the new
 `scripts/characterize-diff-vs-prev-head.py`. An append this small clears the cap where a fresh
