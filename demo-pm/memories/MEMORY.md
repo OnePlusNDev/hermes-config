@@ -1,6 +1,6 @@
 # MEMORY.md — demo-pm（项目牧羊人）
 
-> 最后更新: 2026-09-29 | 经 Hindsight v0.8.2 整理 | 30天归档已执行（快照见 archive/）
+> 最后更新: 2026-10-29 | 经 Hindsight v0.8.2 整理 | 30天归档已执行（快照 archive/MEMORY-20261029.snapshot.md；内容核对无失效，正文未改）
 
 ---
 

@@ -117,6 +117,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-26 | **158,635 / 7,214** (disambig 426,048 / 5,915) |
 | 2026-10-27 | **161,682 / 10,170** (disambig 166,107 / 6,698 — both passes far below the recent highs) |
 | 2026-10-28 | **99,303 / 6,200** (disambig 279,166 / 5,455; wording gate fired on the date-conditional shape) |
+| 2026-10-29 | **112,261 / 5,243** (disambig 174,811 / 5,638; wording gate fired on the same date-conditional shape — 9th consecutive) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -283,3 +284,9 @@ Startup calibration (2026-10-28): launcher launch at 21:01:03 (LLM clients initi
 `/health` healthy at 21:04:27 = **~3.4 min**, with the first six 10 s polls all returning "offline" and
 the log frozen on the `OpenAI-compatible client initialized` lines throughout. That silence is normal
 migration, not a crash — check `ps -Ao pid,etime,command | grep 'port 9178'` before concluding anything.
+
+Startup calibration (2026-10-29): **a truly cold host** — `ps aux | grep -c '[p]ostgres'` returned **0**
+(no pg0 instance at all, not just no daemon) — still went healthy in **~10–20 s** (poll 1 = 000, poll 2 =
+200). So the absence of pg0 processes does NOT imply the multi-minute wait; always start the launcher and
+poll at 10 s intervals before assuming a cold-start band. Expected daily shape remains "offline at first
+probe" because the daemon exits after `--idle-timeout 300`.

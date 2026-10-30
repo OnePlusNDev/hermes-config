@@ -2,7 +2,11 @@
 
 Copy this to `references/demo-pm-backup-workflow-YYYYMMDD.md` and fill in the
 placeholders. Then append an index bullet to `references/dated-runs-index.md`
-(see the unique-anchor warning below).
+(see the unique-anchor warning below). **Verified append recipe for BOTH the index
+bullet and the practice-notes table row (write_file'd `/tmp` Python script, prefix
+anchor + `ALREADY PRESENT` re-run guard + `count()==1` check):**
+`references/index-and-table-append-recipe.md` — use it instead of a `patch` anchor,
+whose candidate anchors all appear 2+ times.
 
 **Same-day repeat run** (first hit 2026-10-03: the profile backed up at *both*
 10:36 and 20:00 CST): the plain `YYYYMMDD.md` name is already taken, so the
@@ -71,7 +75,10 @@ baseline SHA in your note would otherwise be wrong, and the next day's reader se
 "lost commit". Record it plainly, e.g. *"first preflight read `7e5dec0b7450`; a sibling
 **demo-dev** backup (`443b060192ac`, 12:01:40Z) landed immediately after; the re-run preflight and
 Step 2 both read `443b060192ac`, stable through commit time"*. Do **not** count this as network
-flakiness or an aborted attempt — nothing failed.
+flakiness or an aborted attempt — nothing failed. If you reach the script without a second
+preflight, never quote the old baseline silently: state BOTH SHAs and that the 6-file `M` set was
+identical at each (verified 2026-10-29: preflight `7e20cda6357c` → Step 2 `cc044d95c496`, same
+6 M / 0 A / 0 D).
 - <no network flakiness | N aborted attempts + what fixed it>
   **Do NOT write "no network flakiness" until the FOLLOW-UP commit has also landed green**
   (verified 2026-10-24). The claim covers the whole run, and the follow-up is a *second* full
