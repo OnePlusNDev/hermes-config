@@ -79,6 +79,15 @@ and plain re-run (blob SHAs idempotent, costs nothing). Do not tighten this into
 loop before the script; that just widens the window. Two flips in one run is a new
 severity data point, not a new mechanism.
 
+**Re-confirmed 2026-10-30 with the tightest window yet:** switch verified
+`push=true`, then the two-read check glued to the script invocation (~20 s later,
+same `terminal` call) already printed `ACTIVE=OnePlusNTester PUSH=false`, and attempt 1
+died on the first blob 404. That makes **4 flips in 6 days** (10-25 twice, 10-27, 10-29,
+10-30) against a clean 10-26/10-28 pair — the flip is bursty, so a clean run says nothing
+about the next one. Practical consequence: do NOT spend calls trying to *prevent* the flip
+(no switch-verify loops, no adding a third read). Budget the abort instead — every run's
+first blob POST may 404, and the cost of recovery is one `gh auth switch` + one plain re-run.
+
 **Maintain this table with one row per run** — the row belongs in the daily follow-up
 commit alongside the run note, the index bullet, and the SKILL.md `latest:` pointer.
 It is the only continuous record of the 422-race / account-flip recurrence, so a

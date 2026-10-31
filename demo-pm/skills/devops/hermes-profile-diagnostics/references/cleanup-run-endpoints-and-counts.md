@@ -118,6 +118,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-27 | **161,682 / 10,170** (disambig 166,107 / 6,698 — both passes far below the recent highs) |
 | 2026-10-28 | **99,303 / 6,200** (disambig 279,166 / 5,455; wording gate fired on the date-conditional shape) |
 | 2026-10-29 | **112,261 / 5,243** (disambig 174,811 / 5,638; wording gate fired on the same date-conditional shape — 9th consecutive) |
+| 2026-10-30 | **216,498 / 9,363** (disambig 244,920 / 7,093; wording gate fired on the date-conditional shape — 10th consecutive; first reflect crashed, retry after restart succeeded) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -284,6 +285,16 @@ Startup calibration (2026-10-28): launcher launch at 21:01:03 (LLM clients initi
 `/health` healthy at 21:04:27 = **~3.4 min**, with the first six 10 s polls all returning "offline" and
 the log frozen on the `OpenAI-compatible client initialized` lines throughout. That silence is normal
 migration, not a crash — check `ps -Ao pid,etime,command | grep 'port 9178'` before concluding anything.
+
+Startup calibration (2026-10-30): :9178 offline with only the global :8888 daemon alive → launcher start →
+`/health` 200 on the **2nd** 10 s poll (~10–20 s). First health probe wrote `http_code=000` while
+`/tmp/h9178.json` still held a **stale healthy body from a previous run** — never trust a reused temp
+filename as liveness proof; use a fresh per-poll path (`/tmp/h9178_p$i.json`) or check `%{http_code}`.
+The transient first-reflect crash recurred exactly as documented (`Starting agentic reflect` →
+`LinkExpansion` → `ServerDisconnectedError`, daemon process gone), and the retry after a launcher restart
+succeeded on the identical request — consolidation was already persisted, so nothing was lost.
+The 2026-10-30 disambiguation pass also named the **`mentioned_at`-as-expiry** root cause explicitly
+(recording time ≠ content validity): useful wording to quote in the ARCHIVE row when the primary fires.
 
 Startup calibration (2026-10-29): **a truly cold host** — `ps aux | grep -c '[p]ostgres'` returned **0**
 (no pg0 instance at all, not just no daemon) — still went healthy in **~10–20 s** (poll 1 = 000, poll 2 =

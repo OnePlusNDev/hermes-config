@@ -62,10 +62,14 @@ the script's printed hint names only one of them:
 1. **Exclude drift** — the script's `EXCLUDE_*` sets have drifted out of sync
    with the backup script's. Re-sync them; not a real diff.
 2. **A legitimately new local file** — most commonly the monthly 30-day memory
-   archive rollover creating `memories/archive/USER-<YYYYMMDD>.snapshot.md` (with
-   the matching `ARCHIVE.md` row). Those snapshots ARE in the include list, so the
-   `A` is correct and must be backed up — do **not** "fix" an EXCLUDE set to make
-   it vanish.
+   archive rollover creating `memories/archive/USER-<YYYYMMDD>.snapshot.md` or
+   `memories/archive/MEMORY-<YYYYMMDD>.snapshot.md` (with the matching `ARCHIVE.md`
+   row and a `最后更新` bump in the live file). Those snapshots ARE in the include
+   list, so the `A` is correct and must be backed up — do **not** "fix" an
+   EXCLUDE set to make it vanish. Both memory files roll over independently at
+   their own 30-day windows, so expect one `A` roughly monthly: USER.md rolled
+   2026-10-11, MEMORY.md rolled 2026-10-29 (next USER window 2026-11-10, next
+   MEMORY window ~2026-11-28).
 
 Distinguish by path: an `A` under `memories/archive/` named `*-<date>.snapshot.md`
 is category 2 (intended content); an `A` under `tmp*/`, a `*_cache.json`, a root
@@ -89,6 +93,17 @@ exclude mismatch — the script's "check EXCLUDE sync" hint is a false alarm her
    scan matches full token *values*), a value or a `.env` dump is not.
    Classify it in the run note as "new reference doc, content inspected", e.g.
    2026-10-17's note.
+   **Same shape inside THIS skill (verified 2026-10-30):** a `references/*.md`
+   authored *after* the previous day's follow-up push also arrives as `A` the next
+   morning — that run's recipe file (`references/index-and-table-append-recipe.md`)
+   showed up on 10-30 alongside the legitimate `memories/archive/MEMORY-20261029.snapshot.md`.
+   `A 2` in one preflight is therefore not automatically drift: check each path
+   against categories 2/3 before touching an `EXCLUDE_*` set.
+
+**Sanity arithmetic beats the presence/absence of `A`:** local count must equal
+remote-at-PREV_HEAD count + `New` (`270 == 268 + 2`, 2026-10-30). If that identity
+holds and every new path is explained, there is no exclude gap — no matter what
+the script's hint says.
 
 ## Run it ONCE — write the diff to a file, then slice it
 
