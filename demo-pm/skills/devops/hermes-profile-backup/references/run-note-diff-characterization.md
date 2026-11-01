@@ -34,6 +34,24 @@ Step 2 of the clean attempt — and also `parents[0]` of your backup commit, whi
 current remote `main` and prints a warning (correct only when no sibling commit
 landed after yours).
 
+**Pass the FULL 40-char SHA — a short SHA 404s, and the 404 looks exactly like an
+account flip.** Verified 2026-10-31: `--commit=6f1fca687f40` (the 12-char form every
+other `gh` command in these notes accepts) died with
+
+```
+RuntimeError: gh api repos/OnePlusNDev/hermes-config/git/commits/6f1fca687f40 failed:
+gh: Not Found (HTTP 404)
+```
+
+`/git/commits/{sha}` does **not** expand abbreviated SHAs, while
+`/git/refs/heads/main --jq .object.sha` prints the full 40 — so the value you have
+in hand from a log line is usually the short one and needs the full SHA copied from
+the backup script's own `Commit:` line (`6f1fca687f406494b16f15ffa6a02bc1b2c89d2f`).
+Before diagnosing any 404 in the probe as an auth/keyring flip, re-try with the full
+SHA and confirm with `gh api user --jq .login` — a genuine flip also 404s, so only
+the full-SHA retry distinguishes them (this run: user was `OnePlusNDev` all along,
+no flip, and the full-SHA call exited 0 immediately).
+
 ## Pick the anchor AFTER the push — a preflight SHA can be stale
 
 The authoritative anchor is `parents[0]` of your backup commit. Prefer

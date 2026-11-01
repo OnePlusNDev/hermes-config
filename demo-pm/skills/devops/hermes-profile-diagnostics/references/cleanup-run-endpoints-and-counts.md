@@ -38,6 +38,18 @@ POST /v1/default/banks/<bank>/reflect
 - Use the bank list as a **pre-flight** check: one call tells you whether `demo-pm-memory` (48 facts) is served by this daemon. If :9178 is down and the siblings show only `demo-dev/active/hermes`, there is no fallback — start the profile daemon via its launcher.
 - Never `curl … | python3` in cron (tirith HIGH `curl_pipe_shell`, stalls with no approver). Fetch with `urllib` inside a heredoc, or `curl -o /tmp/x.json` then parse the file.
 
+## Flat-file (MEMORY.md / USER.md) 30-day re-check — header wording
+
+Daily shape when nothing changed: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/MEMORY-*.snapshot.md)`
+prints nothing → only bump the header date (`> 最后更新: YYYY-MM-DD`) and keep the existing snapshot; do NOT
+generate a duplicate snapshot of identical content.
+
+**Pitfall (2026-10-31): the header's "正文与 <date> 一致" must name the snapshot the body actually matches,
+not yesterday's run date.** MEMORY.md's body matches its 2026-10-29 snapshot while USER.md's has matched the
+2026-10-11 snapshot for weeks, so blindly copying the previous run's phrasing produced
+「正文与 2026-10-30 一致 … 沿用 archive/USER-20261011.snapshot.md」 — self-contradictory. Read the snapshot
+filename you are reusing and put *that* date in the sentence.
+
 ## Session retention — `started_at` is an epoch FLOAT
 
 `<profile>/state.db`, table `sessions`. `started_at` is a Unix epoch float (e.g. `1792328402.37`), so
@@ -119,6 +131,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-28 | **99,303 / 6,200** (disambig 279,166 / 5,455; wording gate fired on the date-conditional shape) |
 | 2026-10-29 | **112,261 / 5,243** (disambig 174,811 / 5,638; wording gate fired on the same date-conditional shape — 9th consecutive) |
 | 2026-10-30 | **216,498 / 9,363** (disambig 244,920 / 7,093; wording gate fired on the date-conditional shape — 10th consecutive; first reflect crashed, retry after restart succeeded) |
+| 2026-10-31 | **151,379 / 5,516** (disambig 266,832 / 7,350; wording gate fired — 11th consecutive; no daemon crash, both calls succeeded on first try) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -213,6 +226,17 @@ the first 10 s mark instead of assuming the 4–7 min band. The 2026-10-27 prima
 redundancy worth logging in the row: all **18 observations are 1:1 mirrored by raw memories (~2× storage)**,
 plus 4 copies of 「只发结果不发过程」 and 4 of 「绝对自主/禁止请示」, and Issue #9's test criteria split
 into 7 atomic facts. All of it is a merge suggestion — log it, never mutate.
+
+2026-10-31 confirmed a ninth shape — the **"library-span + archive-candidate" pair**: the verdict table
+showed the correct 「30 天以上过期事实 | **无** | 0 条」 row, but the body then argued 「整个记忆库的时间跨度只有
+3 天（06-14 至 06-17），因此按 30 天标准没有任何事实到期」 and added an 「建议归档」 section listing
+「Issue #9 测试标准（7 条原子事实）+ 已闭环的历史操作记录」. The gate fires on that trailing 「建议归档」 —
+correct, because acting on it would archive the Issue #9 criteria that MEMORY.md still carries as active
+test standards. Primary 151,379 input cleared the 50 K token gate; disambiguation (266,832 input) returned
+「无内容性过期事实」 with a per-category table. Ninth shape, eleventh consecutive trigger: never hand-judge.
+Same run also confirmed the daemon can be healthy on the **2nd 10 s poll** (~10–20 s, warm pg0) twice in a
+row (10-30 and 10-31), with no reflect crash on 10-31 — so a clean single-session run (launcher → consolidate
+→ reflect) is now the common shape, not the exception.
 
 ### "Advanced organization" scope check — mental models / directives
 
