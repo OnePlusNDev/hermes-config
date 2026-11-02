@@ -132,6 +132,38 @@ file first (this restores the real newlines), then `read_file` it normally:
 python3 -c "import json; d=json.load(open('/path/to/dump.txt')); open('/tmp/skill.md','w').write(d['content'])"
 ```
 
+## How to actually READ this 100 KB file (practical paging)
+
+`read_file` rejects a single read past ~100K characters, and SKILL.md is ~100.9 KB, so
+`read_file(path, limit=2000)` on it fails outright. Page it instead: `offset=1, limit=250`,
+then `offset=251, limit=250`, etc. — 250-line slices cover the whole file in five calls and
+each returns cleanly (verified 2026-11-01). Loading it via `skill_view` first is only useful
+for the `linked_files` map; the body comes back truncated, so go straight to the paged
+`read_file` on the on-disk path.
+
+## Tooling constraint: the generic `patch` tool is NOT available in review/cron passes
+
+Every "the cap is not enforced by the generic `patch` tool" note above depends on that tool
+being callable. In a background skill-review / cron turn only **memory and skill tools** are
+whitelisted — a `patch` call is refused with
+`Background review denied non-whitelisted tool: patch`. Since `skill_manage` DOES enforce the
+100 K cap and the file sits ~866 B over it, **any** SKILL.md edit is impossible from such a
+pass, including a byte-neutral relocation. Consequence: do the routine `latest:` bump (and any
+SKILL.md surgery) in the *main* run session, and use review passes only for `references/` and
+`templates/` files, which carry no size cap.
+
+## Known structural defect to fix during the next slim (found 2026-11-01)
+
+The **Method Selection** table is split in three. Rows **A** and **B** sit together
+(~lines 78-79), then ~17 lines of prose (clone-currency warning, Method B practice notes,
+dated-run-notes pointer), then row **C** (`Python + Content API`) is orphaned at ~line 99 —
+outside the table, before `## Method A`. A reader scanning the table sees only A and B and
+easily misses Method C entirely (this run's agent almost did).
+
+Fix is byte-neutral: move the row-C line up to sit directly under row B, leave the prose
+below the completed table. Do it in the same edit batch as the next cap slim, and re-check
+`wc -c` afterwards — the move adds no characters, only reorders lines.
+
 ## Support files that exist (so they aren't lost)
 
 - `templates/run-note-template.md` — starter for the daily run note, **plus** the
