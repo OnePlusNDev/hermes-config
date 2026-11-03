@@ -133,6 +133,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-30 | **216,498 / 9,363** (disambig 244,920 / 7,093; wording gate fired on the date-conditional shape — 10th consecutive; first reflect crashed, retry after restart succeeded) |
 | 2026-10-31 | **151,379 / 5,516** (disambig 266,832 / 7,350; wording gate fired — 11th consecutive; no daemon crash, both calls succeeded on first try) |
 | 2026-11-01 | **189,432 / 7,374** (disambig 167,011 / 7,013; wording gate fired on the perishability-reclassification shape — 12th consecutive; no crash) |
+| 2026-11-02 | **174,494 / 6,225** (disambig 357,543 / 4,775; wording gate fired on the 「未发现（有前提）」 conditional shape — 13th consecutive; no crash) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -250,6 +251,17 @@ the 12-char pre-window — correct, because acting on it would archive the live 
 held only `demo-dev` / `active` / `hermes` (no `demo-pm-memory`), so a sibling bypass is impossible for this
 bank — the profile launcher is mandatory. Healthy on the 2nd 10 s poll again (~10–20 s), no crash, completed
 counter 91→92. Tenth shape, twelfth consecutive trigger: never hand-judge.
+
+2026-11-02 confirmed an eleventh shape — the **「未发现（有前提）」 conditional**: the opening conclusion said
+「没有发现超过 30 天的过期事实」, but the first section was titled 「30 天以上过期事实：**未发现（有前提）**」
+and immediately added 「如果实际『今天』已远晚于 2026-06-17 … 那么整批配置类事实都会集体超过 30 天，需要整体复核」,
+plus an 「易腐配置快照」 list (ports / daemon params / LLM key+endpoint / AppIDs / chat_id). The wording gate
+fires because the section heading carries the keyword with the negation outside the 12-char pre-window —
+correct, since acting on the conditional would archive the live config. Primary 174,494 input cleared the 50 K
+gate; disambiguation (357,543 input) returned 「无内容性过期事实」. Eleventh shape, thirteenth consecutive
+trigger: never hand-judge. Same run: healthy on the 3rd 10 s poll, no crash, completed counter 92→93. Also
+reuse `/tmp/h9178_p<N>.json` with care — a poll can return `http_code=000` while the file still holds a
+healthy body from a previous run; trust the HTTP code, not the body.
 
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the
