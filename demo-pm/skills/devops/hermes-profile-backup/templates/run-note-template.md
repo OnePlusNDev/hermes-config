@@ -85,7 +85,15 @@ identical at each (verified 2026-10-29: preflight `7e20cda6357c` → Step 2 `cc0
   push: that day the main push was clean, then the follow-up hung ~270 s in Step 5 (subtree
   build) and needed one plain re-run (see `references/method-b-practice-notes.md`). Writing the
   clean claim after the main commit forced a third, doc-only commit purely to correct the
-  record. Order the sentence last: draft the note, push, and only claim cleanliness once the
+  record. If the follow-up needed a retry, say so here.
+  **But the note ships *inside* the follow-up**, so "wait for the `Done:` line, then write it"
+  is not literally executable (clarified 2026-11-03). Write the closing line as a
+  *verifiable-only* statement (`closing preflight must read Modified: 0, New: 0, Deleted: 0`)
+  and make no "follow-up was clean" assertion; push; then, only if the 422 race or a Step-5
+  hang hit, patch the note **before** the re-run (still one commit). A silent Step-7 ref
+  rejection — log stops at `=== Step 7 ===` with no `Done:` — is the case that slips through:
+  always diff `gh api .../git/refs/heads/main` against the printed `Commit:` first. See
+  `references/method-b-practice-notes.md` §"The ref PATCH can fail SILENTLY".
   follow-up's `Done:` line is in hand. If the follow-up needed a retry, say so here.
   (Corollary: a **correction commit is legitimate** when the already-pushed note states
   something false — a run note that misleads tomorrow's run costs more than one extra commit.

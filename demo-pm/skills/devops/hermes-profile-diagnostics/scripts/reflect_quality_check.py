@@ -43,7 +43,8 @@ DISAMBIG = ('针对上一轮审计的过期判定做定向澄清。背景：以�
 # Negation markers that turn an "expired" mention into a CLEAN verdict.
 _NEG = ('无', '不存在', '没有', '未发现', '零', '0 条')
 # Phrases that assert expired/archivable content exists.
-_KW = ('过期事实', '需归档', '需要归档', '已过期', '过期条目', '过期内容')
+_KW = ('过期事实', '需归档', '需要归档', '已过期', '过期条目', '过期内容',
+       '应归档', '应优先归档', '建议归档')
 
 
 def claims_expired(text: str) -> bool:

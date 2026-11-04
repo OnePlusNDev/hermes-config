@@ -23,6 +23,37 @@ re-parents the identical commit on the fresh HEAD. Do NOT rebase, do NOT attempt
 tree surgery, and do NOT treat it as a partial failure — the first run's blobs are
 already uploaded.
 
+### The ref PATCH can fail SILENTLY — the log just stops at Step 7
+
+Verified 2026-11-03 (follow-up commit, first 422 in the follow-up rather than the main push):
+the script printed Step 1–6 including `Commit: 6606dc9d2c85`, then `=== Step 7: updating ref ===`
+and **nothing else** — no `Remote HEAD now:`, no `Done:`, no error text, and the process exited
+normally (piped through `tee | tail`, so the shell reported `tail`'s status, not the script's).
+`gh api .../git/refs/heads/main` showed a sibling `demo-dev` commit instead, whose parent was our
+main commit: a non-fast-forward rejection in the exact window between Step 6 and Step 7.
+
+Two shapes of the same silent failure exist, so do not rely on either signal:
+- the log prints `Done:` and exits 0 while the ref was not moved (SKILL.md's closing-assertion note), **or**
+- the log simply stops after `=== Step 7 ===` with no `Done:` line (this run).
+
+**Always compare before writing the run note as clean:**
+
+```bash
+gh api repos/$OWNER/$REPO/git/refs/heads/main --jq '.object.sha'   # == the printed Commit: ?
+```
+
+If it differs, that is the 422 race, not a hang and not a lost commit — blob SHAs are
+idempotent, so apply the one-plain-re-run rule (the re-run rebuilds the same tree on the fresh
+HEAD). Never `git reset`, never re-upload "missing" blobs by hand.
+
+**Ordering corollary for the run note.** The note itself ships *inside* the follow-up commit, so
+the template's "do not claim cleanliness until the follow-up's `Done:` line is in hand" cannot be
+satisfied literally. Do this instead: draft the note with a *verifiable-only* closing line
+(`closing preflight must read Modified: 0, New: 0, Deleted: 0`) and no "follow-up was clean"
+assertion; then push. If the race hits, patch the note + this table row **before** the re-run —
+still one commit, no correction commit. Writing "follow-up first-try" up front and fixing it later
+is what forces the extra doc-only commit the template warns about.
+
 ## Observed on recent runs
 
 | Date | 422 race? | Notes |

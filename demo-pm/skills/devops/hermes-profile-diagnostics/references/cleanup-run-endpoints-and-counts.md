@@ -134,6 +134,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-10-31 | **151,379 / 5,516** (disambig 266,832 / 7,350; wording gate fired — 11th consecutive; no daemon crash, both calls succeeded on first try) |
 | 2026-11-01 | **189,432 / 7,374** (disambig 167,011 / 7,013; wording gate fired on the perishability-reclassification shape — 12th consecutive; no crash) |
 | 2026-11-02 | **174,494 / 6,225** (disambig 357,543 / 4,775; wording gate fired on the 「未发现（有前提）」 conditional shape — 13th consecutive; no crash) |
+| 2026-11-03 | **208,888 / 8,642** (gate passed clean — first pass-through in 14 runs; disambig paid anyway: 166,518 / 6,318, `based_on=34`, authoritative 「无内容性过期事实」; no crash) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -263,6 +264,15 @@ trigger: never hand-judge. Same run: healthy on the 3rd 10 s poll, no crash, com
 reuse `/tmp/h9178_p<N>.json` with care — a poll can return `http_code=000` while the file still holds a
 healthy body from a previous run; trust the HTTP code, not the body.
 
+2026-11-03 found a **gate coverage gap** — the primary was the first in 14 runs to pass the wording gate, yet
+it still carried an archive recommendation: after the correct 「库内跨度仅 3 天、无 30 天以上过期事实」 verdict it
+added 「2 条临时状态型事实已失去时效、**应优先归档**或复核」 and 「旧的故障快照归档」. `claims_expired()` only knew
+`需归档 / 需要归档 / 过期事实 / 已过期 / 过期条目 / 过期内容`, so the 「应优先归档」 phrasing slipped through. Fixed by
+adding `应归档 / 应优先归档 / 建议归档` to `_KW` (over-triggering is still preferred). Lesson stands: **a clean wording
+gate is not permission to skip the disambiguation pass when the answer visibly recommends archiving** — always pay
+it on a 30-day-cleanup run. The 2026-11-03 disambig also re-corrected the same LLM scope misjudgment (deepseek-v4-pro
+chat model vs z.ai GLM daemon key) and reported `is_stale=false` / `freshness=up_to_date` on the observations.
+
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the
 reflect audit is the whole job **unless the bank has curated layers**. Check both, with the API-URL prefix:
@@ -349,3 +359,8 @@ Startup calibration (2026-10-29): **a truly cold host** — `ps aux | grep -c '[
 200). So the absence of pg0 processes does NOT imply the multi-minute wait; always start the launcher and
 poll at 10 s intervals before assuming a cold-start band. Expected daily shape remains "offline at first
 probe" because the daemon exits after `--idle-timeout 300`.
+
+Startup calibration (2026-11-03): offline first probe with only the global :8888 daemon listening → launcher →
+poll1/2 `http_code=000`, poll3 `200 {"status":"healthy","database":"connected"}` (~20–30 s, warm pg0). Reflect did
+not crash; consolidation op completed at +251 ms and `operations_by_status.completed` went 93→94 (confirmed by a
+post-reflect `/stats` re-read). Fresh per-poll paths (`/tmp/h9178_p<N>.json`) again avoided the stale-body trap.
