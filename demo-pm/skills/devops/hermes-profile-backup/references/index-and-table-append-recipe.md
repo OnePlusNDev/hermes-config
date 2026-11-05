@@ -25,6 +25,13 @@ files are full of CJK.
 
 ### A. Append to `dated-runs-index.md`
 
+⚠️ **`write_file` does NOT expand `$(date +%s)` in the path** (verified 2026-11-04): writing to
+`/tmp/append_pm_$(date +%s).py` lands a file literally named `/tmp/append_pm_$(date +%s).py`
+(`resolved_path` echoes the `$` back — read it before running). It still works (the literal name
+is unique enough), but do not assume per-run uniqueness from it: two runs the same day would
+clobber. Put a real literal suffix in the filename you pass to `write_file`
+(e.g. `/tmp/append_pm_1104_a.py`) and quote that exact path when you `python3` it.
+
 ```python
 import io
 path = ".../references/dated-runs-index.md"
