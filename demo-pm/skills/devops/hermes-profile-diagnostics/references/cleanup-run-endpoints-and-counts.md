@@ -142,6 +142,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-11-02 | **174,494 / 6,225** (disambig 357,543 / 4,775; wording gate fired on the 「未发现（有前提）」 conditional shape — 13th consecutive; no crash) |
 | 2026-11-03 | **208,888 / 8,642** (gate passed clean — first pass-through in 14 runs; disambig paid anyway: 166,518 / 6,318, `based_on=34`, authoritative 「无内容性过期事实」; no crash) |
 | 2026-11-04 | **169,983 / 9,021** (disambig **316,341 / 10,375** — highest disambig output yet; gate fired on the perishability-reclassification shape, 14th consecutive; no crash) |
+| 2026-11-05 | **188,865 / 7,446** (disambig 239,515 / 6,546; gate fired on the perishability-reclassification shape — 15th consecutive; no crash, ~25-30 s healthy on poll 3, consolidation +277 ms, counter 95→96) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -289,6 +290,14 @@ the five iron rules. Same run: fresh launcher start → `/health` 200 on **poll 
 consolidation `completed` at **+30 ms** (fastest yet), counter 94→95; no crash. Both reflects were run directly through
 `hindsight_client` with `include_facts=True` (valid for the Python client — the 422 caveat is raw-HTTP only), which is
 simpler than the two-gate script when you intend to pay the disambiguation pass unconditionally.
+
+### Bank-vs-flat-file drift: the LLM-key fact is a standing gap
+2026-11-05: the disambig pass checked the bank's LLM-key fact and kept it as 「z.ai GLM `45af10…` +
+`https://api.z.ai/api/paas/v4`，与 06-17 daemon 启动记录一致，保留」 — but MEMORY.md §3 states the z.ai GLM
+key died with 401 on 2026-09-29 and demo-pm's daemon moved to DeepSeek `deepseek-v4-flash`. The bank has
+**no superseding fact**, so the LLM correctly sees no conflict. This is a missing-fact gap, not a stale fact:
+log 「建议补一条显式覆盖事实」 in the ARCHIVE row and do not mutate. Expect it to recur until someone writes
+that fact into the bank.
 
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the

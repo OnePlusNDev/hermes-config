@@ -32,6 +32,13 @@ is unique enough), but do not assume per-run uniqueness from it: two runs the sa
 clobber. Put a real literal suffix in the filename you pass to `write_file`
 (e.g. `/tmp/append_pm_1104_a.py`) and quote that exact path when you `python3` it.
 
+Corollary (verified 2026-11-05): the no-expansion rule is scoped to **file-path arguments of
+`write_file` / `patch`**. Inside a `terminal()` shell command `$(date +%s)` expands normally —
+`BK=/tmp/bk-$(date +%m%d)-$(date +%s); mkdir -p "$BK"` produced a unique scratch dir, which is
+also the tirith-safe way to get a fresh dir without `rm -rf`
+(see `tirith-cron-workarounds.md`). So: literal suffix for helper scripts written by
+`write_file`, shell expansion for scratch dirs created by `terminal()`.
+
 ```python
 import io
 path = ".../references/dated-runs-index.md"
@@ -81,6 +88,13 @@ can land the text in the wrong place without complaining.
 ## Ordering inside the follow-up
 
 Do all four items, then ONE preflight, then ONE push:
+
+**Items 2 and 3 can share ONE helper script (verified 2026-11-05).** A single
+`/tmp/append_pm_<MMDD>_<letter>.py` doing section A then section B — each with its own
+`ALREADY PRESENT` guard — printed `INDEX: APPENDED` / `INDEX occurrences: 1` and
+`TABLE: INSERTED after line N` / `TABLE occurrences: 1` in one `terminal()` call. Two checks
+before the push, both `1`; the follow-up diff then matched the expected
+`3 M / 1 A / 0 D` exactly.
 
 1. run note (`references/demo-pm-backup-workflow-YYYYMMDD.md`, via `write_file`)
 2. index bullet (recipe A)
