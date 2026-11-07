@@ -143,6 +143,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-11-03 | **208,888 / 8,642** (gate passed clean — first pass-through in 14 runs; disambig paid anyway: 166,518 / 6,318, `based_on=34`, authoritative 「无内容性过期事实」; no crash) |
 | 2026-11-04 | **169,983 / 9,021** (disambig **316,341 / 10,375** — highest disambig output yet; gate fired on the perishability-reclassification shape, 14th consecutive; no crash) |
 | 2026-11-05 | **188,865 / 7,446** (disambig 239,515 / 6,546; gate fired on the perishability-reclassification shape — 15th consecutive; no crash, ~25-30 s healthy on poll 3, consolidation +277 ms, counter 95→96) |
+| 2026-11-06 | **176,961 / 7,246** (disambig **309,656 / 7,796**; gate fired on the 「字面上无，但需按当前日期复核」 shape — 16th consecutive; no crash, healthy on poll 2, consolidation **+22 ms** (fastest yet), counter 96→97) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -291,13 +292,24 @@ consolidation `completed` at **+30 ms** (fastest yet), counter 94→95; no crash
 `hindsight_client` with `include_facts=True` (valid for the Python client — the 422 caveat is raw-HTTP only), which is
 simpler than the two-gate script when you intend to pay the disambiguation pass unconditionally.
 
+2026-11-06 confirmed a twelfth shape — the **「字面上无，但需按当前日期复核」 literal-versus-conditional split**: the
+primary opened 「健康度：中等偏好」 and titled its first section 「一、过期事实（30 天以上）：**字面上无，但需按当前日期复核**」,
+then added 「若当下已经晚于 2026-07-17，则上述所有条目在字面上都已超过 30 天」 and a 「**建议归档动作**：…合并上述 8 组」 line
+for the duplicate groups. The gate fires on the date-conditional plus the (post-11-03 widened) 「建议归档」 keyword —
+correct, because acting on either would archive live port/AppID/daemon facts or the active Issue #9 criteria. Primary
+176,961 input cleared the 50 K token gate; disambiguation (309,656 / 7,796) returned 「无内容性过期事实」 with a 5-row
+per-category table. Sixteenth consecutive trigger: never hand-judge. Same run: healthy on poll 2 (~10–20 s, warm pg0),
+consolidation `completed` at **+22 ms** (new fastest), counter 96→97, no crash. The disambig pass also characterised
+`secret 10014 invalid` as 「带日期的状态快照，处置动作是复核而非归档」 — useful wording for the ARCHIVE row.
+
 ### Bank-vs-flat-file drift: the LLM-key fact is a standing gap
 2026-11-05: the disambig pass checked the bank's LLM-key fact and kept it as 「z.ai GLM `45af10…` +
 `https://api.z.ai/api/paas/v4`，与 06-17 daemon 启动记录一致，保留」 — but MEMORY.md §3 states the z.ai GLM
 key died with 401 on 2026-09-29 and demo-pm's daemon moved to DeepSeek `deepseek-v4-flash`. The bank has
 **no superseding fact**, so the LLM correctly sees no conflict. This is a missing-fact gap, not a stale fact:
 log 「建议补一条显式覆盖事实」 in the ARCHIVE row and do not mutate. Expect it to recur until someone writes
-that fact into the bank.
+that fact into the bank. (Recurred 2026-11-06: disambig again kept z.ai GLM as the daemon-side key, so the gap
+is now three consecutive days — still a missing-fact gap, never grounds to delete either record.)
 
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the

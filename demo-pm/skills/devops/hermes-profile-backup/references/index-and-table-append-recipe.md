@@ -77,6 +77,16 @@ else:
 is the real check — a `patch`-tool "success" message alone does not prove the
 row landed once.
 
+⚠️ **The "next line starts with `|`" structural check only applies MID-TABLE**
+(verified 2026-11-06). When the previous day's row was the table's LAST row, the
+new row becomes the last row too and the line after it is the blank line before
+`**Maintain this table with one row per run** …`. A probe that prints
+`next line starts '|': False` there is reporting **normal terminal position, not
+damage** — do not "fix" it. The checks that actually matter for a last-row
+insert: the previous row still ends ` |`, the new row ends ` |`, and
+`count("| YYYY-MM-DD |") == 1`. Only when inserting between two existing rows
+must the following line start with `|`.
+
 ## Why not the `patch` tool at all
 
 It works for the SKILL.md `latest:` bump (same-length swap, file already at its
@@ -89,17 +99,34 @@ can land the text in the wrong place without complaining.
 
 Do all four items, then ONE preflight, then ONE push:
 
-**Items 2 and 3 can share ONE helper script (verified 2026-11-05).** A single
-`/tmp/append_pm_<MMDD>_<letter>.py` doing section A then section B — each with its own
-`ALREADY PRESENT` guard — printed `INDEX: APPENDED` / `INDEX occurrences: 1` and
-`TABLE: INSERTED after line N` / `TABLE occurrences: 1` in one `terminal()` call. Two checks
-before the push, both `1`; the follow-up diff then matched the expected
-`3 M / 1 A / 0 D` exactly.
+**Items 2, 3 and 4 can ALL share ONE helper script (verified 2026-11-05 for 2+3,
+again 2026-11-06 for all four).** A single `/tmp/append_pm_<MMDD>_<letter>.py`
+doing section A (index), section B (table row) then the SKILL.md pointer swap —
+each with its own `ALREADY PRESENT` / count guard — printed
+`INDEX: APPENDED` / `INDEX occurrences: 1`,
+`SKILL: POINTER MOVED` / `SKILL old refs left: 0`,
+`TABLE: INSERTED after line N` / `TABLE occurrences: 1`, plus the table-structure
+flags, in ONE `terminal()` call. The follow-up diff then matched the expected
+`3 M / 1 A / 0 D` exactly on the first try.
+
+The pointer swap inside the helper is a count-guarded `str.replace`, which is
+safer than the `patch` tool on a 100 K file with a repeated token:
+
+```python
+s = SKILL.read_text()
+assert s.count("latest: PREV-DATE") == 1
+SKILL.write_text(s.replace("latest: PREV-DATE", "latest: TODAY"))
+```
+
+Same-length dates, so no cap pressure; assert the old token is gone afterwards
+(`count("latest: PREV-DATE") == 0`). One script, one write, one push — fewer
+round-trips and no `patch`-anchor transcription risk.
 
 1. run note (`references/demo-pm-backup-workflow-YYYYMMDD.md`, via `write_file`)
 2. index bullet (recipe A)
 3. practice-notes row (recipe B)
-4. SKILL.md `latest:` same-length swap (generic `patch` tool)
+4. SKILL.md `latest:` same-length swap (same helper, above; generic `patch` tool
+   also works if you kept that item separate)
 
 Expected preflight shape for the follow-up: **`3 M / 1 A / 0 D`** (A = the run
 note). `cron/jobs.json` may or may not re-dirty in between; its absence is not a
