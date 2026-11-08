@@ -144,6 +144,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-11-04 | **169,983 / 9,021** (disambig **316,341 / 10,375** — highest disambig output yet; gate fired on the perishability-reclassification shape, 14th consecutive; no crash) |
 | 2026-11-05 | **188,865 / 7,446** (disambig 239,515 / 6,546; gate fired on the perishability-reclassification shape — 15th consecutive; no crash, ~25-30 s healthy on poll 3, consolidation +277 ms, counter 95→96) |
 | 2026-11-06 | **176,961 / 7,246** (disambig **309,656 / 7,796**; gate fired on the 「字面上无，但需按当前日期复核」 shape — 16th consecutive; no crash, healthy on poll 2, consolidation **+22 ms** (fastest yet), counter 96→97) |
+| 2026-11-07 | **172,238 / 8,311** (disambig 313,042 / 9,166; gate fired on the **sentence-initial 「过期事实：无」** shape — negation sits AFTER the keyword in a bolded conclusion line, 17th consecutive; first reflect after a fresh start crashed (`ServerDisconnectedError` / leaked-semaphore) and succeeded on retry after relaunch; consolidation +82 ms, counter 97→98) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -309,7 +310,14 @@ key died with 401 on 2026-09-29 and demo-pm's daemon moved to DeepSeek `deepseek
 **no superseding fact**, so the LLM correctly sees no conflict. This is a missing-fact gap, not a stale fact:
 log 「建议补一条显式覆盖事实」 in the ARCHIVE row and do not mutate. Expect it to recur until someone writes
 that fact into the bank. (Recurred 2026-11-06: disambig again kept z.ai GLM as the daemon-side key, so the gap
-is now three consecutive days — still a missing-fact gap, never grounds to delete either record.)
+is now three consecutive days — still a missing-fact gap, never grounds to delete either record.) 2026-11-07:
+fourth consecutive day; the primary additionally flagged two facts that exist only inside source-document blocks
+and therefore cannot be recalled as facts (the 10014 snapshot and the deepseek-switch/GLM-fallback record) — log
+as 「建议补录为独立事实」, still no mutation. The same run's stable non-age finding set is now well defined:
+redundancy ≈30–40 % of raw facts (Issue #9 split into 7 atoms, 「只发结果」 ×4, 铁律 ×2), plus three
+**non-archivable** contradictions (chat model vs daemon LLM key = different scopes; deliver-Home vs group
+reply = carrier ambiguity; Issue 「告知开始处理」 vs 沟通规范「禁止正在处理」 = carrier ambiguity, 06-17 never
+revoked 06-14). All three recur verbatim across runs — quote them in the ARCHIVE row, never "resolve" them.
 
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the

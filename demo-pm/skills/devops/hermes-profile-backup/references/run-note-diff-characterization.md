@@ -118,6 +118,24 @@ exclude mismatch — the script's "check EXCLUDE sync" hint is a false alarm her
    `A 2` in one preflight is therefore not automatically drift: check each path
    against categories 2/3 before touching an `EXCLUDE_*` set.
 
+4. **A new SCRIPT under a sibling skill's `scripts/` (verified 2026-11-07).** Same
+   shape as category 3, in `.py` form: that run's `A` was
+   `demo-pm/skills/devops/hermes-profile-diagnostics/scripts/mem_cleanup_client.py`
+   (3,438 B), and it arrived alongside an `M .../hermes-profile-diagnostics/SKILL.md`
+   hunk that ADDED the pointer row documenting it. That **pair** is the signature of
+   intended content — a skill's own cron documenting its own new helper. Accept it.
+   Two cheap checks, because `.py` is also the shape of the temp diagnostics the
+   exclude sets are built to catch:
+   (a) the owning skill's SKILL.md gained a pointer/reference line for the script —
+   visible as a `+` hunk in that skill's `M` block; with no pointer, treat the
+   script as suspect and investigate before backing it up;
+   (b) content-inspect it (`grep -nE '\.env|TOKEN|API_KEY|token' <file>`) — expect no
+   `.env` open and no token value; a `--url`/`--bank` flag helper is normal.
+   ⚠️ Do NOT "fix" it with a new `EXCLUDE_PREFIX` entry: that set matches at any
+   depth, so a `mem_*`-style prefix would silently delete a legit skill script on
+   the next run — the 2026-08-28 blanket-prefix data-loss shape. Skill scripts are
+   include-list content, the same class as `references/*.md`.
+
 **Sanity arithmetic beats the presence/absence of `A`:** local count must equal
 remote-at-PREV_HEAD count + `New` (`270 == 268 + 2`, 2026-10-30). If that identity
 holds and every new path is explained, there is no exclude gap — no matter what
