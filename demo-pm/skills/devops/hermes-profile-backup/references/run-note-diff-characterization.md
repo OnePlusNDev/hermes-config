@@ -72,7 +72,29 @@ SHA and the script's Step-2 SHA differ, re-run with `--commit=<main_sha>` and
 cite the `parents[0]` value in the run note.**
 
 Rule of thumb: read the script's `Remote HEAD:` line (Step 2) as it runs; if it
-differs from the preflight value, do not cite the preflight value anywhere.
+differs from the preflight value, cite BOTH and say which anchor produced the
+classification — never quote a single SHA as if it were the only HEAD that day.
+
+**If you already ran the probe with the preflight SHA, do NOT re-run it**
+(verified 2026-11-08, reconciling this section with the run-ONCE rule below).
+Sibling profiles back up only their own subtree, so a sibling commit does not
+touch a single `demo-pm/` blob: every `M` file is byte-identical at the preflight
+HEAD and at the sibling-advanced Step-2 HEAD, and the reported M/A/D set is
+correct as printed. Re-running to "fix" the anchor costs a second full pass (one
+blob GET per changed file) for a byte-identical answer. What the run note must do
+instead is disclose the divergence in one line and state that the shape matched at
+each:
+
+> Characterized ONCE pre-push with `characterize-diff-vs-prev-head.py <preflight_sha>`
+> → exit 0, `MODIFIED 6 / ADDED 0 / DELETED 0` … plus, in the Execution notes,
+> "Preflight read `<preflight_sha>`; the script's Step 2 read `<step2_sha>` — a
+> sibling landed in between. The file set and diff shape were identical at each
+> (6 M / 0 A / 0 D) and the script parented the commit on the fresh HEAD."
+
+That day: preflight `e56adb10f3cf`, Step 2 `7abe43b6b158` (demo-dev backup, 300
+blobs), both `6 M / 0 A / 0 D`, no 422 race. The failure mode to avoid is citing
+one SHA silently — tomorrow's reader then sees a baseline that does not match any
+commit and suspects a lost push.
 
 Expect `ADDED 0` in steady state — but a non-zero `ADDED` has **two** causes, and
 the script's printed hint names only one of them:

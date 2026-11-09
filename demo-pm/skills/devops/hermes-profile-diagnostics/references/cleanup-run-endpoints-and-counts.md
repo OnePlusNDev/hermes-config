@@ -145,6 +145,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-11-05 | **188,865 / 7,446** (disambig 239,515 / 6,546; gate fired on the perishability-reclassification shape — 15th consecutive; no crash, ~25-30 s healthy on poll 3, consolidation +277 ms, counter 95→96) |
 | 2026-11-06 | **176,961 / 7,246** (disambig **309,656 / 7,796**; gate fired on the 「字面上无，但需按当前日期复核」 shape — 16th consecutive; no crash, healthy on poll 2, consolidation **+22 ms** (fastest yet), counter 96→97) |
 | 2026-11-07 | **172,238 / 8,311** (disambig 313,042 / 9,166; gate fired on the **sentence-initial 「过期事实：无」** shape — negation sits AFTER the keyword in a bolded conclusion line, 17th consecutive; first reflect after a fresh start crashed (`ServerDisconnectedError` / leaked-semaphore) and succeeded on retry after relaunch; consolidation +82 ms, counter 97→98) |
+| 2026-11-08 | **174,375 / 6,448** (disambig 264,557 / 6,002; gate fired — 18th consecutive — on the now-standard heading-negation + date-conditional pair: 「### 一、过期事实（≥30 天）：无」 followed by 「若实际当前日期已远超 2026-06-17 则整库会整体一次性过期」; disambig returned 「无内容性过期事实」 after per-category checks and again kept z.ai GLM as the daemon key; consolidation op `completed` at **+506 ms**, `deduplicated=false`, counter 98→99; healthy on poll 2 with poll 1 again showing the **stale-body trap** — `http_code=000` while `/tmp/h9178_p1.json` still held last run's `{"status":"healthy"}` body) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -319,6 +320,16 @@ redundancy ≈30–40 % of raw facts (Issue #9 split into 7 atoms, 「只发结�
 reply = carrier ambiguity; Issue 「告知开始处理」 vs 沟通规范「禁止正在处理」 = carrier ambiguity, 06-17 never
 revoked 06-14). All three recur verbatim across runs — quote them in the ARCHIVE row, never "resolve" them.
 
+2026-11-08 — **fifth consecutive drift day**. The disambig pass again kept z.ai GLM `45af10…` +
+`https://api.z.ai/api/paas/v4` as the daemon-side key with 「无更换记录，未见 key 轮换/401 报错等推翻性事实」,
+and the primary reframed the secret/daemon tension as 「1 处未闭合的潜在矛盾（需确认）」 — i.e. it now treats
+06-16 `secret 10014 invalid` vs 06-17 「4 个 daemon 均已启动」 as a *contradiction* rather than a lone status
+snapshot. Both readings land on the same action: mark 待复核, never archive (the process-started record is not
+proof the secret was fixed — different layers). Same run re-confirmed the stale-body trap in its original
+form: poll 1 `http_code=000` while `/tmp/h9178_p1.json` still held the previous run's healthy body, healthy on
+poll 2. A single `write_file` + `cat >> ARCHIVE.md` append (117→118 lines) still leaves 11 pre-existing blank
+lines in the file, so a `grep -c '^$'` sanity check is meaningless — verify by line count + tail bytes instead.
+
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the
 reflect audit is the whole job **unless the bank has curated layers**. Check both, with the API-URL prefix:
@@ -333,7 +344,8 @@ hindsight -p demo-pm directive list demo-pm-memory
 
 BANK_ID is a **required positional** — `hindsight -p demo-pm mental-model list` with no bank id only
 prints usage. Both returned `No mental models found.` / `No directives found.` on demo-pm-memory
-(2026-10-27 and again 2026-11-04), so there is nothing else to regenerate — do not invent an extra step
+(2026-10-27, 2026-11-04, and again 2026-11-08 — the named-profile form `hindsight -p demo-pm …` works
+directly), so there is nothing else to regenerate — do not invent an extra step
 or report a missing capability. If entries ever do appear, refresh them AFTER consolidation and in the
 SAME daemon session (idle timeout 300 s).
 
