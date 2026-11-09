@@ -23,6 +23,7 @@ tmp_token_check.sh
 .cron_env.sh
 .rules_sha
 tmp_*
+tmp-*.sh
 gh*.sh
 gh*.py
 gh_*
