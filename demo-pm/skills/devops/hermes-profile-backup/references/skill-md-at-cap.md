@@ -141,15 +141,33 @@ each returns cleanly (verified 2026-11-01). Loading it via `skill_view` first is
 for the `linked_files` map; the body comes back truncated, so go straight to the paged
 `read_file` on the on-disk path.
 
+## At cap, `skill_manage` permits only NON-GROWING SKILL.md edits (verified 2026-11-09)
+
+Measured **100,086 chars** (over the 100,000 limit) at the start of that run. A ~+65-char
+rewrite of the `skill_view`-truncation warning was **REFUSED** —
+`SKILL.md content is 100,151 characters (limit: 100,000)`. The SAME edit, retightened to be
+net **−11 chars**, then applied cleanly and left the file at ~100,075 chars — still over the
+limit, yet accepted.
+
+So the validation gates on **growth**, not on the absolute resulting size: when SKILL.md is
+already over cap, shrinking or equal-length edits pass `skill_manage`; any edit that increases
+the character count is refused no matter how small. Consequences: (a) the routine `latest:`
+bump (same length) is always safe; (b) a genuinely new sentence must be *paid for* by
+tightening the same line, and terser phrasing is a legitimate tool — the −11-char rewrite above
+actually improved the warning ("skip `skill_view`, read the on-disk file") instead of merely
+preserving it; (c) this refines the "Tooling constraint" note below — a review pass is not
+frozen out of SKILL.md, only out of *growing* it.
+
 ## Tooling constraint: the generic `patch` tool is NOT available in review/cron passes
 
 Every "the cap is not enforced by the generic `patch` tool" note above depends on that tool
 being callable. In a background skill-review / cron turn only **memory and skill tools** are
 whitelisted — a `patch` call is refused with
 `Background review denied non-whitelisted tool: patch`. Since `skill_manage` DOES enforce the
-100 K cap and the file sits ~866 B over it, **any** SKILL.md edit is impossible from such a
-pass, including a byte-neutral relocation. Consequence: do the routine `latest:` bump (and any
-SKILL.md surgery) in the *main* run session, and use review passes only for `references/` and
+100 K cap and the file sits ~866 B over it, **any SKILL.md edit that GROWS the file** is
+impossible from such a pass (a byte-neutral relocation included); a *shrinking* edit does pass
+— see the 2026-11-09 note above. Consequence: do the routine `latest:` bump (and any
+SKILL.md surgery) in the *main* run session, and use review passes for `references/` and
 `templates/` files, which carry no size cap.
 
 ## Known structural defect to fix during the next slim (found 2026-11-01)

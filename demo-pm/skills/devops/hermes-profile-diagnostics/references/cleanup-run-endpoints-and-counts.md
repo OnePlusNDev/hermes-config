@@ -93,6 +93,26 @@ The row is a single very long Chinese line with backticks, quotes and slashes, s
 `cd <profile>/memories/archive && cat /tmp/archive_row_<MMDD>.md >> ARCHIVE.md`.
 ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 
+## Reflect failure modes — crash vs HTTP 504 wall-clock timeout
+
+Two *different* failure shapes both look like "the reflect didn't finish". Diagnose before acting:
+
+| Symptom | Daemon | Recovery |
+|---|---|---|
+| `ServerDisconnectedError` / client exit, daemon process gone | **dead** | restart launcher, replay identical request |
+| **HTTP 504** `Reflect operation timed out after 300 seconds. Consider reducing the budget or simplifying the query.` | **alive** (`/health` 200, WORKER_STATS still logging) | **just resend the identical request** — do NOT restart |
+
+2026-11-09 (demo-pm) was the first 504: `Starting agentic reflect` 21:01:33 → `LinkExpansion` 21:02:16 →
+daemon log `[REFLECT demo-pm--93906] Wall-clock timeout after 300.0s (limit: 300s)` at 21:06:33, HTTP 504.
+The daemon never died; `/health` answered 200 immediately afterwards and the worker poller kept printing
+stats. Retrying the exact same `budget=high` request succeeded (primary 112,764 / disambig 306,054) with the
+daemon still in its original session. Root cause is provider-side slowness (deepseek at peak) pushing a
+single reflect past the fixed 300 s server cap — **not** auth, not a corrupt bank, not a missing key.
+Escalation order: (1) resend identical request; (2) if it 504s again, drop to `--budget mid` (fewer agentic
+retrieval steps, still clears the 50 K deepseek token gate because deepseek reads the whole bank);
+(3) only then investigate restart. Note the timeout is server-side and **not** configurable per request, so
+a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt burns the full 300 s.
+
 ## Probe-log quirks
 
 - **Best pattern: redirect the probe's stdout to a file and read it with `read_file`.** Launch
@@ -146,6 +166,7 @@ ARCHIVE.md ends with a newline, so no blank line is needed before the row.
 | 2026-11-06 | **176,961 / 7,246** (disambig **309,656 / 7,796**; gate fired on the 「字面上无，但需按当前日期复核」 shape — 16th consecutive; no crash, healthy on poll 2, consolidation **+22 ms** (fastest yet), counter 96→97) |
 | 2026-11-07 | **172,238 / 8,311** (disambig 313,042 / 9,166; gate fired on the **sentence-initial 「过期事实：无」** shape — negation sits AFTER the keyword in a bolded conclusion line, 17th consecutive; first reflect after a fresh start crashed (`ServerDisconnectedError` / leaked-semaphore) and succeeded on retry after relaunch; consolidation +82 ms, counter 97→98) |
 | 2026-11-08 | **174,375 / 6,448** (disambig 264,557 / 6,002; gate fired — 18th consecutive — on the now-standard heading-negation + date-conditional pair: 「### 一、过期事实（≥30 天）：无」 followed by 「若实际当前日期已远超 2026-06-17 则整库会整体一次性过期」; disambig returned 「无内容性过期事实」 after per-category checks and again kept z.ai GLM as the daemon key; consolidation op `completed` at **+506 ms**, `deduplicated=false`, counter 98→99; healthy on poll 2 with poll 1 again showing the **stale-body trap** — `http_code=000` while `/tmp/h9178_p1.json` still held last run's `{"status":"healthy"}` body) |
+| 2026-11-09 | **112,764 / 6,762** (disambig **306,054 / 8,532**; gate fired on the archive-recommendation + date-conditional pair — 19th consecutive; **NEW failure mode: first reflect hit a server-side 504 at the 300 s wall clock while the daemon stayed alive** — identical retry at `budget=high` succeeded, no restart; consolidation `completed` at **+351 ms**, counter 99→100, healthy on poll 2 with the stale-body trap again) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —

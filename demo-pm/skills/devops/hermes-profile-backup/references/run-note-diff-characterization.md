@@ -75,6 +75,15 @@ Rule of thumb: read the script's `Remote HEAD:` line (Step 2) as it runs; if it
 differs from the preflight value, cite BOTH and say which anchor produced the
 classification — never quote a single SHA as if it were the only HEAD that day.
 
+**A session-start refs read is NOT an anchor (verified 2026-11-09).** The first
+`gh api .../git/refs/heads/main --jq .object.sha` of the run — the one taken to
+confirm owner/repo before the security scan — returned `5e1f4d75022c`; a minute
+later the preflight read `33fec41e9fc6` because a sibling commit landed in the
+gap, and preflight + Step 2 then agreed with each other. Two rules follow:
+never cite that opening read in the run note (it may match no commit at all), and
+do NOT treat its disagreement with the preflight as a preflight→Step-2 divergence
+worth disclosing — the divergence that matters is strictly preflight vs Step 2.
+
 **If you already ran the probe with the preflight SHA, do NOT re-run it**
 (verified 2026-11-08, reconciling this section with the run-ONCE rule below).
 Sibling profiles back up only their own subtree, so a sibling commit does not
