@@ -158,6 +158,18 @@ actually improved the warning ("skip `skill_view`, read the on-disk file") inste
 preserving it; (c) this refines the "Tooling constraint" note below — a review pass is not
 frozen out of SKILL.md, only out of *growing* it.
 
+## Opening a daily run with `skill_view` costs a 106 KB dump you still cannot read
+
+Verified 2026-11-10: calling `skill_view('hermes-profile-backup')` first thing returned
+**108,606 characters** of JSON and the tool saved it to a temp file with only a 1,500-char
+preview — the skill body was not actually usable without a `python3 -c "json.load(...)['content']"`
+extraction to `/tmp/skill_backup.md`, then `read_file` with offsets. Two tool calls and ~110 KB
+of context spent to reach the same place that a single
+`read_file("~/.hermes/profiles/demo-pm/skills/devops/hermes-profile-backup/SKILL.md")` reaches
+directly. SKILL.md line 41 already says this; the failure mode is *skipping* it out of habit at
+session start. Daily-run rule: `read_file` the on-disk SKILL.md, and only fall back to the
+extraction recipe if some other tool has already produced the JSON dump.
+
 ## Tooling constraint: the generic `patch` tool is NOT available in review/cron passes
 
 Every "the cap is not enforced by the generic `patch` tool" note above depends on that tool

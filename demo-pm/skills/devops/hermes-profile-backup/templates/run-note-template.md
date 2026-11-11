@@ -142,6 +142,16 @@ not re-dirty between the two commits (it did not on 10-27), so **do not read its
 as a failed follow-up** — the gate is the closing preflight reading
 `Modified: 0, New: 0, Deleted: 0`, not the file list.
 
+**Run the preflight ONCE MORE between drafting the follow-up and pushing it**
+(verified 2026-11-10). With all four items written to disk but not yet pushed, the
+preflight must read exactly `Modified: 3, New: 1, Deleted: 0` with a `CLEAN` token
+scan — the `A` is today's run note, the three `M` are `dated-runs-index.md`,
+`SKILL.md` and `method-b-practice-notes.md`. This is the only check that catches a
+stray fifth edit (a doc touched twice, a leftover scratch file) while it is still
+foldable into the same commit; without it the stray ships as tomorrow's benign
+carry-over lag and dilutes that day's diff. A 4th `M` for `cron/jobs.json` is normal
+runtime churn — push it. Today's run matched `3/1/0` on the nose.
+
 **Fold ALL doc edits into this commit** — including any reference-file additions or
 triage-recipe edits (e.g. a new `references/*.md`, or an update to
 `references/curator-archive-churn-triage.md`). An edit made *after* the follow-up push

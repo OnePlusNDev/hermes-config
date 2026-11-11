@@ -167,6 +167,7 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-07 | **172,238 / 8,311** (disambig 313,042 / 9,166; gate fired on the **sentence-initial 「过期事实：无」** shape — negation sits AFTER the keyword in a bolded conclusion line, 17th consecutive; first reflect after a fresh start crashed (`ServerDisconnectedError` / leaked-semaphore) and succeeded on retry after relaunch; consolidation +82 ms, counter 97→98) |
 | 2026-11-08 | **174,375 / 6,448** (disambig 264,557 / 6,002; gate fired — 18th consecutive — on the now-standard heading-negation + date-conditional pair: 「### 一、过期事实（≥30 天）：无」 followed by 「若实际当前日期已远超 2026-06-17 则整库会整体一次性过期」; disambig returned 「无内容性过期事实」 after per-category checks and again kept z.ai GLM as the daemon key; consolidation op `completed` at **+506 ms**, `deduplicated=false`, counter 98→99; healthy on poll 2 with poll 1 again showing the **stale-body trap** — `http_code=000` while `/tmp/h9178_p1.json` still held last run's `{"status":"healthy"}` body) |
 | 2026-11-09 | **112,764 / 6,762** (disambig **306,054 / 8,532**; gate fired on the archive-recommendation + date-conditional pair — 19th consecutive; **NEW failure mode: first reflect hit a server-side 504 at the 300 s wall clock while the daemon stayed alive** — identical retry at `budget=high` succeeded, no restart; consolidation `completed` at **+351 ms**, counter 99→100, healthy on poll 2 with the stale-body trap again) |
+| 2026-11-10 | **199,548 / 9,377** (disambig 267,215 / 5,133; gate fired — 20th consecutive — on the **heading + date-conditional + 「快照式事实应优先复核」 table** shape: 「### 一、超过 30 天的过期事实」 then 「若已远超 2026-07-17 则整个记忆库都属过期」; disambig returned 「无内容性过期事实」 with a 7-row table and again kept z.ai GLM as the daemon key — **drift day 6 consecutive**; no crash, no 504; consolidation `completed` at **+245 ms**, `deduplicated=false`, counter 100→101; stale-body trap on poll 1 for the third run running) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
@@ -350,6 +351,13 @@ proof the secret was fixed — different layers). Same run re-confirmed the stal
 form: poll 1 `http_code=000` while `/tmp/h9178_p1.json` still held the previous run's healthy body, healthy on
 poll 2. A single `write_file` + `cat >> ARCHIVE.md` append (117→118 lines) still leaves 11 pre-existing blank
 lines in the file, so a `grep -c '^$'` sanity check is meaningless — verify by line count + tail bytes instead.
+
+2026-11-10 — **sixth consecutive drift day** (11-09 was the fifth, not separately noted here): disambig again
+kept z.ai GLM `45af10…` + `https://api.z.ai/api/paas/v4` as the daemon-side key, reasoning 「2026-06-17 终态记录
+一致，无旧模型（deepseek/openai）记录可覆盖」. The bank genuinely holds no superseding fact, so the LLM is
+not wrong — the fix remains 「建议补一条显式覆盖事实」, never a deletion. Same run re-confirmed the stable
+non-age finding set verbatim (redundancy 30–40 %; three carrier ambiguities) and characterised `secret 10014`
+/ `Scheduler 缺 im:chat:readonly` as 「状态型事实，处理方式是实测验证而非按时间归档」.
 
 ### "Advanced organization" scope check — mental models / directives
 When the task says "use Hindsight's optimization capability for advanced tidying", consolidation + the
