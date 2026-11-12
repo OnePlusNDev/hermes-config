@@ -56,6 +56,19 @@ not yesterday's run date.** MEMORY.md's body matches its 2026-10-29 snapshot whi
 「正文与 2026-10-30 一致 … 沿用 archive/USER-20261011.snapshot.md」 — self-contradictory. Read the snapshot
 filename you are reusing and put *that* date in the sentence.
 
+**`patch` after reading via `terminal cat` emits a bogus sibling-write warning.** The successful result still
+carries `_warning: "…/MEMORY.md was modified by sibling subagent '<uuid>' but this agent never read it."` even
+though the only writer is you — the read-tracking only counts `read_file`, not `terminal(cat …)`. Verified
+2026-11-11 on both MEMORY.md and USER.md. Do NOT re-read-and-re-patch on that warning: confirm the returned
+`diff` contains exactly the single header-date line (and that `diff <(tail -n +5 …) <(tail -n +5 archive/<snapshot>)`
+stays silent) and move on. The same warning appears on `patch` to this reference file after a `terminal`-only read.
+
+**Two consecutive `http_code=000` polls are not a failed start.** 2026-11-11: launcher → poll1 000, poll2 000,
+poll3 `200 {"status":"healthy"}` (~20–30 s, warm pg0), with `ps -Ao pid,etime,command | grep 'port 9178'` showing
+a live `--daemon --idle-timeout 300` process throughout. Poll at 10 s intervals for at least 5–6 attempts and use
+`ps`/`lsof` as the liveness authority; connection-refused alone never distinguishes "still migrating" from
+"crashed" (see SKILL.md).
+
 ## Session retention — `started_at` is an epoch FLOAT
 
 `<profile>/state.db`, table `sessions`. `started_at` is a Unix epoch float (e.g. `1792328402.37`), so
@@ -168,6 +181,7 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-08 | **174,375 / 6,448** (disambig 264,557 / 6,002; gate fired — 18th consecutive — on the now-standard heading-negation + date-conditional pair: 「### 一、过期事实（≥30 天）：无」 followed by 「若实际当前日期已远超 2026-06-17 则整库会整体一次性过期」; disambig returned 「无内容性过期事实」 after per-category checks and again kept z.ai GLM as the daemon key; consolidation op `completed` at **+506 ms**, `deduplicated=false`, counter 98→99; healthy on poll 2 with poll 1 again showing the **stale-body trap** — `http_code=000` while `/tmp/h9178_p1.json` still held last run's `{"status":"healthy"}` body) |
 | 2026-11-09 | **112,764 / 6,762** (disambig **306,054 / 8,532**; gate fired on the archive-recommendation + date-conditional pair — 19th consecutive; **NEW failure mode: first reflect hit a server-side 504 at the 300 s wall clock while the daemon stayed alive** — identical retry at `budget=high` succeeded, no restart; consolidation `completed` at **+351 ms**, counter 99→100, healthy on poll 2 with the stale-body trap again) |
 | 2026-11-10 | **199,548 / 9,377** (disambig 267,215 / 5,133; gate fired — 20th consecutive — on the **heading + date-conditional + 「快照式事实应优先复核」 table** shape: 「### 一、超过 30 天的过期事实」 then 「若已远超 2026-07-17 则整个记忆库都属过期」; disambig returned 「无内容性过期事实」 with a 7-row table and again kept z.ai GLM as the daemon key — **drift day 6 consecutive**; no crash, no 504; consolidation `completed` at **+245 ms**, `deduplicated=false`, counter 100→101; stale-body trap on poll 1 for the third run running) |
+| 2026-11-11 | **174,613 / 6,627** (disambig 238,590 / 7,028; gate fired — 21st consecutive — on the **「过期事实（30天以上）」 heading + 「若当前日期晚于 2026-07-17 则全部事实均已超过 30 天」 + 「最优先需要重验或归档」 4-item list** shape: run-state snapshot / port table / LLM key+endpoint / Feishu env-var conclusions; disambig returned 「无内容性过期事实」 with a 9-row table and again kept z.ai GLM as the daemon key — **drift day 7 consecutive**; no crash, no 504; consolidation `completed` at **+175 ms**, `deduplicated=false`, counter 101→102; stale-body trap on poll 1 for the fourth run running, and this time poll 2 was ALSO `000` with healthy only on poll 3 (~20–30 s)) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —

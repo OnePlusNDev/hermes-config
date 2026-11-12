@@ -170,17 +170,30 @@ directly. SKILL.md line 41 already says this; the failure mode is *skipping* it 
 session start. Daily-run rule: `read_file` the on-disk SKILL.md, and only fall back to the
 extraction recipe if some other tool has already produced the JSON dump.
 
-## Tooling constraint: the generic `patch` tool is NOT available in review/cron passes
+## Tooling constraint: the *review* turn is restricted — a cron RUN turn is not (refined 2026-11-11)
 
 Every "the cap is not enforced by the generic `patch` tool" note above depends on that tool
-being callable. In a background skill-review / cron turn only **memory and skill tools** are
-whitelisted — a `patch` call is refused with
-`Background review denied non-whitelisted tool: patch`. Since `skill_manage` DOES enforce the
-100 K cap and the file sits ~866 B over it, **any SKILL.md edit that GROWS the file** is
-impossible from such a pass (a byte-neutral relocation included); a *shrinking* edit does pass
-— see the 2026-11-09 note above. Consequence: do the routine `latest:` bump (and any
-SKILL.md surgery) in the *main* run session, and use review passes for `references/` and
-`templates/` files, which carry no size cap.
+being callable. Which passes can call it is **not** a property of "is this a cron job" — it is a
+property of the *turn type*, and the two got conflated in the first version of this note:
+
+- **Background skill-review / curator turn** — only memory + skill tools are whitelisted; a
+  `patch` call is refused with `Background review denied non-whitelisted tool: patch`.
+- **Scheduled cron RUN turn** (the daily backup job itself) — the **full toolset is present**.
+  Verified 2026-11-11: that run called `patch` three times (SKILL.md `latest:` bump
+  `2026-11-10` → `2026-11-11`, plus the `dated-runs-index.md` bullet and the
+  `method-b-practice-notes.md` table row) with no refusals, and the SKILL.md swap left the file
+  **byte-identical at 100,859 B**.
+
+So the correct rule is *check, don't assume*: the SKILL.md `latest:` bump and any byte-neutral
+surgery are normally done in the run session, where `patch` has always been available here —
+including equality-length swaps on a file that is 859 B over cap. `skill_manage` still enforces
+the cap (growth refused, shrink/equal accepted — see the 2026-11-09 note), so use `skill_manage`
+only for `references/` and `templates/`, which carry no size cap.
+
+⚠️ Do not read this note — or the earlier "not available in review/cron passes" wording — as
+"cron jobs cannot edit SKILL.md". That framing caused a needless detour before the 2026-11-11
+run re-tested it. If a `patch` call is refused mid-run, then fall back to `skill_manage` with a
+non-growing edit; do not pre-emptively skip the bump.
 
 ## Known structural defect to fix during the next slim (found 2026-11-01)
 
