@@ -67,9 +67,27 @@ gh api "repos/$OWNER/$REPO/commits?per_page=4" \
 ```
 
 Endpoint gotcha (hit 2026-10-21): **`/git/commits?per_page=4` returns HTTP 404
-`{"message":"Not Found"}`** — the list endpoint is `/commits`, not `/git/commits`
-(`/git/commits/<sha>`, singular with an explicit SHA, IS valid). A 404 here looks
-like a missing repo or an auth/account problem; it is neither, just the wrong path.
+`{"message":"Not Found"}`** — the list endpoint is `/commits`, not `/git/commits`.
+A 404 here looks like a missing repo or an auth/account problem; it is neither,
+just the wrong path.
+
+⚠️ **Correction (verified 2026-11-12): `/git/commits/<sha>` is NOT reliably valid either —
+an abbreviated SHA 404s.** Both `gh api .../git/commits/065dc96e4192` and
+`.../git/commits/e69ffed97a2e` returned `{"message":"Not Found"}` (twice each), right after
+the SAME SHAs appeared as `sha[0:12]` in the `/commits` list — so the objects existed and the
+path form was the problem. Do **not** escalate to "repo/account broken" or start re-authing on
+a 404 from `/git/commits/<anything>`. Use the list endpoint and match on the prefix:
+
+```bash
+gh api "repos/$OWNER/$REPO/commits?per_page=5" \
+  --jq '.[] | "\(.sha[0:12])  \(.commit.author.date)  \(.commit.message | split("\n")[0])"'
+```
+
+**Same call attributes a sibling that landed between preflight and Step 2** (not just a 422):
+2026-11-12 the preflight read `e69ffed97a2e`, Step 2 read `065dc96e4192` — the list showed
+`065dc96e4192 backup: demo-dev profile config (2026-11-12)` at 12:01:26Z, i.e. a sibling cron
+between the two probes. Quote BOTH SHAs in the run note (template rule), and name the sibling
+from this call rather than guessing from the profile name.
 
 Verified 2026-10-21: preflight saw HEAD `68d5da9921bc`, the first commit `e69fffb3c243`
 was rejected 422, and `/commits` showed `e2edf5ebcbf3 backup: demo-dev profile config

@@ -183,6 +183,8 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-10 | **199,548 / 9,377** (disambig 267,215 / 5,133; gate fired — 20th consecutive — on the **heading + date-conditional + 「快照式事实应优先复核」 table** shape: 「### 一、超过 30 天的过期事实」 then 「若已远超 2026-07-17 则整个记忆库都属过期」; disambig returned 「无内容性过期事实」 with a 7-row table and again kept z.ai GLM as the daemon key — **drift day 6 consecutive**; no crash, no 504; consolidation `completed` at **+245 ms**, `deduplicated=false`, counter 100→101; stale-body trap on poll 1 for the third run running) |
 | 2026-11-11 | **174,613 / 6,627** (disambig 238,590 / 7,028; gate fired — 21st consecutive — on the **「过期事实（30天以上）」 heading + 「若当前日期晚于 2026-07-17 则全部事实均已超过 30 天」 + 「最优先需要重验或归档」 4-item list** shape: run-state snapshot / port table / LLM key+endpoint / Feishu env-var conclusions; disambig returned 「无内容性过期事实」 with a 9-row table and again kept z.ai GLM as the daemon key — **drift day 7 consecutive**; no crash, no 504; consolidation `completed` at **+175 ms**, `deduplicated=false`, counter 101→102; stale-body trap on poll 1 for the fourth run running, and this time poll 2 was ALSO `000` with healthy only on poll 3 (~20–30 s)) |
 
+| 2026-11-12 | **199,108 / 7,105** (disambig 299,045 / 7,120; gate fired — 22nd consecutive — on the **「健康评分」 opening + 「## 1. 过期事实（30 天以上）：没有」 heading (negation AFTER keyword) + 「以库内最新记录 2026-06-17 为参照系，若实际当前日期已远晚于该日则整批配置快照型事实集体跨 30 天」** shape, closing with 「目前无需归档任何内容」; disambig returned 「无内容性过期事实」 with a 7-row table and again kept z.ai GLM — **drift day 8**; no crash, no 504; consolidation `completed` at **+33 ms**, `deduplicated=false`, counter 102→103; daemon healthy on **poll 1** (~10 s, no stale-body trap); primary newly quantified redundancy as 「合并后事实数可压缩约三分之一」，6 组重复 + 1 处载体歧义 + 1 处作用域差异) |
+
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
 negation inside the window, so no disambiguation was needed. Don't fire the second pass reflexively;
@@ -386,7 +388,10 @@ hindsight -p demo-pm directive list demo-pm-memory
 ```
 
 BANK_ID is a **required positional** — `hindsight -p demo-pm mental-model list` with no bank id only
-prints usage. Both returned `No mental models found.` / `No directives found.` on demo-pm-memory
+prints usage. **The `hindsight` CLI lives at `~/.local/bin/hindsight`; the hermes venv only ships
+`hindsight-embed` / `hindsight-api`** (`~/.hermes/hermes-agent/venv/bin/hindsight` → "No such file or
+directory", verified 2026-11-12). Both returned `No mental models found.` / `No directives found.` on
+demo-pm-memory
 (2026-10-27, 2026-11-04, and again 2026-11-08 — the named-profile form `hindsight -p demo-pm …` works
 directly), so there is nothing else to regenerate — do not invent an extra step
 or report a missing capability. If entries ever do appear, refresh them AFTER consolidation and in the
