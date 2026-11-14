@@ -139,6 +139,48 @@ It is the only continuous record of the 422-race / account-flip recurrence, so a
 skipped row makes the pattern look rarer than it is. (09-29 and 09-30 originally
 shipped without rows; backfilled 2026-09-30.)
 
+### A DETECTED flip must be acted on in the same shell call — guard, never a bare echo (2026-11-13)
+
+The pre-push read is worth exactly as much as the branch it feeds. Verified 2026-11-13:
+the pre-flight (separate `terminal` call, ~1 min earlier) read `OnePlusNDev` owner
+`push=true`; the pre-push read glued to the script printed **`OnePlusNTester`** — the
+**7th flip in the record** — but it was written as a bare `echo`, so the script ran
+anyway and attempt 1 died at the FIRST blob with `FATAL uploading demo-pm/cron/jobs.json:
+gh: Not Found (HTTP 404)`. That abort was completely preventable: the detection had
+already happened, one line before the failure. `gh auth switch` + plain re-run then
+finished the run cleanly, but the day's single budgeted abort was spent on a known state.
+
+Use a GUARD, not a log line:
+
+```bash
+ACT=$(gh api user --jq '.login')
+PUSH=$(gh api repos/OnePlusNDev/hermes-config --jq '.permissions.push')
+if [ "$ACT" != "OnePlusNDev" ] || [ "$PUSH" != "true" ]; then
+  unset GITHUB_TOKEN; gh auth switch --user OnePlusNDev
+  echo "switched -> $(gh api user --jq '.login')"
+fi
+cd /tmp && REPO_OWNER=OnePlusNDev python3 -u <script> > /tmp/backup_run.log 2>&1; echo "exit=$?"
+```
+
+Two distinct loss modes now on record, do not conflate them:
+- **check loses the race** (10-25, 10-30, 11-02): the read shows the owner, the flip lands
+  between the read and the blob POST → unavoidable, budget the abort.
+- **check wins and is ignored** (this run): the read shows the wrong account and the run
+  proceeds regardless → fully avoidable; the guard form above removes it entirely.
+Only the first justifies "budget the abort"; the second is a scripting slip, not a race.
+
+### The run note's post-push numbers describe the MAIN commit — the final tree is one blob larger
+
+`post-push-verify.py` right after the main commit reports the main-commit state
+(2026-11-13: `demo-pm` 287 blobs == local 287). The follow-up commit then adds the run
+note itself, so re-running the same probe after the follow-up reports **288 == local 288**
+(and total 307 with siblings). Both statements are true at their moment, but a later
+reader who compares the note's 287 against the repo's 288 will read drift. Either say
+"at the main commit" / "after the follow-up" explicitly, or run the probe a second time
+after the follow-up and quote the final pair — the second run is cheap (one GET tree +
+one raw config fetch) and doubles as a leak/key re-check on the tree that actually ships
+the run note.
+
 **Step 5 (subtree build) can hang for minutes even when the API is healthy — plain re-run, budget ONE.**
 Verified 2026-10-24: the main push was first-try with 11 blobs, but the *follow-up* run's 4
 blobs all uploaded fine and then Step 5 never returned — `terminal(timeout=300)` killed it

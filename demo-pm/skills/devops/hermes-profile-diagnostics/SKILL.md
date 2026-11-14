@@ -155,11 +155,29 @@ for _ in range(15):
 
 ## Memory Maintenance & Cleanup
 
-For routine memory cleanup (archiving old memories, triggering consolidation, recovering failed operations), see the detailed API workflow in:
+**Canonical cleanup-run order (re-verified 2026-11-13, 23 consecutive wording-gate triggers):**
+
+1. Pre-flight `mem_cleanup_client.py banks --url http://127.0.0.1:<port>` — confirms the profile bank
+   is actually served by THIS daemon (sibling bypass is impossible when the global :8888 bank list
+   lacks it).
+2. `consolidate` → read the op's status (never infer success from the POST).
+3. Two-pass audit: `reflect_quality_check.py --url … --bank … --baseline 50000` (deepseek reads the
+   whole bank; a 65 K–110 K primary is still a real read — judge by the wording gate, not by size).
+4. `hindsight mental-model list <bank>` / `directive list <bank>` — both empty means consolidation +
+   reflect IS the whole "advanced organization" job; do not invent extra steps.
+5. Flat-file 30-day re-check: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/MEMORY-*.snapshot.md)`
+   — if silent, bump only the header date and name the snapshot the body actually matches; never
+   write a duplicate snapshot.
+6. `sqlite3 state.db` session counts (epoch float `started_at`); with `auto_prune: false`, record and
+   do not prune.
+7. Append a single ARCHIVE.md row (`write_file` to `/tmp` then `cat >>`, never chain `rm`).
+
+Full endpoint schemas, wording-gate shape catalogue and failure modes live in the two reference files
+below. For routine memory cleanup (archiving old memories, triggering consolidation, recovering failed operations), see the detailed API workflow in:
 
 → `references/memory-maintenance.md` — Hindsight HTTP API endpoints for consolidation, recovery, timeseries queries, bank stats, daemon-fallback (proxy through sibling daemon OR global :8888 API), and two flat-file optimization workflows (A: embedded reflect query, B: temp bank + retain).
 
-→ `references/cleanup-run-endpoints-and-counts.md` — **read this first for a cleanup run**: exact consolidate + operation-status URLs, bank-list pre-flight check, session-retention counting (`started_at` is an epoch float — `julianday()` returns 0), `process(action='log')` ignoring `offset`, and the current deepseek reflect token band. It also carries the running catalogue of reflect wording-gate false-positive shapes (eleven so far — always pay the disambiguation pass, never hand-judge) and the `mental-model list` / `directive list` check that defines what "advanced organization" covers when neither exists. Use this file for new findings too — `memory-maintenance.md` is at the 100 K char cap and rejects further patches.
+→ `references/cleanup-run-endpoints-and-counts.md` — **read this first for a cleanup run**: exact consolidate + operation-status URLs, bank-list pre-flight check, session-retention counting (`started_at` is an epoch float — `julianday()` returns 0), `process(action='log')` ignoring `offset`, and the current deepseek reflect token band. It also carries the running catalogue of reflect wording-gate false-positive shapes (a dozen-plus distinct shapes, 23 consecutive triggers as of 2026-11-13 — always pay the disambiguation pass, never hand-judge) and the `mental-model list` / `directive list` check that defines what "advanced organization" covers when neither exists. Use this file for new findings too — `memory-maintenance.md` is at the 100 K char cap and rejects further patches.
 
 → `scripts/mem_cleanup_client.py` — cron-safe pre-flight/stats/consolidate helper (`banks` / `stats` /
 `consolidate` / `op <id>` / `wait-op <id>`, urllib only, `--url` + `--bank` flags). Run it with the hermes

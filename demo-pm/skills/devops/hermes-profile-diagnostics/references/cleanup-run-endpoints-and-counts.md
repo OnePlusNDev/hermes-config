@@ -185,6 +185,8 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 
 | 2026-11-12 | **199,108 / 7,105** (disambig 299,045 / 7,120; gate fired — 22nd consecutive — on the **「健康评分」 opening + 「## 1. 过期事实（30 天以上）：没有」 heading (negation AFTER keyword) + 「以库内最新记录 2026-06-17 为参照系，若实际当前日期已远晚于该日则整批配置快照型事实集体跨 30 天」** shape, closing with 「目前无需归档任何内容」; disambig returned 「无内容性过期事实」 with a 7-row table and again kept z.ai GLM — **drift day 8**; no crash, no 504; consolidation `completed` at **+33 ms**, `deduplicated=false`, counter 102→103; daemon healthy on **poll 1** (~10 s, no stale-body trap); primary newly quantified redundancy as 「合并后事实数可压缩约三分之一」，6 组重复 + 1 处载体歧义 + 1 处作用域差异) |
 
+| 2026-11-13 | **105,411 / 4,300** (disambig **65,704 / 4,544** — new LOW on both fields; combined ~171 K, i.e. what a single pass used to cost; gate fired — 23rd consecutive — on the **「## 记忆健康度评估结论」 opening + 「### 一、过期事实（30 天以上）：以库内时间戳判断——无」 (negation after the keyword and inside the label) + 「库中最新一条记忆是 2026-06-17，之后没有任何新增，我无法从检索结果确认『今天』的实际日期」 unknown-today conditional + 「缺少 2026-06-17 之后的更新」 freshness-risk framing** shape; disambig returned 「无内容性过期事实」 and re-cast `Scheduler 缺 im:chat:readonly (99991672)` + `secret 10014 invalid (2026-06-16)` as 「待现场核验的状态快照，归档会丢掉唯一故障线索」; still kept z.ai GLM — **drift day 9**; no crash, no 504; consolidation `completed` at **+256 ms**, `deduplicated=false`, counter 103→104; healthy on **poll 2** (~10–20 s) with the stale-body trap on poll 1 for the fifth run running) |
+
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —
 negation inside the window, so no disambiguation was needed. Don't fire the second pass reflexively;
@@ -192,7 +194,11 @@ check the wording first, then decide.
 
 Observed band is now **~96 K–407 K input** across both passes. The primary can dip to ~96 K
 (2026-10-20) even with a full 48-fact bank — do NOT treat a sub-112 K primary as "facts were
-never fed" as long as it clears the 50 K baseline; judge it on the wording gate. The gate is
+never fed" as long as it clears the 50 K baseline; judge it on the wording gate. 2026-11-13 went
+lower still on both passes (primary 105,411 / disambig **65,704** — the disambig sat only 15 K above
+the baseline), so a two-pass run can now total ~171 K, roughly one old single pass. **The 50 K
+baseline is a floor test, not a "the bank was read" proof: a disambig at 65 K still returned a full
+per-category verdict, so never re-run just because the numbers look small — read the answer.** The gate is
 "far above the ~2–7 K question-echo band", never a fixed threshold. A high token count never
 clears the wording gate on its own.
 
