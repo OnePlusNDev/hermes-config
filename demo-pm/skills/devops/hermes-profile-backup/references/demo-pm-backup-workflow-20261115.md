@@ -40,11 +40,14 @@ Characterized ONCE against the **pre-push** HEAD `dc14c26aedd2` before the push
 push with the new `characterize-diff-post-push.py` (same 9/2/0 set; prev blobs 308, new 310,
 identical 280) — the per-file counts above come from the post-push run.
 
-- **Routine runtime churn (4):** `cron/jobs.json` — task-polling `completed` 6915→**6962**,
-  `next_run_at` → 11-15T20:30, `last_run_at` 11-15T19:31:33; config-backup `completed` 145→146,
+- **Routine runtime churn (4):** `cron/jobs.json` — task-polling `completed` 6915→**6963**,
+  `next_run_at` → 11-15T20:30, `last_run_at` → 11-15T20:01:39; config-backup `completed` 145→146,
   next 11-16T20:00, last 11-14T20:05:08; memory-archive 145→146, next 11-15T21:00,
-  last 11-14T21:02:57; `updated_at` → 11-15T20:00:50 (a later tick moved it to 20:01:39 and
-  task-polling `completed` to 6963 *after* the blob was uploaded — the pushed blob carries 6962).
+  last 11-14T21:02:57; `updated_at` → 11-15T20:01:39. Note the pre-push characterization probe
+  (run before the 20:01:39 tick of this job's own scheduler) read 6962 / `updated_at`
+  20:00:50; the blob upload landed AFTER that tick, so the pushed blob carries the post-tick
+  values — verified by re-reading the remote blob (`completed` 6963,
+  `updated_at` 20:01:39, remote == local byte-for-byte).
   `memories/MEMORY.md` — header only, 最后更新 2026-11-13 → **2026-11-14** (body byte-identical,
   still reuses `archive/MEMORY-20261029.snapshot.md`); `memories/USER.md` — header only, same bump
   (body identical, reuses `archive/USER-20261011.snapshot.md`); `memories/archive/ARCHIVE.md` —
@@ -113,3 +116,10 @@ Run note + index bullet + SKILL.md `latest:` pointer `2026-11-14` → `2026-11-1
 `references/method-b-practice-notes.md` "Observed on recent runs" table row, pushed with the same
 standalone-subtree script. Afterwards the preflight is expected to report
 `Modified: 0, New: 0, Deleted: 0`.
+
+A second follow-up push then corrected one number in THIS note: the pre-push characterization
+probe had read `cron/jobs.json` before the scheduler's own 20:01:39 tick, so the first draft quoted
+`completed` 6962 / `updated_at` 20:00:50 while the uploaded blob — and the remote file — carry the
+post-tick 6963 / 20:01:39. Lesson for the next run: the pre-push probe shows the state at PROBE
+time, not at UPLOAD time, so any file the scheduler rewrites every tick must be re-read from the
+remote blob before its numbers are quoted in the note.
