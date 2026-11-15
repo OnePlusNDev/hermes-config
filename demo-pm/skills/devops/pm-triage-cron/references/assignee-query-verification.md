@@ -89,3 +89,24 @@ GET /user                                    # login 必须 == OnePlusNPM
 
 同一批 issue 历史上有 PM 反复分诊刷屏的记录（#2 被重复分诊三次），
 所以「没有自己名下的任务就绝对不发言」既是规则也是正确行为，不要为了"有产出"去碰老板名下的 issue。
+
+## 坑 5：四路 curl 全 `HTTP=000 bytes=0` + `curl: (77)` → `SSL_CERT_FILE` 被污染（2026-11-15 实测）
+
+```
+curl: (77) error setting certificate verify locations:
+  CAfile: /private/etc/declare -x TERdeclare -x TELEGRAM_ALLO... CApath: none
+```
+
+会话 shell 里 `SSL_CERT_FILE` 值是垃圾串（上一轮某个坏掉的 `export` 留下的），
+curl 把它当 CA 路径打开，TLS 握手都没进去 → 四路全是 `HTTP=000 bytes=0`。
+**这不是 token 问题、不是仓库问题、也不是网络抖动**（网络抖动只会有一两路失败）。
+
+```bash
+env | grep -iE 'SSL_CERT|CA_BUNDLE|CURL_CA' | cut -c1-200   # 看值是否被污染
+unset SSL_CERT_FILE
+curl -sS -o /dev/null -w "test=%{http_code}\n" --max-time 15 https://api.github.com/rate_limit  # 必须 200
+```
+
+unset 后重跑 fetch 即恢复（macOS curl 回落到系统 keychain / `/etc/ssl/cert.pem`）。
+判据速查：`HTTP=000`+`curl:(77)`=CA 环境变量坏；`token_len!=40`=token 取值错；`HTTP=404`+`token_len=0`=凭据没取到。
+详见 `references/ssl-cert-env-pollution.md`。

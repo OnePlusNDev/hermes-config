@@ -170,6 +170,14 @@ Two distinct loss modes now on record, do not conflate them:
   proceeds regardless → fully avoidable; the guard form above removes it entirely.
 Only the first justifies "budget the abort"; the second is a scripting slip, not a race.
 
+**Confirmed 2026-11-14 — the first run to open under the guard form:** pre-flight read
+`OnePlusNTester` / `permissions.push=false` (the **8th** flip in the record, 11-13 was the 7th),
+the guard branch switched + re-verified `push=true`, and the whole run finished **first-try with
+0 aborts** on both the main and the follow-up commit. The same detected state that cost an abort
+on 11-13 became a no-op. Cost of the guard: one extra `gh api repos/.../ --jq '.permissions.push'`
+call per push — keep it, including on the follow-up, which is a second full push and hits the same
+keyring race.
+
 ### The run note's post-push numbers describe the MAIN commit — the final tree is one blob larger
 
 `post-push-verify.py` right after the main commit reports the main-commit state

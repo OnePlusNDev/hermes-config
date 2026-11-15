@@ -54,6 +54,18 @@ Characterize each `M` against the **pre-push** remote HEAD with
 file whether it is routine runtime churn or benign carry-over lag — see
 `references/run-note-diff-characterization.md`. Do NOT diff against the current remote: right
 after a push it equals local and everything reads `IDENTICAL`.
+
+**If the push already landed before you characterized** — e.g. the running order drifted and you
+only notice the need while drafting the note — do NOT point the characterize probe at `main`; it
+reads IDENTICAL for every file. Use `scripts/characterize-diff-post-push.py <PREV_SHA>`
+instead (read-only): it derives the changed set from the PREV commit's tree vs the just-pushed
+commit's tree, fetches each old blob via `git/blobs/<sha>` and diffs it against the local file,
+printing per-file `(+A/-D) old_lines/new_lines`. Verified 2026-11-14, the first run that
+characterized *after* the main commit: one `python3 -u … > /tmp/diffchar_<date>.txt` call produced
+the per-file `+10/-10, +1/-1, +1/-1, +1/-0, +42/-0, +20/-2, +7/-1` counts quoted in that note plus
+`MODIFIED 7 / ADDED 0 / DELETED 0`, matching the preflight exactly. Quote those counts in the Diff
+section rather than writing a bare "see diff".
+
 `config.yaml` is deliberately NOT in the diff: the remote blob already equalled the local
 one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 

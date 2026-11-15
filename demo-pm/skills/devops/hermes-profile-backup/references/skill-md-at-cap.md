@@ -220,6 +220,13 @@ below the completed table. Do it in the same edit batch as the next cap slim, an
 
 ## Support files that exist (so they aren't lost)
 
+- `scripts/characterize-diff-post-push.py` (added 2026-11-14) — post-push counterpart to
+  `scripts/characterize-diff-vs-prev-head.py`: derives the changed set from the PREV commit tree vs
+  the pushed tree, then diffs each old blob against the local file. Use it when the main commit
+  already landed (the pre-push probe then reads IDENTICAL for everything). SKILL.md carries **no**
+  pointer to it on purpose (adding one would grow a file that is already over cap); it is pointed
+  at from `templates/run-note-template.md` §"If the push already landed". **Add a SKILL.md pointer
+  to it during the next slim**, next to the existing `Post-push probe:` line.
 - `templates/run-note-template.md` — starter for the daily run note, **plus** the
   index-append rules. It carries the ⚠️ unique-anchor warning that could not be
   added to SKILL.md: every bullet in `dated-runs-index.md` ends with the identical
