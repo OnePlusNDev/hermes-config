@@ -66,6 +66,13 @@ the per-file `+10/-10, +1/-1, +1/-1, +1/-0, +42/-0, +20/-2, +7/-1` counts quoted
 `MODIFIED 7 / ADDED 0 / DELETED 0`, matching the preflight exactly. Quote those counts in the Diff
 section rather than writing a bare "see diff".
 
+**Re-read scheduler-rewritten files from the REMOTE blob before quoting their numbers.** The
+characterize probes report PROBE-time state; the uploaded blob carries UPLOAD-time state, and the
+cron scheduler can tick in between (`cron/jobs.json` counters / `updated_at` / `last_run_at`, the
+`memories/*.md` header date). Quoting the probe value cost a third correction push on 2026-11-15
+(probe said 6962, blob said 6963). `gh api repos/OWNER/REPO/contents/<path> --jq .content |
+base64 -d` after the push, then quote that; see `references/method-b-practice-notes.md`.
+
 `config.yaml` is deliberately NOT in the diff: the remote blob already equalled the local
 one (<n> bytes; <n> chars — the usual CJK-comment discrepancy).
 

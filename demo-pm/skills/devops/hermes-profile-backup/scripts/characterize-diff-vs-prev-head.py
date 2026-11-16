@@ -117,8 +117,9 @@ def should_exclude(rel_path):
     # files (e.g. skills/creative/comfyui/scripts/health_check.py) survive.
     if len(parts) == 1 and fname.startswith("health_"):
         return True
-    # Root-level tmp dirs hold PM-triage diagnostics that read .env.
-    if parts[0] in ("tmp", "tmp_pm"):
+    # Root-level tmp dirs (tmp/, tmp_pm/, tmp_pmtriage_*, tmp_triage/) hold PM-triage
+    # diagnostics that read .env (dated tmp_* variants discovered 2026-11-16).
+    if parts[0] == "tmp" or parts[0].startswith("tmp_"):
         return True
     if "cron" in parts and "output" in parts:
         return True
@@ -134,7 +135,7 @@ def local_entries():
     root_str = str(PROFILE_DIR)
     for root, dirs, fnames in os.walk(root_str):
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS
-                   and not (root == root_str and d in ("tmp", "tmp_pm"))]
+                   and not (root == root_str and (d == "tmp" or d.startswith("tmp_")))]
         for f in fnames:
             fp = Path(root) / f
             rel = str(fp.relative_to(PROFILE_DIR)).replace(os.sep, "/")

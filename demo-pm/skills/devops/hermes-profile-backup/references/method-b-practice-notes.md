@@ -117,6 +117,26 @@ is what forces the extra doc-only commit the template warns about.
 | 2026-11-14 | no | **first-try, 0 aborts** - pre-flight `gh api user` -> **`OnePlusNTester`** (`push=false`) -> `gh auth switch --user OnePlusNDev` verified `push=true`, **8th keyring flip in the record** (11-13 was the 7th); the pre-script guard re-check (ACT/PUSH branch, not a bare echo) read `OnePlusNDev` and no mid-run re-flip / blob 404 followed. Preflight, Step 2 and commit all read HEAD `975f3e5d21b6` (307 blobs) - no sibling landing, **7 M / 0 A / 0 D** (4 routine churn incl. the 11-13 21:00-21:06 cleanup ARCHIVE row — `:9178` offline at first probe, stale-body trap 5th consecutive (poll1 000 with a stale healthy body), healthy at poll 2, op `320965a1` +256 ms, counter 103->104, both reflect passes fine, primary 105,411 / 4,300, gate 23rd consecutive, disambig 65,704 / 4,544 = new low on both fields, drift day 9; + 3 carry-over doc edits from the 11-13 session), **no ref-PATCH 422 race**. 7 blobs + subtree `a870ab98160c` + top tree `8ff3398d391f` in one clean pass; post-push verify PASS first try (demo-pm 288 == local 288). No network flakiness in the main push; the `mkdtemp` payload fix held. |
 | 2026-11-15 | no | **first-try, 0 aborts** - pre-flight `gh api user` -> **`OnePlusNTester`** (`push=false`) -> guard form (switch + re-read login AND `permissions.push` in the SAME shell call) verified `OnePlusNDev` / `push=true`, **9th keyring flip in the record** (11-14 was the 8th, 11-13 the 7th) and the second guard immediately before the script read `OnePlusNDev` too, so the switch held through commit time. Remote **stable at `dc14c26aedd2`** from preflight through commit time (no sibling advance) -> 9 M / 2 A / 0 D, 11 blobs + subtree `3d23ff16441e` + top tree `f2660f34ec5c` in one clean pass, **no ref-PATCH 422 race**. First run to back up a run-note-generated script (`characterize-diff-post-push.py`) that then re-verified its own commit. No network flakiness; the `mkdtemp` payload fix held. |
 
+**A pre-push probe reads PROBE-time state; the uploaded blob carries UPLOAD-time state**
+(verified 2026-11-15). `characterize-diff-vs-prev-head.py` ran before the push and showed
+`cron/jobs.json` task-polling `completed` 6915 -> 6962 with `updated_at` 20:00:50. The scheduler
+then ticked (20:01:39) **between the probe and the blob POST**, so the pushed blob carried
+6963 / 20:01:39. The run note quoted the stale 6962 and needed a third push to correct one number.
+
+Rule: for any file the scheduler rewrites every tick — `cron/jobs.json` counters/`updated_at`/
+`last_run_at`, the `memories/*.md` header date — re-read the **remote** blob after the push and
+quote those values, never the probe output:
+
+```bash
+gh api repos/OWNER/REPO/contents/demo-pm/cron/jobs.json --jq '.content' | base64 -d > /tmp/remote_jobs.json
+python3 -c "import json;d=json.load(open('/tmp/remote_jobs.json'));print(d['updated_at'],[j['repeat'].get('completed') for j in d['jobs']])"
+```
+
+`characterize-diff-post-push.py` shares the same blind spot when it runs before the tick (`+A/-D`
+line counts are still trustworthy; the embedded counter VALUES are not). Cheap guard: the closing
+preflight already proves remote == local, so a remote-vs-local read of one scheduler file is the
+confirmation step, not extra work.
+
 **The flip can be lost even when the check sits in the SAME shell call as the script**
 (verified 2026-10-25). Sequence: switch → verify `push=true` → (same `terminal` call)
 `A=$(gh api user ...)` reads the owner → script starts → first blob POST 404. So

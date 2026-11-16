@@ -86,6 +86,7 @@ rsync -a --delete \
   --exclude '/health_*' \
   --exclude 'tmp_triage/' \
   --exclude '/tmp/' \
+  --exclude '/tmp_*/' \
   --exclude '/tmp_pm/' \
   --exclude '._*' \
   --exclude 'memory_backup_*.json' \

@@ -83,6 +83,14 @@ old = cur.execute("select count(*) from sessions where started_at < ?",
 (`auto_prune: false`, `retention_days: 90`) — **not** `config.json` (that file is the Hindsight config).
 With `auto_prune: false`, record the counts in ARCHIVE.md and do not prune.
 
+**Two `auto_prune` blocks exist in `config.yaml` — grep without context misreads the policy.** Verified
+2026-11-15 (demo-pm): a bare `grep -E 'auto_prune|retention_days'` returned four lines,
+`auto_prune: true` / `retention_days: 7` (a *snapshots* section, ~line 123) followed by
+`auto_prune: false` / `retention_days: 90` (the `sessions:` section, ~line 604). The first pair is NOT the
+session-retention policy; only the pair under the `sessions:` key governs `state.db`. Always grep with
+context (`grep -n -B4 -A3 'auto_prune\|retention_days'`) and quote the `sessions:` subsection in the ARCHIVE
+row — otherwise the run can mis-report "auto-prune on, 7 days" for a profile that in fact never prunes.
+
 ### Counting without execute_code
 
 In cron mode `execute_code` is refused unless the profile has `approvals.cron_mode: approve`
@@ -188,6 +196,8 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-13 | **105,411 / 4,300** (disambig **65,704 / 4,544** — new LOW on both fields; combined ~171 K, i.e. what a single pass used to cost; gate fired — 23rd consecutive — on the **「## 记忆健康度评估结论」 opening + 「### 一、过期事实（30 天以上）：以库内时间戳判断——无」 (negation after the keyword and inside the label) + 「库中最新一条记忆是 2026-06-17，之后没有任何新增，我无法从检索结果确认『今天』的实际日期」 unknown-today conditional + 「缺少 2026-06-17 之后的更新」 freshness-risk framing** shape; disambig returned 「无内容性过期事实」 and re-cast `Scheduler 缺 im:chat:readonly (99991672)` + `secret 10014 invalid (2026-06-16)` as 「待现场核验的状态快照，归档会丢掉唯一故障线索」; still kept z.ai GLM — **drift day 9**; no crash, no 504; consolidation `completed` at **+256 ms**, `deduplicated=false`, counter 103→104; healthy on **poll 2** (~10–20 s) with the stale-body trap on poll 1 for the fifth run running) |
 
 | 2026-11-14 | **154,472 / 6,766** (disambig 187,408 / 6,139; gate fired — 24th consecutive — on the **「## 记忆健康度评估结论」 opening + 「总体：良好但存在三类轻中度问题——0 项超期归档」 + 「### 1. 过期事实（>30 天）：**无**」 (negation after keyword) + date-relative-baseline conditional 「若当前实际日期已远晚于 2026-06-17，则上述所有配置类事实（端口/密钥/App ID）在现实中都已超 30 天」** shape; disambig returned 「无内容性过期事实」 with a 6-row table and kept z.ai GLM — **drift day 10**; it also sharpened the `secret 10014` finding into a reusable judgement: the item exists **only inside the source-document paragraph text, never extracted as a standalone fact** → there is literally no archivable object, and the bank holds no later repair record; no crash, no 504; consolidation `completed` at **+388 ms**, `deduplicated=false`, counter 104→105; poll1 AND poll2 both `000` with the stale body in `/tmp/h9178_p1.json` (stale-body trap 6th run), healthy on poll 3 (~20–30 s), `ps` showed the live `--daemon --idle-timeout 300 --port 9178` throughout) |
+
+| 2026-11-15 | **171,678 / 7,129** (disambig **120,333 / 4,848**; gate fired — 25th consecutive — on the **「## 记忆健康度评估结论」 opening + 「### 1. 过期事实（30天以上）——无」 heading (negation AFTER the keyword, outside the 12-char pre-window) + 「[注意] 前提提醒：若「当前日期」已晚于 2026-07-14 / 2026-07-17，则整批配置类事实（端口、App ID、chat_id、daemon 数量、LLM key）将全部越过 30 天线，需做一次全量复核」 date-conditional + a 4-item 「需要标注时效边界的事实」 list** shape; disambig returned 「无内容性过期事实」 with a 6-row category table (five AppIDs / ports / LLM key+endpoint / Issue rules+#9 / iron rules / Feishu mechanism) and again kept z.ai GLM — **drift day 11**; primary also raised 4 non-archivable suggestions worth quoting: ~30–40 % redundancy (「只发结果」×4, Issue #9 split into 7 atoms), `secret 10014` still unclosed, Scheduler `im:chat:readonly` as a conditional fact, and tester-01 first-person entries present in the demo-pm bank (profile-identity mix, 歧义 not 冲突); no crash, no 504; consolidation `completed` at **+83 ms**, `deduplicated=false`, counter 105→106; poll1 `000` with the stale body in `/tmp/h9178_p1.json` (stale-body trap 7th run), healthy on poll 2 (~20 s), `ps` showed the live `--daemon --idle-timeout 300 --port 9178`) |
 
 **A first pass CAN pass both gates.** 2026-10-23's primary opened with a per-category table whose
 first row read 「是否存在「30 天以上且已失效、必须归档」的过期事实 → **无**」 and said 「明确」 —

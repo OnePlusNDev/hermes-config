@@ -116,10 +116,11 @@ def should_exclude(rel_path: str) -> bool:
     if len(parts) == 1 and fname.startswith("health_"):
         return True
 
-    # Root-level tmp dirs (tmp/, tmp_pm/) hold PM-triage diagnostic scripts that
-    # read .env for GITHUB_TOKEN (discovered 2026-09-04). Scoped to root: a blanket
-    # "tmp" dir exclude would swallow legit nested dirs.
-    if parts[0] in ("tmp", "tmp_pm"):
+    # Root-level tmp dirs (tmp/, tmp_pm/, tmp_pmtriage_1116_0900/, tmp_triage/) hold
+    # PM-triage diagnostic scripts that read .env for GITHUB_TOKEN (discovered 2026-09-04;
+    # dated tmp_* variants 2026-11-16). Scoped to root: a blanket "tmp" dir exclude
+    # would swallow legit nested dirs.
+    if parts[0] == "tmp" or parts[0].startswith("tmp_"):
         return True
 
     # cron/output/ — everything under it
