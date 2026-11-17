@@ -118,6 +118,24 @@ is what forces the extra doc-only commit the template warns about.
 | 2026-11-15 | no | **first-try, 0 aborts** - pre-flight `gh api user` -> **`OnePlusNTester`** (`push=false`) -> guard form (switch + re-read login AND `permissions.push` in the SAME shell call) verified `OnePlusNDev` / `push=true`, **9th keyring flip in the record** (11-14 was the 8th, 11-13 the 7th) and the second guard immediately before the script read `OnePlusNDev` too, so the switch held through commit time. Remote **stable at `dc14c26aedd2`** from preflight through commit time (no sibling advance) -> 9 M / 2 A / 0 D, 11 blobs + subtree `3d23ff16441e` + top tree `f2660f34ec5c` in one clean pass, **no ref-PATCH 422 race**. First run to back up a run-note-generated script (`characterize-diff-post-push.py`) that then re-verified its own commit. No network flakiness; the `mkdtemp` payload fix held. |
 | 2026-11-16 | no | **first-try, 0 aborts** - pre-flight `gh api user` -> **`OnePlusNTester`** (`push=false`) -> guard form verified `OnePlusNDev` / `push=true`, **10th keyring flip in the record** (11-15 was the 9th); a **second** flip to `OnePlusNTester` landed before the pre-push guard (**11th**), which re-switched and ran the script **inside the same shell call** so the identity could not re-flip mid-run - no blob 404. **New exclude gap found and closed on the spot**: the first preflight read **9 M / 12 A**, the 12 `A` all under root-level `tmp_pmtriage_1116_0900/` (`fetch.sh` pulls `GITHUB_TOKEN` out of `.env` via the split-token `KEY="GITHUB_""TOKEN"` trick); the dir name matched no existing rule (`tmp_*` matched FILENAMES only; root scope listed `tmp`/`tmp_pm` only) so it is now excluded ROOT-SCOPED (`parts[0]=="tmp" or parts[0].startswith("tmp_")`) in all four scripts + rsync `'/tmp_*/'` + gitignore template + SKILL.md bullet, and the live `.gitignore` was synced in its own one-file commit `bf758a028a03` (the standalone script copies `.gitignore` from the base tree unchanged, so it cannot carry that edit). A sibling landed during the fix (first preflight `8cfada8692c3` -> re-run preflight and Step 2 both `d4cfb996feb4`, 311 blobs, stable through commit) -> **16 M / 0 A / 0 D**, 16 blobs + subtree `f2d5fd6baaa4` + top tree `644c55012a7b` in one clean pass, **no ref-PATCH 422 race**. Churn numbers read back from the uploaded blobs (probe said 6963/20:01, blob said 7011): task-polling 6963->**7011**, config-backup 146->**147**, memory-cleanup 146->**147**, MEMORY/USER header ->**2026-11-15**, ARCHIVE = 11-15 cleanup row (stale-body trap **7th consecutive**). 7 `M` = this run's exclude fix, 5 = carry-over doc edits. No network flakiness; the `mkdtemp` payload fix held. |
 
+**The backup script cannot carry a live-`.gitignore` edit — give it its own tiny commit** (verified
+2026-11-16, `bf758a028a03`). Step 5 copies every base-tree entry unchanged and only replaces the
+`demo-pm` entry, so a `.gitignore` you edited locally is never uploaded — the pushed tree still
+points at the OLD blob. Correct move when adding a new exclude class: push the backup, then a
+separate blob → tree(`base_tree`) → commit → ref for `.gitignore`, then the follow-up (its Step 2
+re-reads the base tree and copies the new file forward). It cannot disturb the closing `0/0/0`
+assertion, which only diffs `demo-pm/` paths. Full recipe + idempotency guard:
+`references/gitignore-sync-and-live-repo-edits.md` (that file also records the dated-root-`tmp_*`
+dir exclude gap found the same run).
+
+**A second keyring flip can land between the pre-flight guard and the pre-push guard — run the
+SWITCH and the SCRIPT in one shell call** (verified 2026-11-16: two flips in one run, the 10th and
+11th; the pre-push guard caught the second). For Method B this is stronger than the git-push
+one-liner: `unset GITHUB_TOKEN; [ "$(gh api user --jq .login)" != "$REPO_OWNER" ] && gh auth switch
+--user "$REPO_OWNER"; python3 -u .../gh-api-standalone-subtree-backup.py` — the script's own blob
+POSTs then inherit the identity you just verified, with no window to re-flip. Result that run:
+0 aborts, 0 blob 404s.
+
 **A pre-push probe reads PROBE-time state; the uploaded blob carries UPLOAD-time state**
 (verified 2026-11-15). `characterize-diff-vs-prev-head.py` ran before the push and showed
 `cron/jobs.json` task-polling `completed` 6915 -> 6962 with `updated_at` 20:00:50. The scheduler
