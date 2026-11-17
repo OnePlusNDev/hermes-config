@@ -1,7 +1,9 @@
 # demo-pm backup run — 2026-11-17
 
 ## Result
-**Method B (standalone subtree, no clone)** — **FIRST-TRY, 0 aborts (guard form; 12th keyring flip caught before any blob POST)**.
+**Method B (standalone subtree, no clone)** — **main commit FIRST-TRY, 0 aborts (guard form; 12th
+keyring flip caught before any blob POST); the follow-up commit needed one budgeted re-run for the
+422 race**, so this is not a zero-422 day.
 Main commit: `6c41bf38ee3e3254256824df2768cac5c881f070`
 URL: https://github.com/OnePlusNDev/hermes-config/commit/6c41bf38ee3e3254256824df2768cac5c881f070
 Diff: **7 M, 1 A, 0 D**.
@@ -74,9 +76,17 @@ matches the landed commit's file list exactly.
 - Token scan on upload candidates: **CLEAN - no full token patterns**
 
 ## Execution notes
-- Remote HEAD was `ca797b5e908b` at blob-phase start and at commit time → **no ref-PATCH 422 race**;
-  the ref PATCH succeeded on the first attempt. No sibling landed during this run (the sibling that
-  moved HEAD earlier was the 11-16 follow-up, already present at the first preflight).
+- Remote HEAD was `ca797b5e908b` at blob-phase start and at commit time → **no ref-PATCH 422 race on
+  the MAIN commit**; the ref PATCH succeeded on the first attempt. No sibling landed during the main
+  commit (the sibling that moved HEAD earlier was the 11-16 follow-up, already present at the first
+  preflight).
+- **The FOLLOW-UP commit hit the 422 race** — a sibling landed between its Step 2 and Step 7:
+  `43aa414a527e` "backup: demo-dev profile config (2026-11-17)", 12:03:51Z. It was absorbed by the
+  **one budgeted plain re-run** (attempt 2 clean, same 3 M / 1 A, subtree `f561c294b492`, commit
+  `3d0a4570d7ca`, ref PATCH first try). So today's run is *not* a zero-422 day: the main commit was
+  clean, the follow-up needed one retry. This correction commit exists because the run note, the
+  index bullet and the practice-notes row as first pushed said "no ref-PATCH 422 race" without that
+  qualifier — a recurrence log that under-counts is worse than an extra doc commit.
 - 8 blobs uploaded, subtree `8ea99dc09111a61d2af42fad50212ee3ea743414`, top tree
   `6fbecdd98e0a0f0d5e880d6668a100a187d1d76b`, commit + ref in one clean pass.
 - ⚠️ **`gh-api-standalone-subtree-backup.py` does not implement `--help`** — it ignores unknown
