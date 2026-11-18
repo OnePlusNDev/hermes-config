@@ -240,6 +240,31 @@ Recovery if it slipped: patch the blank-line+row pair back into `row| \n new row
 shot. This edit lands in the follow-up commit, so fixing it after the push costs a 3rd
 commit — get it right the first time.
 
+**⚠️ A Python-appended bullet is ONE physical line — a `patch` `old_string` containing a newline
+can never match it** (verified 2026-11-17). The helper writes one `BULLET` string, so an anchor
+transcribed from the helper's source or from a wrapped display fails with "Could not find a match".
+Anchor on a short fragment inside the line, keyed by the bullet's own filename:
+`` `references/demo-pm-backup-workflow-<YYYYMMDD>.md` -- Method B run, **FIRST-TRY, 0 aborts (no 422 race)**: ``.
+
+**⚠️ Never let a mid-sentence `old_string` shear off the clause that follows it** (verified
+2026-11-17). Replacing `**no ref-PATCH 422 race**. Churn re-read from the uploaded blobs:
+task-polling 7011->**7059**` with a sentence ending `...not a zero-422 day.` silently deleted the
+`Churn re-read … 7059` clause and left a stray `day., config-backup 147->**148**`. `patch` reported
+success and its hunk looked like a normal replacement. Rule: carry the **entire remaining clause in
+BOTH** strings, or anchor so the replacement ends at a natural boundary (`|`, a closing backtick, a
+full stop + capital, the row terminator ` |`) — then `grep -o '.\{0,60\}<new phrase>.\{0,90\}'` the
+joined sentence to confirm nothing was sheared.
+
+**⚠️ Write the `## Result` headline as a two-part claim from the start** (verified 2026-11-17). The
+`FIRST-TRY, 0 aborts (no 422 race)` claim lives in the note's Result line *and* the index bullet's
+opening clause — the body can honour "don't claim cleanliness before the follow-up lands" while the
+headline still asserts a clean day. The note ships *inside* the follow-up, so write
+`main commit FIRST-TRY, 0 aborts; the FOLLOW-UP needed one budgeted re-run for the 422 race` (or
+"follow-up also clean" once you have its `Done:` line). That day the follow-up hit the 422 (sibling
+`demo-dev` between its Step 2 and Step 7) after the headline had shipped with `(no 422 race)` — fixed
+with the documented small correction commit across the three doc files. Under-counting the 422
+recurrence log is worse than one extra commit.
+
 Verify the append landed exactly once — both checks must print `1`:
 
 ```bash
