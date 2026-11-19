@@ -265,6 +265,11 @@ headline still asserts a clean day. The note ships *inside* the follow-up, so wr
 with the documented small correction commit across the three doc files. Under-counting the 422
 recurrence log is worse than one extra commit.
 
+**Reusable writer:** `scripts/append-run-note-docs.py --date <YYYY-MM-DD> --bullet-file /tmp/bullet.txt
+--row-file /tmp/row.txt` appends the index bullet (collapsed to one physical line) and inserts the
+practice-notes table row after the last `| 20… |` row, idempotently, then prints `INDEX count=1` /
+`ROW count=1` — the same two checks described below, done for you.
+
 Verify the append landed exactly once — both checks must print `1`:
 
 ```bash

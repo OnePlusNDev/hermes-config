@@ -1,6 +1,6 @@
 # Tooling gotchas: script usage + patch anchoring
 
-Four traps that all cost time on 2026-11-17. None are environment failures — they are
+Six traps that all cost time on 2026-11-17 and 2026-11-18. None are environment failures — they are
 properties of the scripts and of the `patch` tool as used on this skill's own files.
 
 ## 1. The backup scripts implement no `--help`
@@ -101,3 +101,30 @@ its Step 2 and Step 7) and needed the one budgeted plain re-run. The note had al
   (3 doc files: run note Result + Execution notes, index bullet headline, practice-notes row).
   Under-counting the 422 recurrence log is worse than one extra commit — that log is what future
   runs use to judge whether the race is getting worse.
+
+## 6. Do not reconstruct the punctuation around a `latest:` pointer — anchor on an inner fragment
+
+The per-run SKILL.md edit is a one-token bump of the dated-run-notes pointer (line 98). 2026-11-18
+the first attempt used `old_string = "(latest: 2026-11-17; full per-run index"` and failed with
+"Could not find a match" — the real line is
+
+```
+Dated run notes: `references/demo-pm-backup-workflow-YYYYMMDD.md` (same-day repeat run → `YYYYMMDDb.md`; latest: 2026-11-17; full per-run index in `references/dated-runs-index.md`).
+```
+
+i.e. the `(` belongs to an **earlier clause** (`(same-day repeat run → …`), not to `latest:`. The
+reliable anchor is the inner fragment with no leading punctuation:
+`latest: 2026-11-17; full per-run index` → `latest: 2026-11-18; full per-run index`.
+
+Rules:
+- `grep -n "latest: 20" SKILL.md | cut -c1-260` FIRST, then copy the fragment verbatim out of that
+  output. Guessing the delimiter is the whole failure mode.
+- When `patch` fails this way, its "Did you mean one of these sections?" block shows unrelated
+  regions (emoji-comment code fences, etc.) carrying `❌`/`✅` example lines. That is noise: a
+  punctuation-damaged anchor yields no useful suggestion. Fix the anchor, don't chase the hints.
+- The bump is a **same-length swap** (two digits), so the at-cap file stays at exactly
+  `100901` bytes — verified 2026-11-18 (`wc -c` before and after identical). This is the one edit
+  that is always safe on SKILL.md; anything that changes line count or length is not.
+- Promote the follow-up with `scripts/append-run-note-docs.py` (idempotent bullet + table-row
+  writer that prints the `== 1` verification counts) instead of hand-writing an append script each
+  run — see its header for usage.

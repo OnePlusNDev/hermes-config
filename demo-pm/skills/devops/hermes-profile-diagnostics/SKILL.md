@@ -157,12 +157,17 @@ for _ in range(15):
 
 ## Memory Maintenance & Cleanup
 
-**Canonical cleanup-run order (re-verified 2026-11-16, 26 consecutive wording-gate triggers):**
+**Canonical cleanup-run order (re-verified 2026-11-18, 28 consecutive wording-gate triggers):**
 
 1. Pre-flight `mem_cleanup_client.py banks --url http://127.0.0.1:<port>` — confirms the profile bank
    is actually served by THIS daemon (sibling bypass is impossible when the global :8888 bank list
-   lacks it).
-2. `consolidate` → read the op's status (never infer success from the POST).
+   lacks it). **Both helper scripts live under THIS skill's `scripts/`, not `<profile>/scripts/`** —
+   `~/.hermes/profiles/<p>/skills/devops/hermes-profile-diagnostics/scripts/`. Searching the filesystem
+   for them just burns a 180 s terminal timeout; the profile `scripts/` dir normally holds only
+   `start_hindsight_daemon.sh`.
+2. `consolidate` → read the op's status (never infer success from the POST). One-call CLI form:
+   `hindsight -p <cli-profile> bank consolidate <bank> --wait --poll-interval 5` prints the op id and
+   `Consolidation completed (Ns)`; still fetch the op for `created_at` → `completed_at` before logging.
 3. Two-pass audit: `reflect_quality_check.py --url … --bank … --baseline 50000` (deepseek reads the
    whole bank; a 65 K–110 K primary is still a real read — judge by the wording gate, not by size).
 4. `hindsight mental-model list <bank>` / `directive list <bank>` — both empty means consolidation +
