@@ -295,3 +295,43 @@ gh api "repos/$OWNER/$REPO/commits?path=demo-pm/<file>&sha=<PRE_PUSH_HEAD>&per_p
 
 Otherwise skip it — the mtime-vs-previous-commit-timestamp route above costs one call
 instead of N.
+
+## Do not hand-roll the probe (2026-11-19)
+
+That run's note was characterized by a throwaway `/tmp` script (`parents[0]` → tree
+`?recursive=1` → per-file blob GET → `difflib.unified_diff(n=0)`), written because the
+SKILL.md pointer was skimmed past. It produced exactly what
+`scripts/characterize-diff-vs-prev-head.py --commit=<full main sha>` already produces, at the
+cost of a new script that had to be debugged mid-run (see the `gh api` argv trap in
+`tooling-gotchas-and-patch-anchoring.md` §8).
+
+**Run the probe first.** Hand-rolling is justified in only two cases: (a) the probe already died
+on transport flakiness and you need the remaining files, or (b) you need something it does not
+print — e.g. per-file `+N/-N` counts, which `unified_diff(..., n=0)` gives you (skip `+++`, `---`,
+`@@` lines when counting). If you do hand-roll, feed it the file list from the **preflight / tree
+diff**, never a list you typed: a typed list silently omits a file the moment the M set changes.
+
+Two mechanics worth reusing either way:
+- `gh api repos/O/R/git/blobs/<sha> --jq .content | base64 -d` returns the raw bytes with no JSON
+  envelope — no Python-side base64 needed, and it streams straight to a temp file for `diff`/difflib.
+- The correct baseline is `parents[0]` of the **main** commit, which equals the `Remote HEAD:` line
+  the backup script printed at Step 2 — so one `--commit=<full 40-char main sha>` reproduces the
+  whole exercise, siblings included.
+
+## Confirmed: `append-run-note-docs.py` in production (2026-11-19)
+
+First real use on the follow-up. Output shape to expect (exit 0):
+
+```
+INDEX: appended bullet
+ROW: inserted after line 121
+INDEX count=1
+ROW count=1
+OK
+```
+
+Order matters — the writer runs **before** the follow-up push (write dated note → write
+bullet/row `.txt` files → run the writer → bump SKILL.md `latest:` → push → closing preflight
+`0/0/0`). Running it after the push would leave an uncommitted index edit behind, which the next
+morning surfaces as a phantom `A`/`M` pair in the preflight.
+
