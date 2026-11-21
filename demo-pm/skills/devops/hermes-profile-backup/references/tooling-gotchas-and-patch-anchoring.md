@@ -1,6 +1,6 @@
 # Tooling gotchas: script usage + patch anchoring
 
-Eight traps that all cost time on 2026-11-17 through 2026-11-19. None are environment failures — they
+Nine traps that all cost time on 2026-11-17 through 2026-11-20. None are environment failures — they
 are properties of the scripts and of the `patch` tool as used on this skill's own files.
 
 ## 1. The backup scripts implement no `--help`
@@ -45,6 +45,15 @@ Rules:
   `ca797b5e908b`, preflight baseline was the follow-up commit, here is why they differ) rather
   than silently quoting one.
 - To make the probe correct, pass the SHA: `characterize-diff-vs-prev-head.py <PRE_PUSH_HEAD>`.
+- **Post-push variant:** once the main commit has landed, the right probe is
+  `scripts/characterize-diff-post-push.py <PREV_SHA>` — it derives the changed set from the PREV
+  tree vs the pushed tree and prints per-file `(+A/-D) old_lines new_lines`, which is exactly what
+  the run note's Diff block quotes. Verified 2026-11-20 on 7 M: `+10/-10, +1/-1, +1/-1, +14/-0,
+  +40/-0, +44/-2, +8/-2` with `prev blobs=318 new blobs=318 identical=292`.
+- **Self-consistency check before quoting:** `identical + changed == demo-pm blob count`
+  (2026-11-20: 292 + 7 = 299, matching the preflight's 299 local files). If it does not add up, the
+  SHA you passed is not the pre-push HEAD (a sibling advanced it, or you used the follow-up
+  commit) — fix the SHA instead of hand-reconciling the numbers.
 
 ## 3. A Python-appended index bullet is ONE physical line
 
@@ -169,4 +178,25 @@ gh api "repos/O/R/git/trees/<sha>?recursive=1"
 `json.loads`, which reads like a bad token or a missing repo — it is neither. An empty
 `gh api` body with exit 0 is almost always a mis-split argv, so check the argument list before
 suspecting auth or rate limits. Same rule for `?per_page=`/`?path=` combinations.
+
+## 9. Reading this skill's SKILL.md costs ~100 K chars if you read it whole — page it or grep it
+
+SKILL.md is **100,901 bytes / 1,295 lines** (at the cap; see `references/skill-md-at-cap.md`).
+Line 41 of SKILL.md already says "skip `skill_view` → `read_file` on-disk SKILL.md", but
+`read_file` without `offset` returns **500 lines per call**, so following that advice literally
+means **three sequential reads and ~100 K chars of context** — measured 2026-11-20, the single
+largest context cost of the run, and nothing in it was needed beyond four sections.
+
+Cheaper shapes, in order of preference:
+- **Grep first, read a window.** `search_files(pattern="^## ", path=<skill_dir>/SKILL.md)` gives the
+  section map; then `read_file(path, offset=<line>, limit=40)` for the section you need. A full
+  daily run needs only: §Pre-Backup Security Check, §Preflight diff + token scan, §Method Selection,
+  and `templates/run-note-template.md` (a separate 22 KB file, read it whole).
+- `grep -n "latest: 20" SKILL.md` for the pointer bump; `tail -c`/`sed -n` on the specific
+  references file for index/row edits. Neither needs SKILL.md in context.
+- Do **not** try `limit=2000` to get it in one call: the reader rejects reads over ~100 K chars, so
+  the whole-file read of this SKILL.md fails rather than returning.
+- Corollary for editing: any prose you are tempted to add here belongs in `references/` (this file,
+  the run-note index, or a new `references/<topic>.md`) — SKILL.md is byte-frozen at 100,901 and
+  only same-length swaps are safe.
 

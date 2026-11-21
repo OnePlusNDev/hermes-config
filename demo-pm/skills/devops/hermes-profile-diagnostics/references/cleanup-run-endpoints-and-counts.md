@@ -106,6 +106,10 @@ sqlite3 <profile>/state.db "select count(*) as total,
 
 2026-10-19: `5928|1482|4482` (total / >90 d / >30 d).
 
+2026-11-20: `7528|3082|6028` — the **>90 d count went UP** vs 2026-11-19's recorded `3032`, which is
+impossible for a table that only gains *newer* rows (import/rebuild suspected). Record the anomaly in the
+ARCHIVE row instead of silently quoting the delta; do not treat these counters as monotone.
+
 ### Appending the ARCHIVE.md row
 
 The row is a single very long Chinese line with backticks, quotes and slashes, so a shell
@@ -206,6 +210,9 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-18 | **344,932 / 11,993** (disambig 174,335 / 8,345; gate fired — **28th consecutive** — on a new shape: **「## 0. 审计范围与数据现状」 前置声明 + 「A 类：已过期 / 被更新事实取代」 表格 + 结论行「需要归档 / 删除的事实条数：**2 条**」**, i.e. the first primary that emits an explicit *numeric archive count* instead of the 「应归档」 phrasing — `claims_expired()` catches it only via the bare 「归档」 keyword, so treat any "N 条" verdict as gate-fired and pay the disambig; the 2 items were again the deepseek-scope record and `secret 10014`; disambig **explicitly retracted the previous pass** (「上一轮结论应整体撤回」) and returned 「无内容性过期事实，归档条数 0」，per-item reasoning: (a) violates the scope rule — `deepseek-v4-pro` (`DEEPSEEK_API_KEY` / `api.deepseek.com/v1`) is the Bot chat model while 06-17's z.ai GLM is `HINDSIGHT_API_LLM_API_KEY`, cross-scope never supersedes; (b) violates the status-snapshot rule — no repair record, archiving would destroy the only TODO lead, so the action is 现场复验; drift day 14 (z.ai GLM kept again); no crash, no 504; consolidation `completed` at **+522 ms**, `deduplicated=false`, counter 108→109; stale-body trap on poll 1 (9th run), healthy on poll 2 ~10–20 s) |
 
 | 2026-11-19 | **31,073 / 5,001** — **new primary low, and the FIRST run whose primary fell BELOW the 50 K baseline** (prior low 95,622 on 10-20; 11-13 was 105,411). The probe fired **both gates at once**: `[gate] tokens: 31073 < baseline 50000` → "facts likely not fed" AND `[gate] wording: AFFIRMATIVE`. Disambig **133,133 / 4,918** — it was a genuine full-bank read (per-item 06-14/06-16/06-17 timeline, 13 bilingual duplicate groups, 3 soft tensions), so **a sub-baseline primary is NOT proof the bank was empty** — pay the disambig, read the answer, never re-run on the number alone. Shape: table-cell negation 「| **过期事实（>30天）** | **无**。」 + 「### 1. 过期事实：0 条」 heading + the 06-14 batch date-conditional — 29th consecutive wording trigger. Disambig: 「无内容性过期事实」, 8-category table, plus two boundary items (`99991672` = conditional, mark not archive; 「只发结果」 ×3 = redundancy not expiry). Redundancy re-quantified **~50 %** (13 bilingual groups) vs the earlier 30–40 % estimate; drift day 15 (z.ai GLM kept); consolidation `completed` at **+161 ms**, `deduplicated=false`, counter 109→110; poll1 AND poll2 `000` with the stale body (10th consecutive trap), healthy on poll 3 (~30 s) |
+
+| 2026-11-20 | **170,607 / 7,876** (disambig **395,237 / 8,395**; gate fired — **30th consecutive** — on the plainest shape yet: opening line 「30 天以上过期事实：无。」 plus section heading 「## 一、过期事实（30 天以上）：无」 (negation outside the 12-char pre-window) plus the 06-17 date-conditional 「若实际当前日期已明显晚于 2026-06-17，则整库（含 06-17 配置快照）都会越过 30 天线」; disambig returned 「无内容性过期事实」/归档条数 0 with an 8-row per-category table, labelled `secret 10014`, `99991672` and the `--daemon --idle-timeout 86400` boot record as `as-of` boundary items, and re-stated the chat-model-vs-daemon-key scope split — **drift day 16**; no crash, no 504, both passes first-try; consolidation via `hindsight -p demo-pm bank consolidate … --wait` `completed` at **+446 ms** (the CLI prints no `deduplicated` field — do not invent one; judge no-op by `total_nodes`/`total_links` staying 48/1228), counter 110→111; daemon healthy on **poll 3** (~20–30 s, warm pg0) with fresh per-poll `/tmp/h9178_p<N>.json` paths) |
+
 
 **The disambig answer can explicitly retract the primary.** 2026-11-18's second pass opened with
 「这 2 条中，没有任何一条满足内容失效条件」 and closed with 「上一轮审计的『需归档/删除 2 条』结论应整体撤回」.
