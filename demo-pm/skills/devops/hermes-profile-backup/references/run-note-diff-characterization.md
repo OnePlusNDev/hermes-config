@@ -335,3 +335,36 @@ bullet/row `.txt` files → run the writer → bump SKILL.md `latest:` → push 
 `0/0/0`). Running it after the push would leave an uncommitted index edit behind, which the next
 morning surfaces as a phantom `A`/`M` pair in the preflight.
 
+## A `(+1/-1)` hunk whose two lines look IDENTICAL — the edit is past the 300-char clip (2026-11-21)
+
+`characterize-diff-post-push.py` clips each diff line at 300 chars. The long single-line bullets in
+`demo-pm-github-api/SKILL.md` (the account-drift paragraph is ~1 KB on one physical line) therefore
+print an `-`/`+` pair that, as displayed, is byte-identical — you see `(+1/-1)` and no visible change.
+Do **not** guess what changed, and do not re-run the probe (it will print the same clip).
+
+Fetch the old blob and diff only that line with `difflib.SequenceMatcher`; it prints just the edited
+span with ~60 chars of context on each side:
+
+```python
+import subprocess, base64, json, difflib
+p = "<local file>"
+local = open(p).read().split("\n")[LINE_NO - 1]
+sha = subprocess.check_output(["gh","api",
+      "repos/OnePlusNDev/hermes-config/contents/<repo path>?ref=<PREV_SHA>","--jq",".sha"]).decode().strip()
+blob = json.loads(subprocess.check_output(["gh","api",
+       "repos/OnePlusNDev/hermes-config/git/blobs/"+sha]))
+remote = base64.b64decode(blob["content"]).decode("utf-8").split("\n")[LINE_NO - 1]
+for tag,i1,i2,j1,j2 in difflib.SequenceMatcher(None, remote, local).get_opcodes():
+    if tag != "equal":
+        print(tag, repr(remote[max(0,i1-60):i2+60]), "->", repr(local[max(0,j1-60):j2+60]))
+```
+
+The `?ref=<PREV_SHA>` matters — a bare `contents/<path>` returns the blob you just pushed and reports
+every line equal. 2026-11-21 result: the hunk appended a new 2026-11-20 复核 clause to the drift
+bullet (which is exactly what the run note then described). Keeping this to one blob GET + one
+stdout line is cheaper than widening `--max-lines`, which only multiplies the clip.
+
+Corollary for the run note: when the visible hunk proves nothing, describe the file by the sentence
+you found with this probe ("+1/-1: appends the 2026-11-20 复核 note that the pre-check-and-switch is
+standing practice") rather than writing an unverified "text tweak".
+

@@ -168,7 +168,20 @@ of context spent to reach the same place that a single
 `read_file("~/.hermes/profiles/demo-pm/skills/devops/hermes-profile-backup/SKILL.md")` reaches
 directly. SKILL.md line 41 already says this; the failure mode is *skipping* it out of habit at
 session start. Daily-run rule: `read_file` the on-disk SKILL.md, and only fall back to the
-extraction recipe if some other tool has already produced the JSON dump.
+to the extraction recipe if some other tool has already produced the JSON dump.
+
+**Fourth occurrence, 2026-11-21 — the fix is a *starting order*, not a reminder.** That run opened
+with `skill_view('hermes-profile-backup')` out of habit and got a **109,380-char** truncated blob
+(`Full output could not be saved to sandbox`), then still had to `read_file` lines 1–200 of the
+on-disk SKILL.md for §Pre-Backup Security Check / §Method Selection. The warning that would have
+prevented it lives at line 41 of the file you can only page *after* paying for the dump — so
+"remember not to `skill_view`" cannot work. What works is ordering the run so no skill read is
+needed first: (1) `grep` `config.yaml` for `sk-` / non-empty `api_key` (task-mandated, no skill
+needed), (2) the auth guard, (3) `scripts/preflight-backup-scan.py` — its own header documents the
+workflow. Only then read SKILL.md sections by offset if something is unclear. The `linked_files`
+map is the one thing `skill_view` gives that a paged `read_file` does not; when you need the file
+list, use `search_files(target='files')` on the skill's own directory (a narrow, non-recursive
+glob — fine per the 2026-10-05 note) instead of paying 109 KB for it.
 
 **Third occurrence, 2026-11-12 — two refinements for the recovery path:**
 - In a **cron RUN turn `execute_code` is refused** (`BLOCKED: execute_code runs arbitrary local

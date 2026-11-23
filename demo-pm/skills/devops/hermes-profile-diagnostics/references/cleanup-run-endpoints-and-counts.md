@@ -12,6 +12,11 @@ findings here instead). Verified on demo-pm, 2026-10-18.
 | Consolidate | `POST /v1/default/banks/<bank>/consolidate`, body `{}` → `{"operation_id": "...", "deduplicated": false}` |
 | Operation status | `GET /v1/default/banks/<bank>/operations/<op_id>` → `status`, `operation_type`, `completed_at`, `error_message`, `retry_count` |
 
+**`GET /banks` is not a route.** It answers `{"detail":"Not Found"}` — the `/v1/default/` prefix is
+mandatory on every endpoint (`/v1/default/banks`, `/v1/default/banks/<bank>/stats`, …). Verified
+2026-11-21 on both `:8888` and `:9178`; cost one wasted pre-flight call when probing a sibling daemon,
+so always spell the full path when checking whether another daemon could serve this bank.
+
 ### Reflect request body (exact schema — 422 if you guess)
 
 ```jsonc
@@ -61,7 +66,8 @@ carries `_warning: "…/MEMORY.md was modified by sibling subagent '<uuid>' but 
 though the only writer is you — the read-tracking only counts `read_file`, not `terminal(cat …)`. Verified
 2026-11-11 on both MEMORY.md and USER.md. Do NOT re-read-and-re-patch on that warning: confirm the returned
 `diff` contains exactly the single header-date line (and that `diff <(tail -n +5 …) <(tail -n +5 archive/<snapshot>)`
-stays silent) and move on. The same warning appears on `patch` to this reference file after a `terminal`-only read.
+stays silent) and move on. The same warning appears on `patch` to this reference file after a `terminal`-only read **and** after a
+`skill_view` read (verified 2026-11-21).
 
 **Two consecutive `http_code=000` polls are not a failed start.** 2026-11-11: launcher → poll1 000, poll2 000,
 poll3 `200 {"status":"healthy"}` (~20–30 s, warm pg0), with `ps -Ao pid,etime,command | grep 'port 9178'` showing
@@ -212,6 +218,8 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-19 | **31,073 / 5,001** — **new primary low, and the FIRST run whose primary fell BELOW the 50 K baseline** (prior low 95,622 on 10-20; 11-13 was 105,411). The probe fired **both gates at once**: `[gate] tokens: 31073 < baseline 50000` → "facts likely not fed" AND `[gate] wording: AFFIRMATIVE`. Disambig **133,133 / 4,918** — it was a genuine full-bank read (per-item 06-14/06-16/06-17 timeline, 13 bilingual duplicate groups, 3 soft tensions), so **a sub-baseline primary is NOT proof the bank was empty** — pay the disambig, read the answer, never re-run on the number alone. Shape: table-cell negation 「| **过期事实（>30天）** | **无**。」 + 「### 1. 过期事实：0 条」 heading + the 06-14 batch date-conditional — 29th consecutive wording trigger. Disambig: 「无内容性过期事实」, 8-category table, plus two boundary items (`99991672` = conditional, mark not archive; 「只发结果」 ×3 = redundancy not expiry). Redundancy re-quantified **~50 %** (13 bilingual groups) vs the earlier 30–40 % estimate; drift day 15 (z.ai GLM kept); consolidation `completed` at **+161 ms**, `deduplicated=false`, counter 109→110; poll1 AND poll2 `000` with the stale body (10th consecutive trap), healthy on poll 3 (~30 s) |
 
 | 2026-11-20 | **170,607 / 7,876** (disambig **395,237 / 8,395**; gate fired — **30th consecutive** — on the plainest shape yet: opening line 「30 天以上过期事实：无。」 plus section heading 「## 一、过期事实（30 天以上）：无」 (negation outside the 12-char pre-window) plus the 06-17 date-conditional 「若实际当前日期已明显晚于 2026-06-17，则整库（含 06-17 配置快照）都会越过 30 天线」; disambig returned 「无内容性过期事实」/归档条数 0 with an 8-row per-category table, labelled `secret 10014`, `99991672` and the `--daemon --idle-timeout 86400` boot record as `as-of` boundary items, and re-stated the chat-model-vs-daemon-key scope split — **drift day 16**; no crash, no 504, both passes first-try; consolidation via `hindsight -p demo-pm bank consolidate … --wait` `completed` at **+446 ms** (the CLI prints no `deduplicated` field — do not invent one; judge no-op by `total_nodes`/`total_links` staying 48/1228), counter 110→111; daemon healthy on **poll 3** (~20–30 s, warm pg0) with fresh per-poll `/tmp/h9178_p<N>.json` paths) |
+
+| 2026-11-21 | **99,453 / 5,294** (disambig **351,465 / 5,934**; gate fired — **31st consecutive** — on the plainest table-cell shape again: 「| 30天以上过期事实 | **未发现**（库内时间跨度仅 2026-06-14 ~ 2026-06-17） |」 (negation after the keyword, outside the 12-char pre-window) + the 06-17 date-conditional + a closing 「建议动作：优先做重复合并」; disambig returned 「无内容性过期事实」/归档条数 0 with per-scope checks (AppID/端口/chat_id 稳定标识, z.ai GLM key, 策略类规则, 模型切换史), and re-cast `secret 10014` + Scheduler `99991672` as 「状态待办 / 条件性事实」 — **drift day 17**; no crash, no 504, both passes first-try; consolidation op `0c30126e…` `completed` at **+216 ms**, `deduplicated` not printed by the CLI (judge no-op by 48/1228 unchanged), counter 111→112; daemon healthy on **poll 1** (~10 s, warm pg0, no stale-body trap); flat files diff-silent → header-only bump; sessions `7578|3132|6076`, all three counters again ~+50 over the prior run — do not treat them as monotone) |
 
 
 **The disambig answer can explicitly retract the primary.** 2026-11-18's second pass opened with
