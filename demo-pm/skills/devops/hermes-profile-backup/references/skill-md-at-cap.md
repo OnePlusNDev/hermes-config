@@ -183,6 +183,22 @@ map is the one thing `skill_view` gives that a paged `read_file` does not; when 
 list, use `search_files(target='files')` on the skill's own directory (a narrow, non-recursive
 glob — fine per the 2026-10-05 note) instead of paying 109 KB for it.
 
+**Fifth occurrence, 2026-11-23 — the "starting order" rule only works if it is the literal first
+action, and the persisted dump is NOT a recovery path.** That run opened with
+`skill_view('hermes-profile-backup')` again, because the cron prompt's phrasing ("备份 Hermes 配置到
+GitHub") fires the skill-read reflex before any planning happens — the routine reads like a task
+that needs instructions, so step 1 becomes "load the skill". It is not: the task-mandated
+`grep` of `config.yaml` for `sk-` / non-empty `api_key` needs no skill text, the auth guard needs
+none, and `scripts/preflight-backup-scan.py` documents its own workflow in its header docstring.
+Start at the grep, stay inside the cap, and read SKILL.md sections by offset only if something is
+actually unclear.
+
+And do not count on the truncated dump either: it is persisted as **one single JSON line** with
+every newline escaped, so `read_file` on that path returns an unreadable mega-line, and
+`execute_code` (the tool that could `json.loads` it) is blocked in cron mode. There is no cheap
+recovery — which is the real cost of the reflex, not the 30 seconds of download.
+
+
 **Third occurrence, 2026-11-12 — two refinements for the recovery path:**
 - In a **cron RUN turn `execute_code` is refused** (`BLOCKED: execute_code runs arbitrary local
   Python … Cron jobs run without a user present to approve it`), so the extraction must go

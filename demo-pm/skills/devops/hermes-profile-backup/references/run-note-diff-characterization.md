@@ -368,3 +368,35 @@ Corollary for the run note: when the visible hunk proves nothing, describe the f
 you found with this probe ("+1/-1: appends the 2026-11-20 复核 note that the pre-check-and-switch is
 standing practice") rather than writing an unverified "text tweak".
 
+## A diff base older than yesterday's run note = a MISSED TICK, not a sibling (2026-11-23)
+
+`cron/jobs.json` is the only place the scheduler records whether last night's run actually ran.
+When the pre-push diff base is more than one day stale — the newest
+`references/demo-pm-backup-workflow-YYYYMMDD.md` is two days old, or the pre-push HEAD still
+carries state you already described in that older note — do NOT write the usual "a sibling landed
+between preflight and Step 2" story, and do NOT assume the previous backup pushed. Check the job
+records first:
+
+```bash
+gh api repos/OnePlusNDev/hermes-config/contents/demo-pm/cron/jobs.json --jq .content \
+  | base64 -d | grep -nE '"(next_run_at|last_run_at|last_status|last_error)"'
+```
+
+`last_status: "error"` + `last_error: "RuntimeError: Connection error."` against BOTH the
+config-backup and the memory-cleanup job, with no run note for that date and no new
+`memories/archive/ARCHIVE.md` section, is the signature of a missed tick — verified 2026-11-23:
+the 11-22 20:02 and 21:03 ticks both failed, and the 11-23 run had to catch up.
+
+Consequences to record in the note — none of them are failures of THIS run:
+- the `M` set carries N days of churn at once (task-polling `repeat.completed` +96 = two days at
+  48/day; config-backup / memory-cleanup counters +2 each). Write "two days at 48/day", not
+  "+96 since yesterday".
+- `MEMORY.md` / `USER.md` header dates move by N days, and `ARCHIVE.md` holds the section for the
+  last day that DID execute — not yesterday's.
+- put it in the Result headline: `main commit FIRST-TRY ... ; this run is the catch-up for the
+  failed <date> tick`, so tomorrow's reader does not hunt for a missing commit.
+- leave the scheduler diagnosis as an open item for the next run. It is scheduler outbound
+  connectivity, not the backup path: the same script pushed clean minutes later in the same hour,
+  which is exactly the evidence that separates "our push broke" from "the tick never fired".
+
+
