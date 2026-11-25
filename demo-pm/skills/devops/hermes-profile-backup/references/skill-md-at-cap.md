@@ -196,7 +196,19 @@ actually unclear.
 And do not count on the truncated dump either: it is persisted as **one single JSON line** with
 every newline escaped, so `read_file` on that path returns an unreadable mega-line, and
 `execute_code` (the tool that could `json.loads` it) is blocked in cron mode. There is no cheap
-recovery — which is the real cost of the reflex, not the 30 seconds of download.
+recovery, which is the real cost of the reflex, not the 30 seconds of download.
+
+**Addendum, 2026-11-24 — sixth occurrence, and the dump IS greppable (the "no cheap recovery"
+claim above overstates it).** The reflex fired again off the identical cron-prompt phrasing, burning
+~107 KB of context. But the persisted dump is only unreadable to `read_file`; plain `grep` still
+works on it, because escaping the newlines leaves all the text in place on the one physical line.
+One call — `grep -n "Method B\|scripts/\|preflight\|## " <dump-path> | head -80` — surfaced the
+method-selection, preflight and script-trio pointers this run needed, and `grep -o` can lift a
+specific passage. So the dump is a *slow* recovery that burns context, not a dead end.
+
+None of that is a licence to keep loading it: greppability is the reason the reflex is survivable,
+not the reason it is harmless. Start at the `config.yaml` grep; treat retrieving the dump as the
+recovery path after a mistake, never as the first step.
 
 
 **Third occurrence, 2026-11-12 — two refinements for the recovery path:**

@@ -23,7 +23,8 @@ curl -sS -u "OnePlusNPM:$TOK" -H "Accept: application/vnd.github+json" \
 然后 write_file 一个 `parse.py`：**把 fetch 输出的绝对路径写死成常量**，勿 `glob('/tmp/pm_issues_*.json')[-1]` 取尾——字典序会选中兄弟轮的 `pm_issues_x7.json`，静默读到别人的空结果误判「无待办」。fetch 脚本 `echo "SAVED=<path>"`，解析脚本写死该路径并用唯一文件名防覆盖。`COUNT:0` 不可信：先 `head -c 400` 验响应是真 `[ ]`，再跑无 `assignee` crosscheck 才回 `[SILENT]`。
 0 条 → 去掉 `assignee` 参数做全量 open crosscheck → 仍无 PM 名下 → 回 `[SILENT]`。
 
-**脚本：** `scripts/pm_fetch.sh`、`scripts/pm_parse.py`（用法见文件头）。
+**脚本：** `scripts/pm_fetch.sh`、`scripts/pm_parse.py`、`scripts/pm_gql_fallback.py`（REST 403 的 GraphQL 兜底枚举；用法见文件头）。
+**⚠️ core 配额耗尽 → 全 REST 403（2026-11-25）：** `pm_parse.py` 抛 `AttributeError` 且 `PM_query_len` 是错误 dict 键数（**不是** issue 数）时：查 `/rate_limit` 等 reset，期间跑上面的 GraphQL 脚本，两路一致才 `[SILENT]`。详见 `references/core-rate-limit-403-and-graphql-fallback.md`。
 
 **查询参数自检 + 空结果取证：** 见 `references/assignee-query-verification.md` — `GITHUB_` 前缀误取 token（404）、sed 改写旧脚本导致计数矛盾（5 vs 7）、issues 端点混入 PR、`[SILENT]` 前的四步取证清单。
 
@@ -43,7 +44,7 @@ echo "token_len=${#TOK}"   # 必须 = 40，否则 token 没取到
 
 **2026-09-12 基线：** PM 名下 0 条，4 个 open issue 全挂 `OnePlusNBoss` → `[SILENT]`。夹具会增删，勿把数量变化当异常。当时 RULES.md 为 **0 字节空文件**——**2026-10-24 已从 demo-tester 恢复（4537 B）**，详见 `references/2026-10-24-rules-md-was-empty-and-restored.md`；以后若再读到 0 字节，直接照该文件恢复，勿当正常稳态。
 
-**2026-09-11 复跑基线：** `full_triage.py` 的 urllib 路径**再次** TLS 握手超时（`_ssl.c:1015`），确认已失效。curl 回退（`grep '^GITHUB_TOKEN'` + `cut` 提 token，`token_len=40`，Basic Auth `-u "OnePlusNPM:$TOK"`，唯一文件名 `/tmp/pmx_*_20260911.*`）**HTTP=200**：mine=5 字节空数组、all=32690 字节。解析用纯解析脚本（零 token 纹理）一次通过。结果：PM 名下 0 条；全仓 5 个 open item（#2/#4/#5/#6/#7）全部在 `OnePlusNBoss` 名下，无游离 issue → `CROSSCHECK_RESULT: NO_PM_TASKS` → `[SILENT]`。附带：本轮 `~/.hermes/profiles/demo-pm/RULES.md` 为 **0 字节空文件**（非缺失），无额外铁律可依，按任务提示执行。
+**2026-09-11 复跑基线：** PM 名下 0 条；全仓 5 个 open item 全挂 `OnePlusNBoss` → `[SILENT]`。urllib 直连再次 TLS 超时，curl 回退（`grep '^GITHUB_TOKEN'` + `cut`，`token_len=40`，`-u "OnePlusNPM:$TOK"`）HTTP=200 稳定可用。
 
 **⚠️ 2026-09-11 再坑：解析脚本勿用 `glob('/tmp/pmx_*')`！** 本轮 fetch 用唯一 STAMP（`pmx_*_20260911_150106.json`），但解析脚本用 `glob` 取「最新」文件时捡到了**兄弟 cron 上一轮的旧文件**（`pmx_mine_a7f3.json` / `pmx_all_open_a1_20260910.json`），差点读到过期数据。修法：**解析脚本里硬编码本次 STAMP 文件名**（`f"/tmp/pmx_mine_{S}.json"`），不要靠 glob 排序猜「最新」。fetch 脚本末尾 `echo "STAMP=${B}"`，把该 STAMP 原样抄进 parse 脚本。
 

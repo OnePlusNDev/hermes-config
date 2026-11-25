@@ -55,6 +55,13 @@ def main():
         return 2
 
     mine = load(sys.argv[1])
+    if not isinstance(mine, list):
+        # 实测签名：core 配额耗尽时 /issues 返回对象而非数组，len() 是键数（如 3），
+        # 继续往下走会在 show() 里抛 AttributeError: 'str' object has no attribute 'get'。
+        print("FATAL: 响应不是数组，而是 %s：%s" % (type(mine).__name__, str(mine)[:300]))
+        print("→ 典型原因是 HTTP 403 API rate limit exceeded。"
+              "见 SKILL.md 2026-11-25 条目：查 /rate_limit，用 scripts/pm_gql_fallback.py 走 GraphQL 独立配额。")
+        return 1
     print("PM_query_len:", len(mine))
     show(mine, "MINE")
 

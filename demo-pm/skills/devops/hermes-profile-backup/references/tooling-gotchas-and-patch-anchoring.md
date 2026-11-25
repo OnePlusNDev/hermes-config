@@ -1,7 +1,8 @@
 # Tooling gotchas: script usage + patch anchoring
 
-Nine traps that all cost time on 2026-11-17 through 2026-11-20. None are environment failures — they
-are properties of the scripts and of the `patch` tool as used on this skill's own files.
+Thirteen traps that all cost time on 2026-11-17 through 2026-11-24. None are environment failures —
+they are properties of the scripts, of the `patch` tool as used on this skill's own files, and of the
+secret scanner / macOS shell as seen from cron mode.
 
 ## 1. The backup scripts implement no `--help`
 
@@ -199,4 +200,92 @@ Cheaper shapes, in order of preference:
 - Corollary for editing: any prose you are tempted to add here belongs in `references/` (this file,
   the run-note index, or a new `references/<topic>.md`) — SKILL.md is byte-frozen at 100,901 and
   only same-length swaps are safe.
+
+## 10. There is no `timeout` binary — use the terminal tool's `timeout=` parameter
+
+2026-11-24: `timeout 420 python3 gh-api-standalone-subtree-backup.py` returned
+`/bin/bash: line 2: timeout: command not found` **with exit code 0 and the script never running.**
+GNU coreutils is not installed on this host, so `timeout` (and `gtimeout`) do not exist.
+
+- Wrap long Steps 3–7 runs with the **terminal tool's own `timeout=` argument**, not a shell
+  wrapper: `terminal(command="REPO_OWNER=OnePlusNDev python3 gh-api-standalone-subtree-backup.py", timeout=480)`.
+- The failure is easy to misread as success, which is the actual trap: bash writes
+  `command not found` to the same stream as the script's stdout, so `… | tail -N` shows a clean
+  exit 0 and a short/empty tail. **Never treat "no error in the tail" as "the push landed"** —
+  confirm the `=== Step 2 … Step 7 ===` lines and the `Done:` line, or check remote HEAD.
+- Nothing is corrupted when this happens (the run had not started), so just re-issue without the
+  wrapper. Do not count it as an aborted attempt in the run note.
+
+## 11. The secret scanner rewrites `grep`/`echo` output around key-shaped words — count in Python
+
+Verified 2026-11-24. The task-mandated one-liner
+
+```bash
+grep -nE "api_key: *'[^']{1,}'" config.yaml || echo "NO_NONEMPTY_APIKEY"; echo "=== api_key lines total ==="
+```
+
+came back in the tool result as `NO_NONEMPTY_APIKEY=*** api_key lines total ===`. The scan was
+actually **clean** (no non-empty `api_key`), but the scanner replaced the punctuation and words
+following the key-shaped token with `***` before the output reached the transcript. A later reader
+can mistake that `***` for a redacted secret that was found.
+
+This is the inverse of the "grep display truncation hides full tokens" trap: there the display hid
+real content; here the scanner rewrites the *prose surrounding* a keyword.
+
+Fix — do the whole check in Python and print **only counts and line numbers, never values**:
+
+```python
+import re
+lines = open('config.yaml').read().splitlines()
+print('api_key lines:', sum(1 for l in lines if 'api_key' in l))
+print('NON-EMPTY:', [i for i, l in enumerate(lines, 1)
+                     if l.split('api_key', 1)[1].lstrip(': ').strip()
+                     not in ('', "''", '\"\"', 'auto', 'null', '~')])
+print('sk-:', [i for i, l in enumerate(lines, 1) if re.search(r'sk-[A-Za-z0-9_-]{20,}', l)])
+```
+
+Verified 2026-11-24 → `api_key lines: 15`, `NON-EMPTY: NONE`, `sk-: NONE`, quotable verbatim in the
+run note with no scanner interference and no secret ever entering the transcript. Use the broader
+`sk-[A-Za-z0-9_-]{20,}` character class (SKILL.md documents the narrower `[A-Za-z0-9]` form) —
+both read 0 in the steady state, and the broader one cannot miss an underscore-bearing key.
+
+Also grab the `.env` evidence the same way, **names only**:
+`grep -oE '^[A-Z_]+=' .env | tr -d '=' | tr '\n' ' '` → quote `GITHUB_TOKEN`, `DEEPSEEK_API_KEY`, …
+in the note, never the values.
+
+## 12. `completed` lives at `jobs[].repeat.completed` — read counters from the characterize diff
+
+2026-11-24: a flat lookup over the three jobs printed `completed= None` for **all** of them, which
+reads like a schema change. It is not — the counter is nested, as the diff hunk shows at
+`@@ -23 +23 @@ "completed": 7347`. A top-level `j.get('completed')` can therefore never find it.
+
+- Do **not** chase the "schema moved" theory. Read the counters out of
+  `scripts/characterize-diff-post-push.py <PREV_SHA>`, whose `cron/jobs.json` hunk prints the literal
+  `- "completed": 7347` / `+ "completed": 7395` pair plus `last_run_at`, `last_status`,
+  `last_error` and the top-level `updated_at` — all in one probe, no second `gh api` round trip.
+- That single probe is the authoritative source the template demands anyway ("re-read
+  scheduler-rewritten files from the REMOTE blob before quoting"), because it reads the pushed tree.
+- Same probe also shows a **recovered** scheduler at a glance: `last_status: error` /
+  `last_error: "RuntimeError: Connection error."` flipping to `ok` / `null` is how the run after an
+  outage closes the previous note's open item — say so explicitly in the Result section.
+
+## 13. The preflight's `blobs:` figure is whole-repo — the sanity check needs the `demo-pm/` count
+
+`scripts/preflight-backup-scan.py` prints `Local files (after excludes): 302` next to
+`Remote HEAD: <sha>  blobs: 321`. Those two numbers are **not** supposed to match: 321 is every
+blob in the repo (all sibling profiles), 302 is this profile's subtree.
+
+Verified 2026-11-24: `demo-pm` 302 · `demo-dev` 5 · `demo-tester` 8 · `tester-01` 5 · `.gitignore` 1.
+The documented equality is **local count == remote `demo-pm/`-filtered count**, so filter before
+comparing:
+
+```bash
+gh api "repos/$OWNER/$REPO/git/trees/main?recursive=1" --jq '.tree[] | select(.type=="blob") | .path' > /tmp/remote_paths.txt
+grep -c '^demo-pm/' /tmp/remote_paths.txt      # compare against local count
+awk -F/ '{print $1}' /tmp/remote_paths.txt | sort | uniq -c   # sibling integrity
+```
+
+Reading the printed 321 as "19 files missing locally" invites a false exclude-gap panic and a
+wasted `--exclude` hunt. The unfiltered total will always run ~19–25 high. (`grep -c` returns 0 and
+exits 1 when nothing matches, so add `|| true` when counting in a `set -e`-style script.)
 
