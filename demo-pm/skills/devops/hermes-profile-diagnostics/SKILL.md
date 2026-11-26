@@ -172,9 +172,11 @@ for _ in range(15):
    whole bank; a 65 K–110 K primary is still a real read — judge by the wording gate, not by size).
 4. `hindsight mental-model list <bank>` / `directive list <bank>` — both empty means consolidation +
    reflect IS the whole "advanced organization" job; do not invent extra steps.
-5. Flat-file 30-day re-check: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/MEMORY-*.snapshot.md)`
-   — if silent, bump only the header date and name the snapshot the body actually matches; never
-   write a duplicate snapshot.
+5. Flat-file 30-day re-check: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/<THE-SNAPSHOT>.snapshot.md)`
+   — **name the exact snapshot, never the `MEMORY-*.snapshot.md` glob**: with 4 snapshots on disk the glob
+   expands to several operands and `diff` errors with `extra operand` (process substitution only feeds the
+   first). Same for USER.md. If silent, bump only the header date and keep that snapshot; never write a
+   duplicate snapshot.
 6. `sqlite3 state.db` session counts (epoch float `started_at`); with `auto_prune: false`, record and
    do not prune.
 7. Append a single ARCHIVE.md row (`write_file` to `/tmp` then `cat >>`, never chain `rm`).

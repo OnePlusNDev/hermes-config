@@ -1,6 +1,6 @@
 # Tooling gotchas: script usage + patch anchoring
 
-Thirteen traps that all cost time on 2026-11-17 through 2026-11-24. None are environment failures —
+Fifteen traps that all cost time on 2026-11-17 through 2026-11-25. None are environment failures —
 they are properties of the scripts, of the `patch` tool as used on this skill's own files, and of the
 secret scanner / macOS shell as seen from cron mode.
 
@@ -288,4 +288,56 @@ awk -F/ '{print $1}' /tmp/remote_paths.txt | sort | uniq -c   # sibling integrit
 Reading the printed 321 as "19 files missing locally" invites a false exclude-gap panic and a
 wasted `--exclude` hunt. The unfiltered total will always run ~19–25 high. (`grep -c` returns 0 and
 exits 1 when nothing matches, so add `|| true` when counting in a `set -e`-style script.)
+
+## 14. Prove "no sibling landed" from the backup commit's PARENT — not from two HEAD readings
+
+The run note wants a defensible sentence about whether a sibling profile pushed between the
+preflight and the commit. Comparing two printed HEAD lines only tells you what each *read* saw; the
+commit object itself records the answer, because your commit's parent **is** the HEAD it was built
+on:
+
+```bash
+gh api repos/$OWNER/$REPO/git/commits/<MY_COMMIT_FULL_SHA> --jq '.parents[].sha'
+# equal to the SHA the preflight printed  ->  nothing landed in between
+```
+
+Verified 2026-11-25: preflight read `ae5e3e4b8dad` (322 blobs) and that SHA was the parent of the
+backup commit `1d03e1fb96ad`, so the note states *"remote stable at `ae5e3e4b8dad` — it is the parent
+of the backup commit → no sibling, no ref-PATCH 422 race"*. That is a first-hand proof, and it costs
+one call. When the parent differs, say so and name both SHAs (that is the real "sibling landed
+mid-prep" case).
+
+Two corollaries worth knowing before you alarm yourself:
+
+- **The previous commit's message can be yesterday's `backup: demo-pm <date>` follow-up, not its main
+  commit.** Both carry the same subject line, so a parent that looks like "yesterday's backup" while
+  the run note names a different main-commit SHA is **not** a lost commit — check that note's
+  `## Follow-up commit` section. Verified 2026-11-25: parent `ae5e3e4b8dad` was the 11-24 follow-up
+  (2026-11-24T12:05:32Z), whose main commit was `1f50ae58`; it exists, it was just superseded. The
+  run note records it explicitly so tomorrow's reader does not re-derive the panic.
+- **Second leg for the closing assertion.** `gh api repos/$OWNER/$REPO/git/refs/heads/main --jq
+  '.object.sha'` must equal the follow-up's printed `Commit:` — the `0/0/0` preflight proves the tree
+  matches, and the ref read proves the ref PATCH actually moved (the script's own `Done:` line prints
+  exit 0 even when a ref PATCH silently failed).
+
+## 15. `git/commits/<sha>` 404s on an abbreviated SHA — pass all 40 characters
+
+2026-11-25:
+
+```bash
+gh api repos/$OWNER/$REPO/git/commits/ae5e3e4b8dad
+# gh: Not Found (HTTP 404)   {"message":"Not Found","documentation_url":".../git/commits#get-a-commit-object"}
+gh api repos/$OWNER/$REPO/git/commits/ae5e3e4b8dad390cf56cbf90e444398a0cef9388   # ✅
+```
+
+The `git/commits/<sha>` **object** endpoint wants the full 40-char SHA; the 12-char form the preflight
+and backup log print is not enough there. `repos/O/R/commits/<sha>` (the non-`git` path) and the
+skill's scripts do accept short SHAs, so the 404 is specific to the object endpoint.
+
+- **Do not read this 404 as "the push was lost" or "the remote tree no longer has that commit."**
+  It is a path-shape problem. Re-issue with the full SHA, or resolve it once with
+  `gh api repos/$OWNER/$REPO/git/refs/heads/main --jq '.object.sha'` and use that value.
+- Same rule for `git/blobs/<sha>` and `git/trees/<sha>` if you ever hand-build a request: full SHAs
+  only.
+
 

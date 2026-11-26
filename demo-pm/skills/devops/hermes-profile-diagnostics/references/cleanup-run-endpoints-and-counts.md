@@ -51,9 +51,10 @@ POST /v1/default/banks/<bank>/reflect
 
 ## Flat-file (MEMORY.md / USER.md) 30-day re-check — header wording
 
-Daily shape when nothing changed: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/MEMORY-*.snapshot.md)`
-prints nothing → only bump the header date (`> 最后更新: YYYY-MM-DD`) and keep the existing snapshot; do NOT
-generate a duplicate snapshot of identical content.
+Daily shape when nothing changed: `diff <(tail -n +5 MEMORY.md) <(tail -n +5 archive/MEMORY-<YYYYMMDD>.snapshot.md)`
+— pass the **one** snapshot the body matches, never the `MEMORY-*.snapshot.md` glob (4 snapshots on disk →
+multiple operands → `diff: extra operand`, and process substitution silently feeds only the first). Prints nothing → only bump the header date (`> 最后更新: YYYY-MM-DD`) and keep the existing snapshot; do NOT
+generate a duplicate snapshot of identical content. Same rule for `USER-<YYYYMMDD>.snapshot.md`.
 
 **Pitfall (2026-10-31): the header's "正文与 <date> 一致" must name the snapshot the body actually matches,
 not yesterday's run date.** MEMORY.md's body matches its 2026-10-29 snapshot while USER.md's has matched the
@@ -224,6 +225,8 @@ a `mid`/`low` budget is the only lever. Practical cost: each timed-out attempt b
 | 2026-11-23 | **227,610 / 9,895** (disambig **102,787 / 5,068**; gate fired — **32nd consecutive** — on the **「## 记忆健康度评估结论」 opening + 「### 1. 过期事实（>30 天）：无 —— 但时间基准需注意」 heading (negation after the keyword) + 3-day span table + the 06-17 date-conditional + the `event_date 2026-06-14` vs `mentioned_at` metadata-mismatch caveat**; disambig returned 「无内容性过期事实」/归档条数 0 and explicitly retracted the creation-age premise (「上一轮审计把创建时间早当作过期依据是不成立的」), keeping `secret 10014` as 「未闭环待办」 — **drift day 18**; no crash, no 504, both passes first-try; consolidation op `8cf12f77…` `completed` at **+270 ms**, counter 112→113; stale-body trap on poll 1 (11th run) then healthy on poll 2 (~10–20 s, `--idle-timeout 300`); flat files diff-silent → header-only bump; sessions `7678|3232|6178`) |
 
 | 2026-11-24 | **158,702 / 6,483** (disambig **167,942 / 6,379**; gate fired — **33rd consecutive** — on the **「## 一、过期 / 应归档或需复核的事实」 section heading + 「若今天已 ≥ 2026-07-17 → 则全部事实（06-14 与 06-17 两批）都超过 30 天」 date-conditional + a P2 「归档 7 条碎片」 recommendation** shape; disambig returned 「无内容性过期事实」/归档条数 0, and for the first time phrased the scope split as 「06-17 讲的是 daemon 的 `HINDSIGHT_API_LLM_API_KEY`，06-14 讲的是 tester-01 的对话主模型」 → **并存有效，非冲突**; it also added a useful non-archivable argument for `secret 10014`: 「06-17 的『四 daemon 均成功启动』只能证明 LLM key 有效，不能反推飞书 app secret 已修复（两者不是同一凭据）」 — **drift day 19**; no crash, no 504, both passes first-try; consolidation op `ca2f932a…` `completed` at **+351 ms**, `deduplicated=false`, counter 113→114; stale-body trap on poll 1 (12th run) then healthy on poll 2 (~10–20 s, `--idle-timeout 300`); flat files diff-silent → header-only bump; sessions `7728|3282|6228` — all three again **exactly +50** over 11-23, same non-monotone shape as 11-21) |
+
+| 2026-11-25 | **113,455 / 5,115** (disambig **321,798 / 7,510**; gate fired — **34th consecutive** — on the **「## 结论速览」 table whose first row reads 「30 天以上过期事实 | **无**（无需归档）」 + section heading 「## 一、过期事实（30 天以上）：没有」 + 「若实际当前日期已远超 2026-06-17，则配置快照类事实将整体到期」 date-conditional** shape; disambig returned 「无内容性过期事实」/归档条数 0 and introduced a sharper redundancy diagnosis: the duplication is **双层存储** (each raw fact mirrored 1:1 by a derived observation — chat_id / ports / OpenID / daemon params), plus Issue #9 as 7 atomic facts + 1 summary and 「只发结果」 ×3–4, i.e. merge, never age-archive; it also split the tensions into one *resolved* (open_id targeting superseded by 06-17 「@all 更可靠」 → annotate the mapping table 「仅供参考」) and one *undecidable* (Home-DM vs group-reply carrier split) — **drift day 20**; no crash, no 504, both passes first-try; consolidation op `2e27594a…` `completed` at **+97 ms**, `deduplicated` not printed by the CLI (48/1228 unchanged), counter 114→115; poll1/poll2 `000` with the stale body (13th trap), healthy on poll 3 (~20–30 s, `--idle-timeout 300`); flat files diff-silent → header-only bump; sessions `7778|3332|6278` — again **exactly +50** on all three, third run in a row) |
 
 
 **The disambig answer can explicitly retract the primary.** 2026-11-18's second pass opened with
