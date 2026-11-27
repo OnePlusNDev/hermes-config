@@ -210,6 +210,34 @@ None of that is a licence to keep loading it: greppability is the reason the ref
 not the reason it is harmless. Start at the `config.yaml` grep; treat retrieving the dump as the
 recovery path after a mistake, never as the first step.
 
+**Seventh occurrence, 2026-11-26 — cheapest recovery is a one-call heredoc, not `python3 -c`.**
+The reflex fired again at session start (108 KB dump under `/var/folders/...`, and `read_file` on it
+returned `total_lines: 0, file_size: 110461` — the documented single-line envelope). Recovery that
+worked first try in ONE `terminal` call:
+
+```bash
+python3 - <<'EOF'
+import json
+d = json.load(open("<dump path printed by the tool result>"))
+open("/tmp/skill_backup.md","w").write(d["content"])
+print(len(d["content"]), list(d.get("linked_files",{})))
+EOF
+```
+
+then page `/tmp/skill_backup.md` with `read_file(offset, limit)`. The heredoc sidesteps the
+nested-quote escaping that makes the `python3 -c "json.load(...)['content']"` one-liner easy to
+mangle, and printing `linked_files` keys restores the map `skill_view` would have handed back.
+Total recovery cost: 2 calls. Reflex cost: ~110 KB of context.
+
+Because the warning lives *inside* the file you can only read after paying that cost, the durable
+fix has to be a channel that is read *before* the reflex. Profile memory is the best one when
+enabled: a single line like "config-backup cron: read `hermes-profile-backup/SKILL.md` from disk,
+never `skill_view`" is injected every turn. When memory is unavailable, the only pre-reflex text
+is the cron prompt and roughly line 41 of SKILL.md — which is why that line has to stay short and
+imperative ("Daily run: skip `skill_view` … → `read_file` on-disk SKILL.md") rather than growing
+into a paragraph. Recurrence notes in THIS file do not prevent occurrence eight; they only document
+it.
+
 
 **Third occurrence, 2026-11-12 — two refinements for the recovery path:**
 - In a **cron RUN turn `execute_code` is refused** (`BLOCKED: execute_code runs arbitrary local

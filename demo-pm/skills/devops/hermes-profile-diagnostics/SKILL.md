@@ -192,6 +192,11 @@ below. For routine memory cleanup (archiving old memories, triggering consolidat
 `consolidate` / `op <id>` / `wait-op <id>`, urllib only, `--url` + `--bank` flags). Run it with the hermes
 venv python; replaces hand-writing a `/tmp` client each run and dodges both the `execute_code` cron block
 and the `curl | python3` tirith rule. Verified 2026-11-06 (demo-pm).
+**The `op` / `wait-op` positional `<op_id>` must come BEFORE the flags** — `… op <uuid> --url … --bank …`.
+Putting it last fails with argparse `error: unrecognized arguments: <uuid>` (exit 2), which is easy to
+misread as a bad op id. Verified 2026-11-26 (demo-pm). Reading the op after `hindsight -p <p> bank
+consolidate … --wait` is still required — the CLI prints the op id but no `deduplicated` field, and the
+`completed_at - created_at` delta is what goes in the ARCHIVE row.
 
 → `scripts/reflect_quality_check.py` — re-runnable two-pass reflect probe. Applies **two independent gates** and auto-runs the disambiguation reflect if either fails: (a) **wording** — does the answer affirmatively claim expired/archivable facts? (b) **tokens** — `usage.input_tokens` vs a MODEL-SPECIFIC baseline. Baselines: glm-4-flash full-context ≈ 6.8–7.0K, question-echo ≈ 2.2K; **deepseek-v4-flash reads the WHOLE bank — observed 112K–273K on the same 48-fact bank**, so pass `--baseline 50000` (or higher) for deepseek. The token gate alone is NOT sufficient: a *high-token, fully itemized* analysis can still carry the **creation-age false positive** (flags long-lived config as "expired" purely because its creation timestamp is 2026-06/07 — observed 2026-10-01 at 203K tokens). The wording gate catches that shape. Run it with the hermes venv python (`hindsight_client` is not in system python). **Never act on a bare-affirmation reflect conclusion, and never `[SILENT]`-prune based on one.** **A clean wording gate is not permission to skip the disambiguation pass:** if the answer still recommends archiving anything (「应归档」/「应优先归档」/「建议归档」/「旧的故障快照归档」), pay the second pass. 2026-11-03 was the first primary in 14 runs to pass both gates, yet it carried exactly such a recommendation — `claims_expired()` only knew `需归档/需要归档`, so `应优先归档` slipped through. Keywords were extended; over-triggering remains preferred over a missed affirmative.
 

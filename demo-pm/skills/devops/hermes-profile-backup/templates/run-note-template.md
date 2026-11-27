@@ -128,6 +128,12 @@ identical at each (verified 2026-10-29: preflight `7e20cda6357c` → Step 2 `cc0
 - Temp/diagnostic script check (`.tmp_*`, `tmp_triage/`, `pm_health*`, `gh_health*`,
   `healthcheck_*`, `get_token`, `__pycache__`) → **NONE**
 - `scripts/post-push-verify.py` → **ALL CHECKS PASS** on the first execution.
+- **Re-run `scripts/post-push-verify.py` once more AFTER the follow-up lands** (verified 2026-11-26).
+  The closing `0/0/0` preflight proves tree equality only; the second verify re-checks the sibling
+  dirs, the remote `config.yaml` key scan and the leak patterns at the FINAL HEAD, and prints the
+  `demo-pm blobs == local N` figure you quote in the delivery report. That N is one higher than the
+  main-commit count because the run note itself is now a tracked file (11-26: 306 → 307). Two calls,
+  and the number in the report stops being a stale main-commit figure.
 
 ## Follow-up commit (this session)
 Run note + index bullet + SKILL.md `latest:` pointer `<prev>` → `<today>` +
