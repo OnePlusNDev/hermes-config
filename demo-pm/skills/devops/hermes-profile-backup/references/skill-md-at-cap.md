@@ -210,6 +210,29 @@ None of that is a licence to keep loading it: greppability is the reason the ref
 not the reason it is harmless. Start at the `config.yaml` grep; treat retrieving the dump as the
 recovery path after a mistake, never as the first step.
 
+**Eighth occurrence, 2026-11-27 — BOTH start-of-session reflexes fail; go straight to disk.**
+`skill_view('hermes-profile-backup')` was paid again (~110 KB; dump path under `/var/folders/…`),
+and `read_file` on that dump is useless — it reports `total_lines: 0` because the whole payload is
+**one JSON line**. The next reflex, `execute_code` to unwrap it, is refused outright in cron mode:
+
+```
+BLOCKED: execute_code runs arbitrary local Python (including subprocess calls that bypass
+shell-string approval checks). Cron jobs run without a user present to approve it.
+```
+
+So in cron there is **no** in-process recovery path for the dump — the heredoc recipe above only
+works through `terminal("python3 - <<'EOF' …")`, never `execute_code`. Cheapest path, worked first
+try: locate the skill on disk, then page it —
+
+```bash
+ls -d ~/.hermes/profiles/<profile>/skills/devops/<skill>   # profile-local, NOT ~/.hermes/skills/
+# then read_file(<that dir>/SKILL.md, offset, limit)
+```
+
+Two calls, zero dump. Note the structural catch: the dump is only reachable *via* `skill_view`,
+which is the thing to avoid, so another occurrence note here cannot prevent occurrence nine —
+only the line-41 pointer in SKILL.md can (it now also names `execute_code`).
+
 **Seventh occurrence, 2026-11-26 — cheapest recovery is a one-call heredoc, not `python3 -c`.**
 The reflex fired again at session start (108 KB dump under `/var/folders/...`, and `read_file` on it
 returned `total_lines: 0, file_size: 110461` — the documented single-line envelope). Recovery that
